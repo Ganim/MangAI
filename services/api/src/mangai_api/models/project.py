@@ -13,6 +13,7 @@ from mangai_api.i18n import (
     normalize_project_target_language,
 )
 from mangai_api.models.common import APIModel
+from mangai_api.models.job import JobRecord
 from mangai_api.models.region import RegionRecord
 
 
@@ -129,6 +130,7 @@ class StoredProjectState(APIModel):
     pages: tuple[ProjectPage, ...] = ()
     assets: tuple[StoredProjectAsset, ...] = ()
     regions: tuple[RegionRecord, ...] = ()
+    jobs: tuple[JobRecord, ...] = ()
 
 
 class PageUploadDraft(ProjectPage):

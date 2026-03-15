@@ -294,6 +294,47 @@ def test_page_regions_can_be_created_listed_and_updated(client: TestClient) -> N
     assert updated_region["shape"]["points"][1]["x"] == 162
 
 
+def test_page_jobs_can_be_queued_and_listed(client: TestClient) -> None:
+    project_id = create_project(client)
+    page_payload = upload_single_page(client, project_id)
+    page_id = page_payload["id"]
+
+    create_response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/jobs",
+        json={"type": "detect_regions"},
+    )
+
+    assert create_response.status_code == 201
+    job = create_response.json()["job"]
+    assert job["type"] == "detect_regions"
+    assert job["status"] == "queued"
+    assert job["page_id"] == page_id
+    assert job["payload"]["job_id"] == job["id"]
+    assert job["payload"]["page_id"] == page_id
+    assert job["result"] is None
+
+    list_response = client.get(f"/api/v1/projects/{project_id}/pages/{page_id}/jobs")
+    assert list_response.status_code == 200
+    jobs = list_response.json()["jobs"]
+    assert len(jobs) == 1
+    assert jobs[0]["id"] == job["id"]
+
+
+def test_page_jobs_reject_unsupported_job_type(client: TestClient) -> None:
+    project_id = create_project(client)
+    page_payload = upload_single_page(client, project_id)
+    page_id = page_payload["id"]
+
+    response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/jobs",
+        json={"type": "generate_translation"},
+    )
+
+    assert response.status_code == 422
+    payload = response.json()
+    assert payload["error_code"] == "INVALID_REQUEST"
+
+
 def test_update_page_region_returns_not_found_for_unknown_region(client: TestClient) -> None:
     project_id = create_project(client)
     page_payload = upload_single_page(client, project_id)
@@ -345,6 +386,12 @@ def test_project_data_persists_across_app_restarts(
     )
     assert region_response.status_code == 201
 
+    job_response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/jobs",
+        json={"type": "detect_regions"},
+    )
+    assert job_response.status_code == 201
+
     monkeypatch.setenv("MANGAI_DATA_DIR", str(api_data_dir))
     clear_settings_cache()
     with TestClient(create_app()) as restarted_client:
@@ -361,3 +408,9 @@ def test_project_data_persists_across_app_restarts(
         )
         assert regions_response.status_code == 200
         assert len(regions_response.json()["regions"]) == 1
+
+        jobs_response = restarted_client.get(
+            f"/api/v1/projects/{project_id}/pages/{page_id}/jobs"
+        )
+        assert jobs_response.status_code == 200
+        assert len(jobs_response.json()["jobs"]) == 1

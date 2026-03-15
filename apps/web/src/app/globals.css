@@ -547,6 +547,11 @@ button:hover {
   gap: 12px;
 }
 
+.editor-job-list {
+  display: grid;
+  gap: 12px;
+}
+
 .editor-region-card {
   display: grid;
   gap: 10px;
@@ -618,6 +623,46 @@ button:hover {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.editor-job-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(78, 49, 25, 0.1);
+  background: var(--panel-strong);
+}
+
+.editor-job-state-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.editor-job-state-pill-queued {
+  background: rgba(165, 111, 31, 0.14);
+  color: #7a5514;
+}
+
+.editor-job-state-pill-running {
+  background: rgba(49, 85, 152, 0.14);
+  color: #204b8d;
+}
+
+.editor-job-state-pill-succeeded {
+  background: rgba(20, 90, 50, 0.14);
+  color: var(--success);
+}
+
+.editor-job-state-pill-failed,
+.editor-job-state-pill-canceled {
+  background: rgba(113, 42, 42, 0.14);
+  color: #7a2d2d;
 }
 
 .editor-region-overlay {

@@ -1,9 +1,10 @@
 # Workers Service
 
-This service will run asynchronous jobs for:
+This service runs asynchronous MangAI jobs.
 
-- detection
-- cleanup
-- OCR
-- translation
-- export
+Current bootstrap:
+
+- worker settings and CLI entrypoint
+- deterministic `detect_regions` stub runner
+- handler registry and dispatch function
+- automated tests for config and job execution

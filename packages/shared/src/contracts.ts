@@ -1,6 +1,7 @@
 import {
   AssignmentOrigin,
   ExportFormat,
+  JobType,
   RegionState,
   RegionType,
   TextDirection,
@@ -27,7 +28,7 @@ import {
   readNullable,
   readUuid,
 } from "./validate.ts";
-import { parseBoundingBox, parseRegion, parseTextStyle } from "./entities.ts";
+import { parseBoundingBox, parseJob, parseRegion, parseTextStyle } from "./entities.ts";
 
 export function parseCreateProjectRequest(value: unknown, path: Array<string | number> = []) {
   const objectValue = readObject<Record<string, unknown>>(value, path);
@@ -242,6 +243,31 @@ export function parsePageRegionResponse(value: unknown, path: Array<string | num
   const objectValue = readObject<Record<string, unknown>>(value, path);
   return {
     region: parseRegion(objectValue.region, atPath(path, "region")),
+  };
+}
+
+export function parseCreatePageJobRequest(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    type: readEnum(objectValue.type, JobType, atPath(path, "type")),
+  };
+}
+
+export function parseListPageJobsResponse(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    jobs: readArray(
+      objectValue.jobs,
+      atPath(path, "jobs"),
+      (item, itemPath) => parseJob(item, itemPath),
+    ),
+  };
+}
+
+export function parsePageJobResponse(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    job: parseJob(objectValue.job, atPath(path, "job")),
   };
 }
 

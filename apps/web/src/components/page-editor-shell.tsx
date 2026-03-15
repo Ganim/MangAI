@@ -7,7 +7,9 @@ import type { AppMessages } from "../i18n/index.ts";
 import type { SupportedUiLocale } from "../i18n/config.ts";
 import {
   ApiClientError,
+  createPageJob,
   createPageRegion,
+  getPageJobs,
   getPageRegions,
   getProjectDetail,
   resolveApiAssetUrl,
@@ -37,6 +39,8 @@ type ProjectDetail = Awaited<ReturnType<typeof getProjectDetail>>;
 type ProjectPage = ProjectDetail["pages"][number];
 type PageRegionsResponse = Awaited<ReturnType<typeof getPageRegions>>;
 type PageRegion = PageRegionsResponse["regions"][number];
+type PageJobsResponse = Awaited<ReturnType<typeof getPageJobs>>;
+type PageJob = PageJobsResponse["jobs"][number];
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiClientError) {
@@ -66,13 +70,18 @@ export function PageEditorShell({
 }: PageEditorShellProps) {
   const [projectDetail, setProjectDetail] = useState<ProjectDetail | null>(null);
   const [regions, setRegions] = useState<PageRegion[]>([]);
+  const [jobs, setJobs] = useState<PageJob[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRegionsLoading, setIsRegionsLoading] = useState(false);
   const [isCreatingRegion, setIsCreatingRegion] = useState(false);
+  const [isJobsLoading, setIsJobsLoading] = useState(false);
+  const [isQueueingDetection, setIsQueueingDetection] = useState(false);
   const [updatingRegionId, setUpdatingRegionId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [regionLoadError, setRegionLoadError] = useState<string | null>(null);
   const [regionActionError, setRegionActionError] = useState<string | null>(null);
+  const [jobLoadError, setJobLoadError] = useState<string | null>(null);
+  const [jobActionError, setJobActionError] = useState<string | null>(null);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [showRegions, setShowRegions] = useState(true);
 
@@ -112,6 +121,7 @@ export function PageEditorShell({
   useEffect(() => {
     if (currentPage === null) {
       setRegions([]);
+      setJobs([]);
       setSelectedRegionId(null);
       return;
     }
@@ -150,6 +160,42 @@ export function PageEditorShell({
       canceled = true;
     };
   }, [currentPage, messages.editor.regionLoadErrorFallback, projectId]);
+
+  useEffect(() => {
+    if (currentPage === null) {
+      setJobs([]);
+      return;
+    }
+
+    const nextPage = currentPage;
+    let canceled = false;
+
+    async function loadJobs() {
+      setIsJobsLoading(true);
+      setJobLoadError(null);
+      try {
+        const response = await getPageJobs(projectId, nextPage.id);
+        if (canceled) {
+          return;
+        }
+        setJobs(response.jobs);
+      } catch (error) {
+        if (canceled) {
+          return;
+        }
+        setJobLoadError(getErrorMessage(error, messages.editor.jobLoadErrorFallback));
+      } finally {
+        if (!canceled) {
+          setIsJobsLoading(false);
+        }
+      }
+    }
+
+    void loadJobs();
+    return () => {
+      canceled = true;
+    };
+  }, [currentPage, messages.editor.jobLoadErrorFallback, projectId]);
 
   const selectedRegion =
     regions.find((candidate) => candidate.id === selectedRegionId) ?? null;
@@ -205,6 +251,26 @@ export function PageEditorShell({
       setRegionActionError(getErrorMessage(error, messages.editor.regionUpdateErrorFallback));
     } finally {
       setUpdatingRegionId(null);
+    }
+  }
+
+  async function handleQueueRegionDetection() {
+    if (currentPage === null) {
+      return;
+    }
+
+    setIsQueueingDetection(true);
+    setJobActionError(null);
+
+    try {
+      const response = await createPageJob(projectId, currentPage.id, {
+        type: "detect_regions",
+      });
+      setJobs((currentJobs) => [response.job, ...currentJobs]);
+    } catch (error) {
+      setJobActionError(getErrorMessage(error, messages.editor.jobCreateErrorFallback));
+    } finally {
+      setIsQueueingDetection(false);
     }
   }
 
@@ -343,6 +409,46 @@ export function PageEditorShell({
               </div>
             ) : (
               <p className="empty-state">{messages.editor.selectionEmpty}</p>
+            )}
+
+            <div className="section-head section-head-compact">
+              <h2 className="section-title">{messages.editor.jobsTitle}</h2>
+              <p className="section-copy">{messages.editor.jobsCopy}</p>
+            </div>
+
+            {jobLoadError ? <p className="notice notice-error">{jobLoadError}</p> : null}
+            {jobActionError ? <p className="notice notice-error">{jobActionError}</p> : null}
+
+            <button
+              className="primary-button"
+              disabled={isQueueingDetection}
+              onClick={() => void handleQueueRegionDetection()}
+              type="button"
+            >
+              {isQueueingDetection
+                ? messages.editor.queuingDetectionAction
+                : messages.editor.queueDetectionAction}
+            </button>
+
+            {isJobsLoading ? (
+              <p className="empty-state">{messages.editor.jobsLoading}</p>
+            ) : jobs.length === 0 ? (
+              <p className="empty-state">{messages.editor.jobsEmpty}</p>
+            ) : (
+              <div className="editor-job-list">
+                {jobs.map((job) => (
+                  <article className="editor-job-card" key={job.id}>
+                    <div className="editor-region-card-header">
+                      <span className="card-step">{messages.editor.jobTypeLabels[job.type]}</span>
+                      <span className={`editor-job-state-pill editor-job-state-pill-${job.status}`}>
+                        {messages.editor.jobStatusLabels[job.status]}
+                      </span>
+                    </div>
+                    <strong>{job.id}</strong>
+                    <p className="card-description">{job.created_at}</p>
+                  </article>
+                ))}
+              </div>
             )}
           </aside>
 

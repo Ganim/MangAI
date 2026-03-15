@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, File, Request, UploadFile, status
 from fastapi.responses import FileResponse
 
 from mangai_api.domain_errors import UploadValidationError
+from mangai_api.models.job import CreatePageJobRequest, JobResponse, ListJobsResponse
 from mangai_api.models.project import (
     CreateProjectRequest,
     CreateProjectResponse,
@@ -51,6 +52,19 @@ def get_project_detail(
     store: LocalProjectStore = Depends(get_project_store),
 ) -> ProjectDetailResponse:
     return store.get_project_detail(project_id)
+
+
+@router.get(
+    "/{project_id}/pages/{page_id}/jobs",
+    response_model=ListJobsResponse,
+    summary="List page jobs",
+)
+def list_page_jobs(
+    project_id: UUID,
+    page_id: UUID,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> ListJobsResponse:
+    return ListJobsResponse(jobs=tuple(store.list_page_jobs(project_id=project_id, page_id=page_id)))
 
 
 @router.get(
@@ -140,6 +154,22 @@ def create_page_region(
 ) -> RegionResponse:
     region = store.create_page_region(project_id=project_id, page_id=page_id, payload=payload)
     return RegionResponse(region=region)
+
+
+@router.post(
+    "/{project_id}/pages/{page_id}/jobs",
+    response_model=JobResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Queue page job",
+)
+def create_page_job(
+    project_id: UUID,
+    page_id: UUID,
+    payload: CreatePageJobRequest,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> JobResponse:
+    job = store.enqueue_page_job(project_id=project_id, page_id=page_id, job_type=payload.type)
+    return JobResponse(job=job)
 
 
 @router.patch(

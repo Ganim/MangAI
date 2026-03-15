@@ -3,6 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from mangai_api.domain_errors import (
+    JobValidationError,
     ProjectNotFoundError,
     ProjectPageNotFoundError,
     RegionNotFoundError,
@@ -54,6 +55,17 @@ def register_error_handlers(app) -> None:
         )
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
+            content=payload.model_dump(),
+        )
+
+    @app.exception_handler(JobValidationError)
+    async def handle_job_validation(_: Request, exc: JobValidationError) -> JSONResponse:
+        payload = ErrorResponse(
+            error_code="INVALID_JOB_REQUEST",
+            message=str(exc),
+        )
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content=payload.model_dump(),
         )
 

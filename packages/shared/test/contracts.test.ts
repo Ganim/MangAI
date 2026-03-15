@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+  parseCreatePageJobRequest,
   SUPPORTED_SOURCE_LANGUAGE_CODES,
   SUPPORTED_TARGET_LANGUAGE_CODES,
   SUPPORTED_UI_LOCALES,
@@ -11,8 +12,10 @@ import {
   normalizeProjectTargetLanguage,
   parseCreatePageRegionRequest,
   parseCreateProjectResponse,
+  parseListPageJobsResponse,
   parseListPageRegionsResponse,
   parsePageRegionResponse,
+  parsePageJobResponse,
   parseProjectDetailResponse,
   normalizeUiLocale,
   parseCreateProjectRequest,
@@ -270,6 +273,62 @@ const parsedRegionResponse = parsePageRegionResponse({
 });
 
 assert.equal(parsedRegionResponse.region.state, "approved");
+
+const parsedCreateJobRequest = parseCreatePageJobRequest({
+  type: "detect_regions",
+});
+
+assert.equal(parsedCreateJobRequest.type, "detect_regions");
+
+const parsedJobsResponse = parseListPageJobsResponse({
+  jobs: [
+    {
+      id: UUID,
+      project_id: UUID_2,
+      page_id: UUID_3,
+      type: "detect_regions",
+      status: "queued",
+      payload: {
+        job_id: UUID,
+        page_id: UUID_3,
+        asset_id: UUID_2,
+      },
+      result: null,
+      error_code: null,
+      error_message: null,
+      created_at: "2026-03-15T00:00:00Z",
+      updated_at: "2026-03-15T00:00:00Z",
+    },
+  ],
+});
+
+assert.equal(parsedJobsResponse.jobs[0]?.type, "detect_regions");
+
+const parsedJobResponse = parsePageJobResponse({
+  job: {
+    id: UUID,
+    project_id: UUID_2,
+    page_id: UUID_3,
+    type: "detect_regions",
+    status: "succeeded",
+    payload: {
+      job_id: UUID,
+      page_id: UUID_3,
+      asset_id: UUID_2,
+    },
+    result: {
+      page_id: UUID_3,
+      regions_created: 3,
+      overlay_asset_id: UUID,
+    },
+    error_code: null,
+    error_message: null,
+    created_at: "2026-03-15T00:00:00Z",
+    updated_at: "2026-03-15T00:00:00Z",
+  },
+});
+
+assert.equal(parsedJobResponse.job.status, "succeeded");
 
 const detectPayload = parseDetectRegionsJobPayload({
   job_id: UUID,

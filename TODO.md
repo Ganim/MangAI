@@ -31,7 +31,7 @@
 - [x] Create monorepo root structure
 - [x] Add Next.js app bootstrap
 - [x] Add FastAPI API bootstrap
-- [ ] Add worker bootstrap
+- [x] Add worker bootstrap
 - [x] Add shared package contracts
 
 ## Architecture
@@ -56,7 +56,7 @@
 ## Backend
 
 - [x] Create project and page APIs
-- [ ] Create job API
+- [x] Create job API
 - [x] Create asset storage layer
 - [ ] Create cleanup pipeline contract
 - [ ] Create OCR pipeline contract

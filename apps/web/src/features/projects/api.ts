@@ -1,9 +1,12 @@
 import {
   parseCreatePageRegionRequest,
+  parseCreatePageJobRequest,
   parseCreateProjectRequest,
   parseCreateProjectResponse,
+  parseListPageJobsResponse,
   parseListProjectsResponse,
   parseListPageRegionsResponse,
+  parsePageJobResponse,
   parsePageRegionResponse,
   parseProjectDetailResponse,
   parseRegisterProjectPagesResponse,
@@ -52,6 +55,17 @@ type UpdatePageRegionInput = {
     width: number;
     height: number;
   };
+};
+
+type CreatePageJobInput = {
+  type:
+    | "detect_regions"
+    | "generate_cleanup"
+    | "run_ocr"
+    | "generate_translation"
+    | "match_dialogue"
+    | "generate_typesetting"
+    | "export_project";
 };
 
 async function readJsonResponse(response: Response): Promise<unknown> {
@@ -108,6 +122,14 @@ export async function getPageRegions(projectId: string, pageId: string) {
     `/projects/${projectId}/pages/${pageId}/regions`,
     { method: "GET" },
     parseListPageRegionsResponse,
+  );
+}
+
+export async function getPageJobs(projectId: string, pageId: string) {
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/jobs`,
+    { method: "GET" },
+    parseListPageJobsResponse,
   );
 }
 
@@ -179,5 +201,21 @@ export async function updatePageRegion(
       body: JSON.stringify(payload),
     },
     parsePageRegionResponse,
+  );
+}
+
+export async function createPageJob(
+  projectId: string,
+  pageId: string,
+  input: CreatePageJobInput,
+) {
+  const payload = parseCreatePageJobRequest(input);
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/jobs`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    parsePageJobResponse,
   );
 }

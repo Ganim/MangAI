@@ -37,6 +37,24 @@ type RegionOriginLabels = {
   user_merged: string;
 };
 
+type JobTypeLabels = {
+  detect_regions: string;
+  generate_cleanup: string;
+  run_ocr: string;
+  generate_translation: string;
+  match_dialogue: string;
+  generate_typesetting: string;
+  export_project: string;
+};
+
+type JobStatusLabels = {
+  queued: string;
+  running: string;
+  succeeded: string;
+  failed: string;
+  canceled: string;
+};
+
 export type AppMessages = {
   common: {
     appName: string;
@@ -156,6 +174,16 @@ export type AppMessages = {
     regionTypeLabels: RegionTypeLabels;
     regionStateLabels: RegionStateLabels;
     regionOriginLabels: RegionOriginLabels;
+    jobsTitle: string;
+    jobsCopy: string;
+    jobsLoading: string;
+    jobsEmpty: string;
+    jobLoadErrorFallback: string;
+    jobCreateErrorFallback: string;
+    queueDetectionAction: string;
+    queuingDetectionAction: string;
+    jobTypeLabels: JobTypeLabels;
+    jobStatusLabels: JobStatusLabels;
     kicker: string;
     canvasCopy: string;
     showRegionsAction: string;
@@ -407,6 +435,31 @@ export const enUSMessages: AppMessages = {
       user_created: "User created",
       user_split: "User split",
       user_merged: "User merged",
+    },
+    jobsTitle: "Automation queue",
+    jobsCopy:
+      "This first jobs panel keeps orchestration visible. You can already queue region detection and inspect the page-level history before async workers are wired in.",
+    jobsLoading: "Loading page jobs...",
+    jobsEmpty: "No jobs have been queued for this page yet.",
+    jobLoadErrorFallback: "The editor could not load the page job history.",
+    jobCreateErrorFallback: "The editor could not queue region detection right now.",
+    queueDetectionAction: "Queue region detection",
+    queuingDetectionAction: "Queuing detection...",
+    jobTypeLabels: {
+      detect_regions: "Region detection",
+      generate_cleanup: "Cleanup generation",
+      run_ocr: "OCR",
+      generate_translation: "Translation",
+      match_dialogue: "Dialogue matching",
+      generate_typesetting: "Typesetting",
+      export_project: "Export",
+    },
+    jobStatusLabels: {
+      queued: "Queued",
+      running: "Running",
+      succeeded: "Succeeded",
+      failed: "Failed",
+      canceled: "Canceled",
     },
     kicker: "Page editor shell",
     canvasCopy:

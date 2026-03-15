@@ -8,9 +8,11 @@
     "dev:web": "pnpm --dir apps/web dev",
     "build:web": "pnpm --dir apps/web build",
     "dev:api": "uv run --project services/api mangai-api",
+    "dev:workers": "uv run --project services/workers mangai-workers",
     "test:web": "pnpm --dir apps/web test",
     "test:shared": "pnpm --dir packages/shared test",
-    "test:api": "uv run --project services/api pytest",
+    "test:api": "uv run --project services/api pytest services/api/tests",
+    "test:workers": "uv run --project services/workers pytest services/workers/tests",
     "lint": "echo \"Lint commands will be added as apps are bootstrapped.\"",
     "format": "echo \"Format commands will be added as apps are bootstrapped.\""
   }

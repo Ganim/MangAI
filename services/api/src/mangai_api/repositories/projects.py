@@ -14,6 +14,7 @@ from mangai_api.constants import (
     SUPPORTED_UPLOAD_MIME_TYPES,
 )
 from mangai_api.domain_errors import (
+    JobValidationError,
     ProjectNotFoundError,
     ProjectPageNotFoundError,
     RegionNotFoundError,
@@ -30,6 +31,7 @@ from mangai_api.models.project import (
     StoredProjectAsset,
     StoredProjectState,
 )
+from mangai_api.models.job import JobRecord
 from mangai_api.models.region import (
     BoundingBox,
     CreateRegionRequest,
@@ -76,6 +78,52 @@ class LocalProjectStore:
             project=project.model_copy(deep=True),
             pages=tuple(page.model_copy(deep=True) for page in pages),
         )
+
+    def list_page_jobs(self, project_id: UUID, page_id: UUID) -> list[JobRecord]:
+        state = self._load_state()
+        self._require_project(state, project_id)
+        self._require_page(state, project_id, page_id)
+        return [
+            job.model_copy(deep=True)
+            for job in sorted(
+                [candidate for candidate in state.jobs if candidate.page_id == page_id],
+                key=lambda candidate: candidate.created_at,
+                reverse=True,
+            )
+        ]
+
+    def enqueue_page_job(self, project_id: UUID, page_id: UUID, job_type: str) -> JobRecord:
+        with self._lock:
+            state = self._load_state_unlocked()
+            self._require_project(state, project_id)
+            self._require_page(state, project_id, page_id)
+            original_asset = self._require_original_asset(state, project_id, page_id)
+            job_id = uuid4()
+            now = _utcnow()
+
+            if job_type != "detect_regions":
+                raise JobValidationError("Only detect_regions jobs are currently supported.")
+
+            job = JobRecord(
+                id=job_id,
+                project_id=project_id,
+                page_id=page_id,
+                type="detect_regions",
+                status="queued",
+                payload={
+                    "job_id": str(job_id),
+                    "page_id": str(page_id),
+                    "asset_id": str(original_asset.id),
+                },
+                result=None,
+                error_code=None,
+                error_message=None,
+                created_at=now,
+                updated_at=now,
+            )
+            next_state = state.model_copy(update={"jobs": (*state.jobs, job)})
+            self._save_state_unlocked(next_state)
+            return job.model_copy(deep=True)
 
     def list_page_regions(self, project_id: UUID, page_id: UUID) -> list[RegionRecord]:
         state = self._load_state()
@@ -356,6 +404,26 @@ class LocalProjectStore:
         if page is None:
             raise ProjectPageNotFoundError(str(project_id), str(page_id))
         return page
+
+    def _require_original_asset(
+        self,
+        state: StoredProjectState,
+        project_id: UUID,
+        page_id: UUID,
+    ) -> StoredProjectAsset:
+        asset = next(
+            (
+                candidate
+                for candidate in state.assets
+                if candidate.project_id == project_id
+                and candidate.page_id == page_id
+                and candidate.kind == "original"
+            ),
+            None,
+        )
+        if asset is None:
+            raise ProjectPageNotFoundError(str(project_id), str(page_id))
+        return asset
 
     def _require_region(
         self,

@@ -18,5 +18,9 @@ class RegionNotFoundError(Exception):
         self.region_id = region_id
 
 
+class JobValidationError(ValueError):
+    pass
+
+
 class UploadValidationError(ValueError):
     pass
