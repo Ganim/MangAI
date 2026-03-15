@@ -34,7 +34,6 @@ export function HomeShell({ locale, messages }: HomeShellProps) {
                 className={className}
                 href={href}
                 hrefLang={candidateLocale}
-                locale={false}
               >
                 {label}
               </Link>
@@ -50,10 +49,10 @@ export function HomeShell({ locale, messages }: HomeShellProps) {
           <p className="hero-subtitle">{messages.home.subtitle}</p>
 
           <div className="hero-actions">
-            <Link className="primary-button" href={`/${locale}#workflow`} locale={false}>
+            <Link className="primary-button" href={`/${locale}#workflow`}>
               {messages.home.primaryAction}
             </Link>
-            <Link className="secondary-button" href={`/${locale}#foundation`} locale={false}>
+            <Link className="secondary-button" href={`/${locale}#foundation`}>
               {messages.home.secondaryAction}
             </Link>
           </div>
