@@ -16,6 +16,9 @@ import {
   updatePageRegion,
 } from "../features/projects/api.ts";
 import {
+  hasPendingPageJobs,
+} from "../features/projects/jobs.ts";
+import {
   buildDefaultRegionInput,
   formatRegionBounds,
   formatRegionIndexLabel,
@@ -196,6 +199,56 @@ export function PageEditorShell({
       canceled = true;
     };
   }, [currentPage, messages.editor.jobLoadErrorFallback, projectId]);
+
+  useEffect(() => {
+    if (currentPage === null || !hasPendingPageJobs(jobs)) {
+      return;
+    }
+
+    const nextPage = currentPage;
+    let canceled = false;
+
+    async function pollPageAutomationState() {
+      try {
+        const [jobsResponse, regionsResponse] = await Promise.all([
+          getPageJobs(projectId, nextPage.id),
+          getPageRegions(projectId, nextPage.id),
+        ]);
+        if (canceled) {
+          return;
+        }
+        setJobs(jobsResponse.jobs);
+        setRegions(regionsResponse.regions);
+        setSelectedRegionId((currentSelectedRegionId) =>
+          regionsResponse.regions.some((region) => region.id === currentSelectedRegionId)
+            ? currentSelectedRegionId
+            : (regionsResponse.regions[0]?.id ?? null),
+        );
+        setJobLoadError(null);
+        setRegionLoadError(null);
+      } catch (error) {
+        if (canceled) {
+          return;
+        }
+        setJobLoadError(getErrorMessage(error, messages.editor.jobLoadErrorFallback));
+      }
+    }
+
+    void pollPageAutomationState();
+    const timer = window.setInterval(() => {
+      void pollPageAutomationState();
+    }, 3000);
+
+    return () => {
+      canceled = true;
+      window.clearInterval(timer);
+    };
+  }, [
+    currentPage,
+    jobs,
+    messages.editor.jobLoadErrorFallback,
+    projectId,
+  ]);
 
   const selectedRegion =
     regions.find((candidate) => candidate.id === selectedRegionId) ?? null;

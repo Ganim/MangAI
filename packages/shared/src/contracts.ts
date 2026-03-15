@@ -2,6 +2,7 @@ import {
   AssignmentOrigin,
   ExportFormat,
   JobType,
+  PageStatus,
   RegionState,
   RegionType,
   TextDirection,
@@ -167,7 +168,7 @@ export function parseRegisteredProjectPage(value: unknown, path: Array<string | 
         (input, inputPath) => readNumber(input, inputPath, { integer: true, min: 1 }),
         atPath(path, "height"),
       ) ?? null,
-    status: readEnum(objectValue.status, ["uploaded"] as const, atPath(path, "status")),
+    status: readEnum(objectValue.status, PageStatus, atPath(path, "status")),
     original_asset_path: readString(
       objectValue.original_asset_path,
       atPath(path, "original_asset_path"),

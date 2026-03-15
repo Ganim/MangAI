@@ -264,6 +264,7 @@ class LocalProjectStore:
                 candidate
                 for candidate in state.assets
                 if candidate.project_id == project_id and candidate.page_id == page_id
+                and candidate.kind == "original"
             ),
             None,
         )

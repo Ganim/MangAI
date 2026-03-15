@@ -192,6 +192,39 @@ const parsedProjectDetail = parseProjectDetailResponse({
 
 assert.equal(parsedProjectDetail.pages[0]?.index, 1);
 
+const parsedAnalyzedPage = parseProjectDetailResponse({
+  project: {
+    id: UUID,
+    schema_version: 1,
+    name: "Project",
+    status: "draft",
+    source_language: "ja-JP",
+    target_language: "pt-BR",
+    target_text_direction: "ltr",
+    page_count: 1,
+    created_at: "2026-03-15T00:00:00Z",
+    updated_at: "2026-03-15T00:00:00Z",
+  },
+  pages: [
+    {
+      id: UUID_3,
+      project_id: UUID,
+      index: 1,
+      file_name: "001.png",
+      mime_type: "image/png",
+      size_bytes: 2048,
+      width: 1600,
+      height: 2400,
+      status: "analyzed",
+      original_asset_path: `/api/v1/projects/${UUID}/pages/${UUID_3}/original`,
+      created_at: "2026-03-15T00:00:00Z",
+      updated_at: "2026-03-15T00:00:00Z",
+    },
+  ],
+});
+
+assert.equal(parsedAnalyzedPage.pages[0]?.status, "analyzed");
+
 const parsedCreateRegionRequest = parseCreatePageRegionRequest({
   type: "speech_balloon",
   bounding_box: {

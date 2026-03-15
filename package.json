@@ -9,6 +9,7 @@
     "build:web": "pnpm --dir apps/web build",
     "dev:api": "uv run --project services/api mangai-api",
     "dev:workers": "uv run --project services/workers mangai-workers",
+    "run:workers:once": "uv run --project services/workers mangai-workers once",
     "test:web": "pnpm --dir apps/web test",
     "test:shared": "pnpm --dir packages/shared test",
     "test:api": "uv run --project services/api pytest services/api/tests",

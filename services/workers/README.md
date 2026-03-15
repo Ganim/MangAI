@@ -6,5 +6,6 @@ Current bootstrap:
 
 - worker settings and CLI entrypoint
 - deterministic `detect_regions` stub runner
+- state-backed queue processor for local jobs
 - handler registry and dispatch function
-- automated tests for config and job execution
+- automated tests for config, queue processing, and job execution

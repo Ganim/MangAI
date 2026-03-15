@@ -18,6 +18,16 @@ from mangai_api.models.region import RegionRecord
 
 
 ProjectStatus = Literal["draft", "active", "archived"]
+PageStatus = Literal[
+    "uploaded",
+    "analyzed",
+    "cleanup_ready",
+    "cleaned",
+    "text_ready",
+    "typeset_ready",
+    "export_ready",
+    "error",
+]
 TextDirection = Literal["ltr", "rtl", "ttb"]
 
 
@@ -81,7 +91,7 @@ class ProjectPage(APIModel):
     size_bytes: int = Field(ge=1)
     width: int | None = Field(default=None, ge=1)
     height: int | None = Field(default=None, ge=1)
-    status: Literal["uploaded"]
+    status: PageStatus
     original_asset_path: str = Field(min_length=1)
     created_at: datetime
     updated_at: datetime
@@ -116,7 +126,7 @@ class StoredProjectAsset(APIModel):
     id: UUID
     project_id: UUID
     page_id: UUID
-    kind: Literal["original"]
+    kind: Literal["original", "overlay"]
     file_name: str
     storage_key: str
     mime_type: str
@@ -146,7 +156,7 @@ class RegisterUploadedProjectPage(APIModel):
     size_bytes: int = Field(ge=1)
     width: int | None = Field(default=None, ge=1)
     height: int | None = Field(default=None, ge=1)
-    status: Literal["uploaded"]
+    status: PageStatus
     original_asset_path: str = Field(min_length=1)
     created_at: datetime
     updated_at: datetime
