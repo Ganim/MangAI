@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
@@ -54,6 +55,52 @@ class ProjectSummary(APIModel):
     source_language: str
     target_language: str
     target_text_direction: TextDirection
+    page_count: int = Field(ge=0)
+    created_at: datetime
+    updated_at: datetime
+
+
+class ListProjectsResponse(APIModel):
+    projects: tuple[ProjectSummary, ...]
+
+
+class RegisterProjectPageRequest(APIModel):
+    file_name: str = Field(min_length=1, max_length=255)
+    mime_type: str = Field(min_length=1, max_length=100)
+    size_bytes: int = Field(ge=1)
+    width: int | None = Field(default=None, ge=1)
+    height: int | None = Field(default=None, ge=1)
+
+    @field_validator("file_name", "mime_type")
+    @classmethod
+    def validate_non_empty_text(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Value cannot be empty.")
+        return stripped
+
+
+class RegisterProjectPagesRequest(APIModel):
+    pages: tuple[RegisterProjectPageRequest, ...] = Field(min_length=1)
+
+
+class PageUploadDraft(APIModel):
+    id: UUID
+    project_id: UUID
+    index: int = Field(ge=1)
+    file_name: str
+    mime_type: str
+    size_bytes: int = Field(ge=1)
+    width: int | None = Field(default=None, ge=1)
+    height: int | None = Field(default=None, ge=1)
+    status: Literal["uploaded"]
+    created_at: datetime
+    updated_at: datetime
+
+
+class RegisterProjectPagesResponse(APIModel):
+    project: ProjectSummary
+    pages: tuple[PageUploadDraft, ...]
 
 
 class CreateProjectResponse(APIModel):

@@ -13,7 +13,7 @@
     "dev": "next dev",
     "build": "next build",
     "typecheck": "tsc --project tsconfig.json --noEmit",
-    "test:unit": "node --experimental-strip-types ./test/i18n.test.ts",
+    "test:unit": "node --experimental-strip-types ./test/run-tests.ts",
     "test": "pnpm run typecheck && pnpm run test:unit && pnpm run build",
     "lint": "echo \"ESLint will be configured with the first interactive UI feature slice.\""
   },

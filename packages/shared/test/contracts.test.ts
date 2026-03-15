@@ -5,10 +5,14 @@ import {
   ValidationError,
   canonicalizeLanguageTag,
   inferTextDirectionForLanguage,
+  parseCreateProjectResponse,
   normalizeUiLocale,
   parseCreateProjectRequest,
   parseDetectRegionsJobPayload,
+  parseListProjectsResponse,
   parseProject,
+  parseRegisterProjectPagesRequest,
+  parseRegisterProjectPagesResponse,
 } from "../src/index.ts";
 
 const UUID = "11111111-1111-4111-8111-111111111111";
@@ -52,6 +56,88 @@ const parsedProject = parseProject({
 });
 
 assert.equal(parsedProject.target_language, "en-US");
+
+const parsedProjectResponse = parseCreateProjectResponse({
+  project: {
+    id: UUID,
+    schema_version: 1,
+    name: "Project",
+    status: "draft",
+    source_language: "ja-JP",
+    target_language: "pt-BR",
+    target_text_direction: "ltr",
+    page_count: 0,
+    created_at: "2026-03-15T00:00:00Z",
+    updated_at: "2026-03-15T00:00:00Z",
+  },
+});
+
+assert.equal(parsedProjectResponse.project.page_count, 0);
+
+const parsedProjectList = parseListProjectsResponse({
+  projects: [
+    {
+      id: UUID,
+      schema_version: 1,
+      name: "Project",
+      status: "draft",
+      source_language: "ja-JP",
+      target_language: "pt-BR",
+      target_text_direction: "ltr",
+      page_count: 2,
+      created_at: "2026-03-15T00:00:00Z",
+      updated_at: "2026-03-15T00:00:00Z",
+    },
+  ],
+});
+
+assert.equal(parsedProjectList.projects[0]?.page_count, 2);
+
+const parsedRegisterPagesRequest = parseRegisterProjectPagesRequest({
+  pages: [
+    {
+      file_name: "001.png",
+      mime_type: "image/png",
+      size_bytes: 2048,
+      width: null,
+      height: null,
+    },
+  ],
+});
+
+assert.equal(parsedRegisterPagesRequest.pages[0]?.file_name, "001.png");
+
+const parsedRegisterPagesResponse = parseRegisterProjectPagesResponse({
+  project: {
+    id: UUID,
+    schema_version: 1,
+    name: "Project",
+    status: "draft",
+    source_language: "ja-JP",
+    target_language: "pt-BR",
+    target_text_direction: "ltr",
+    page_count: 1,
+    created_at: "2026-03-15T00:00:00Z",
+    updated_at: "2026-03-15T00:00:00Z",
+  },
+  pages: [
+    {
+      id: UUID_3,
+      project_id: UUID,
+      index: 1,
+      file_name: "001.png",
+      mime_type: "image/png",
+      size_bytes: 2048,
+      width: null,
+      height: null,
+      status: "uploaded",
+      created_at: "2026-03-15T00:00:00Z",
+      updated_at: "2026-03-15T00:00:00Z",
+    },
+  ],
+});
+
+assert.equal(parsedRegisterPagesResponse.pages[0]?.status, "uploaded");
 
 const detectPayload = parseDetectRegionsJobPayload({
   job_id: UUID,

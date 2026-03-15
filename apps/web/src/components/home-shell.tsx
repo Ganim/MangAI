@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ProjectDashboard } from "./project-dashboard.tsx";
 import type { AppMessages } from "../i18n/index.ts";
 import {
   DEFAULT_UI_LOCALE,
@@ -77,6 +78,8 @@ export function HomeShell({ locale, messages }: HomeShellProps) {
           </div>
         </aside>
       </section>
+
+      <ProjectDashboard locale={locale} messages={messages} />
 
       <section className="section-panel" id="workflow">
         <div className="section-head">

@@ -34,6 +34,44 @@ export type AppMessages = {
     milestoneNote: string;
     defaultWorkspaceLabel: string;
   };
+  dashboard: {
+    kicker: string;
+    apiLoading: string;
+    apiOnline: string;
+    apiOffline: string;
+    loadErrorFallback: string;
+    createErrorFallback: string;
+    uploadErrorFallback: string;
+    uploadSuccess: string;
+    projectTitle: string;
+    projectCopy: string;
+    projectNameLabel: string;
+    projectNamePlaceholder: string;
+    sourceLanguageLabel: string;
+    targetLanguageLabel: string;
+    createAction: string;
+    creatingAction: string;
+    projectListTitle: string;
+    projectListCopy: string;
+    projectListEmpty: string;
+    pageCountLabel: string;
+    uploadTitle: string;
+    uploadCopy: string;
+    selectedProjectLabel: string;
+    noProjectSelected: string;
+    chooseFilesAction: string;
+    uploadQueueEmpty: string;
+    dimensionsPending: string;
+    removeAction: string;
+    registerAction: string;
+    registeringAction: string;
+    uploadHint: string;
+    rejectionReasons: {
+      unsupported_type: string;
+      too_large: string;
+      duplicate_name: string;
+    };
+  };
 };
 
 export const enUSMessages: AppMessages = {
@@ -126,5 +164,47 @@ export const enUSMessages: AppMessages = {
     milestoneNote:
       "Current milestone: web shell online, locales active, contracts shared, and automated validation in place.",
     defaultWorkspaceLabel: "Default workspace locale",
+  },
+  dashboard: {
+    kicker: "Project setup and upload",
+    apiLoading: "Connecting",
+    apiOnline: "API online",
+    apiOffline: "API offline",
+    loadErrorFallback: "The workspace could not load projects from the API.",
+    createErrorFallback: "The project could not be created right now.",
+    uploadErrorFallback: "The selected pages could not be registered right now.",
+    uploadSuccess: "{count} pages registered successfully.",
+    projectTitle: "Create a project and establish its translation direction.",
+    projectCopy:
+      "This slice already talks to the API. You can create draft projects, inspect existing ones, and register a first upload batch as page metadata.",
+    projectNameLabel: "Project name",
+    projectNamePlaceholder: "Chapter 01 - Review pass",
+    sourceLanguageLabel: "Source language",
+    targetLanguageLabel: "Target language",
+    createAction: "Create project",
+    creatingAction: "Creating project...",
+    projectListTitle: "Current project board",
+    projectListCopy:
+      "Each card reflects the API state. Select one project to become the active destination for the upload queue.",
+    projectListEmpty: "No projects yet. Create the first one to unlock the upload queue.",
+    pageCountLabel: "{count} registered pages",
+    uploadTitle: "Prepare the first upload batch",
+    uploadCopy:
+      "Pick page files from your machine, review the queue, and register them into the selected project. Binary storage will come in the next slice; for now we are locking the metadata flow.",
+    selectedProjectLabel: "Active project",
+    noProjectSelected: "Select or create a project first",
+    chooseFilesAction: "Choose page files",
+    uploadQueueEmpty: "No pages in the queue yet. Add JPEG, PNG, or WEBP files to continue.",
+    dimensionsPending: "dimensions captured later",
+    removeAction: "Remove",
+    registerAction: "Register pages",
+    registeringAction: "Registering pages...",
+    uploadHint:
+      "The current API accepts one metadata batch per action and already increments the project page count.",
+    rejectionReasons: {
+      unsupported_type: "{file}: unsupported file type. Use JPEG, PNG, or WEBP.",
+      too_large: "{file}: file exceeds the current 25 MB limit.",
+      duplicate_name: "{file}: duplicate file name detected in this queue.",
+    },
   },
 };

@@ -48,14 +48,14 @@
 - [x] Add app message catalog structure
 - [x] Create initial `en-US` and `pt-BR` locale packs
 - [x] Create project dashboard
-- [ ] Create upload flow
+- [x] Create upload flow
 - [ ] Create page editor shell
 - [ ] Create overlay and mask editing interactions
 - [ ] Create dialogue side panel
 
 ## Backend
 
-- [ ] Create project and page APIs
+- [x] Create project and page APIs
 - [ ] Create job API
 - [ ] Create asset storage layer
 - [ ] Create cleanup pipeline contract
@@ -82,5 +82,5 @@
 
 - [ ] Add linting and formatting
 - [ ] Add CI
-- [ ] Add environment templates
+- [x] Add environment templates
 - [ ] Add local dev orchestration

@@ -9,6 +9,8 @@ import {
   readObject,
   readOptional,
   readString,
+  readTimestamp,
+  readNullable,
   readUuid,
 } from "./validate.ts";
 import { parseBoundingBox, parseTextStyle } from "./entities.ts";
@@ -33,6 +35,141 @@ export function parseCreateProjectRequest(value: unknown, path: Array<string | n
         (input, inputPath) => readEnum(input, TextDirection, inputPath),
         atPath(path, "target_text_direction"),
       ) ?? inferTextDirectionForLanguage(targetLanguage),
+  };
+}
+
+export function parseProjectSummary(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    id: readUuid(objectValue.id, atPath(path, "id")),
+    schema_version: readNumber(objectValue.schema_version, atPath(path, "schema_version"), {
+      integer: true,
+      min: 1,
+    }),
+    name: readString(objectValue.name, atPath(path, "name")),
+    status: readEnum(objectValue.status, ["draft", "active", "archived"] as const, atPath(path, "status")),
+    source_language: canonicalizeLanguageTag(
+      objectValue.source_language,
+      atPath(path, "source_language"),
+    ),
+    target_language: canonicalizeLanguageTag(
+      objectValue.target_language,
+      atPath(path, "target_language"),
+    ),
+    target_text_direction: readEnum(
+      objectValue.target_text_direction,
+      TextDirection,
+      atPath(path, "target_text_direction"),
+    ),
+    page_count: readNumber(objectValue.page_count, atPath(path, "page_count"), {
+      integer: true,
+      min: 0,
+    }),
+    created_at: readTimestamp(objectValue.created_at, atPath(path, "created_at")),
+    updated_at: readTimestamp(objectValue.updated_at, atPath(path, "updated_at")),
+  };
+}
+
+export function parseCreateProjectResponse(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    project: parseProjectSummary(objectValue.project, atPath(path, "project")),
+  };
+}
+
+export function parseListProjectsResponse(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    projects: readArray(
+      objectValue.projects,
+      atPath(path, "projects"),
+      (item, itemPath) => parseProjectSummary(item, itemPath),
+    ),
+  };
+}
+
+export function parseRegisterProjectPagesRequest(
+  value: unknown,
+  path: Array<string | number> = [],
+) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    pages: readArray(
+      objectValue.pages,
+      atPath(path, "pages"),
+      (item, itemPath) => {
+        const pageValue = readObject<Record<string, unknown>>(item, itemPath);
+        return {
+          file_name: readString(pageValue.file_name, atPath(itemPath, "file_name")),
+          mime_type: readString(pageValue.mime_type, atPath(itemPath, "mime_type")),
+          size_bytes: readNumber(pageValue.size_bytes, atPath(itemPath, "size_bytes"), {
+            integer: true,
+            min: 1,
+          }),
+          width:
+            readNullable(
+              pageValue.width,
+              (input, inputPath) => readNumber(input, inputPath, { integer: true, min: 1 }),
+              atPath(itemPath, "width"),
+            ) ?? null,
+          height:
+            readNullable(
+              pageValue.height,
+              (input, inputPath) => readNumber(input, inputPath, { integer: true, min: 1 }),
+              atPath(itemPath, "height"),
+            ) ?? null,
+        };
+      },
+      { minLength: 1 },
+    ),
+  };
+}
+
+export function parseRegisteredProjectPage(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    id: readUuid(objectValue.id, atPath(path, "id")),
+    project_id: readUuid(objectValue.project_id, atPath(path, "project_id")),
+    index: readNumber(objectValue.index, atPath(path, "index"), {
+      integer: true,
+      min: 1,
+    }),
+    file_name: readString(objectValue.file_name, atPath(path, "file_name")),
+    mime_type: readString(objectValue.mime_type, atPath(path, "mime_type")),
+    size_bytes: readNumber(objectValue.size_bytes, atPath(path, "size_bytes"), {
+      integer: true,
+      min: 1,
+    }),
+    width:
+      readNullable(
+        objectValue.width,
+        (input, inputPath) => readNumber(input, inputPath, { integer: true, min: 1 }),
+        atPath(path, "width"),
+      ) ?? null,
+    height:
+      readNullable(
+        objectValue.height,
+        (input, inputPath) => readNumber(input, inputPath, { integer: true, min: 1 }),
+        atPath(path, "height"),
+      ) ?? null,
+    status: readEnum(objectValue.status, ["uploaded"] as const, atPath(path, "status")),
+    created_at: readTimestamp(objectValue.created_at, atPath(path, "created_at")),
+    updated_at: readTimestamp(objectValue.updated_at, atPath(path, "updated_at")),
+  };
+}
+
+export function parseRegisterProjectPagesResponse(
+  value: unknown,
+  path: Array<string | number> = [],
+) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    project: parseProjectSummary(objectValue.project, atPath(path, "project")),
+    pages: readArray(
+      objectValue.pages,
+      atPath(path, "pages"),
+      (item, itemPath) => parseRegisteredProjectPage(item, itemPath),
+    ),
   };
 }
 

@@ -98,4 +98,47 @@ export const ptBRMessages: AppMessages = {
       "Marco atual: shell web online, locales ativos, contratos compartilhados e validacao automatizada pronta.",
     defaultWorkspaceLabel: "Locale padrao do workspace",
   },
+  dashboard: {
+    kicker: "Projeto e envio inicial",
+    apiLoading: "Conectando",
+    apiOnline: "API online",
+    apiOffline: "API offline",
+    loadErrorFallback: "Nao foi possivel carregar os projetos pela API.",
+    createErrorFallback: "Nao foi possivel criar o projeto agora.",
+    uploadErrorFallback: "Nao foi possivel registrar as paginas selecionadas agora.",
+    uploadSuccess: "{count} paginas registradas com sucesso.",
+    projectTitle: "Crie um projeto e defina sua direcao de traducao.",
+    projectCopy:
+      "Este slice ja conversa com a API. Voce pode criar projetos em draft, inspecionar os existentes e registrar um primeiro lote de upload como metadados de pagina.",
+    projectNameLabel: "Nome do projeto",
+    projectNamePlaceholder: "Capitulo 01 - Revisao",
+    sourceLanguageLabel: "Idioma de origem",
+    targetLanguageLabel: "Idioma de destino",
+    createAction: "Criar projeto",
+    creatingAction: "Criando projeto...",
+    projectListTitle: "Quadro atual de projetos",
+    projectListCopy:
+      "Cada card reflete o estado da API. Selecione um projeto para tornalo o destino ativo da fila de upload.",
+    projectListEmpty: "Nenhum projeto ainda. Crie o primeiro para liberar a fila de upload.",
+    pageCountLabel: "{count} paginas registradas",
+    uploadTitle: "Prepare o primeiro lote de upload",
+    uploadCopy:
+      "Escolha arquivos de pagina da sua maquina, revise a fila e registre tudo no projeto selecionado. O armazenamento binario entra no proximo slice; por enquanto estamos fechando o fluxo de metadados.",
+    selectedProjectLabel: "Projeto ativo",
+    noProjectSelected: "Selecione ou crie um projeto primeiro",
+    chooseFilesAction: "Escolher paginas",
+    uploadQueueEmpty:
+      "Nenhuma pagina na fila ainda. Adicione arquivos JPEG, PNG ou WEBP para continuar.",
+    dimensionsPending: "dimensoes capturadas depois",
+    removeAction: "Remover",
+    registerAction: "Registrar paginas",
+    registeringAction: "Registrando paginas...",
+    uploadHint:
+      "A API atual aceita um lote de metadados por acao e ja incrementa a contagem de paginas do projeto.",
+    rejectionReasons: {
+      unsupported_type: "{file}: tipo de arquivo nao suportado. Use JPEG, PNG ou WEBP.",
+      too_large: "{file}: o arquivo excede o limite atual de 25 MB.",
+      duplicate_name: "{file}: nome de arquivo duplicado detectado nesta fila.",
+    },
+  },
 };
