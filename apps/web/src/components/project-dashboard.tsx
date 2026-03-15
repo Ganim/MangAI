@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 
 import type { AppMessages } from "../i18n/index.ts";
@@ -12,6 +13,7 @@ import {
   registerProjectPages,
   resolveApiAssetUrl,
 } from "../features/projects/api.ts";
+import { buildProjectWorkspaceHref } from "../features/projects/routing.ts";
 import {
   createUploadQueue,
   formatBytes,
@@ -337,6 +339,22 @@ export function ProjectDashboard({ locale, messages }: ProjectDashboardProps) {
             })}
           </div>
         )}
+
+        <div className="workspace-inline-actions">
+          <Link
+            className={
+              selectedProject ? "primary-button" : "primary-button primary-button-disabled"
+            }
+            href={selectedProject ? buildProjectWorkspaceHref(locale, selectedProject.id) : "#"}
+            onClick={(event) => {
+              if (!selectedProject) {
+                event.preventDefault();
+              }
+            }}
+          >
+            {messages.dashboard.openProjectAction}
+          </Link>
+        </div>
       </article>
 
       <article className="section-panel dashboard-span-2">

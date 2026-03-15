@@ -49,7 +49,7 @@
 - [x] Create initial `en-US` and `pt-BR` locale packs
 - [x] Create project dashboard
 - [x] Create upload flow
-- [ ] Create page editor shell
+- [x] Create page editor shell
 - [ ] Create overlay and mask editing interactions
 - [ ] Create dialogue side panel
 

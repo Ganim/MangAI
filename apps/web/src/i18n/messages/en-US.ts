@@ -61,6 +61,7 @@ export type AppMessages = {
     projectListTitle: string;
     projectListCopy: string;
     projectListEmpty: string;
+    openProjectAction: string;
     pageCountLabel: string;
     uploadTitle: string;
     uploadCopy: string;
@@ -84,6 +85,45 @@ export type AppMessages = {
       too_large: string;
       duplicate_name: string;
     };
+  };
+  workspace: {
+    kicker: string;
+    backToDashboard: string;
+    loadErrorFallback: string;
+    loadingProject: string;
+    loadingProjectTitle: string;
+    heroCopy: string;
+    sourceLanguageLabel: string;
+    targetLanguageLabel: string;
+    pageCountLabel: string;
+    statusLabel: string;
+    summaryTitle: string;
+    summaryCopy: string;
+    summaryItems: ReadonlyArray<StatusItem>;
+    pagesTitle: string;
+    pagesCopy: string;
+    pageLabel: string;
+    emptyPages: string;
+    stayInProjectAction: string;
+    openEditorAction: string;
+  };
+  editor: {
+    backToProject: string;
+    loadErrorFallback: string;
+    loadingEditor: string;
+    pageNotFound: string;
+    pageNavigatorTitle: string;
+    pageNavigatorCopy: string;
+    pageLabel: string;
+    sidebarTitle: string;
+    sidebarCopy: string;
+    sidebarItems: ReadonlyArray<StatusItem>;
+    kicker: string;
+    canvasCopy: string;
+    toggleMasksAction: string;
+    openInspectorAction: string;
+    overlayDetectedRegions: string;
+    overlayDialogueBlocks: string;
   };
 };
 
@@ -189,7 +229,7 @@ export const enUSMessages: AppMessages = {
     uploadSuccess: "{count} pages registered successfully.",
     projectTitle: "Create a project and establish its translation direction.",
     projectCopy:
-      "This slice already talks to the API. You can create draft projects, inspect existing ones, and register a first upload batch as page metadata.",
+      "This slice already talks to the API. You can create draft projects, inspect existing ones, and send a first upload batch that persists both page records and original files.",
     projectNameLabel: "Project name",
     projectNamePlaceholder: "Chapter 01 - Review pass",
     sourceLanguageLabel: "Source language",
@@ -210,6 +250,7 @@ export const enUSMessages: AppMessages = {
     projectListCopy:
       "Each card reflects the API state. Select one project to become the active destination for the upload queue.",
     projectListEmpty: "No projects yet. Create the first one to unlock the upload queue.",
+    openProjectAction: "Open project workspace",
     pageCountLabel: "{count} registered pages",
     uploadTitle: "Prepare the first upload batch",
     uploadCopy:
@@ -236,5 +277,82 @@ export const enUSMessages: AppMessages = {
       too_large: "{file}: file exceeds the current 25 MB limit.",
       duplicate_name: "{file}: duplicate file name detected in this queue.",
     },
+  },
+  workspace: {
+    kicker: "Project workspace",
+    backToDashboard: "Back to dashboard",
+    loadErrorFallback: "The selected project could not be loaded.",
+    loadingProject: "Loading project workspace...",
+    loadingProjectTitle: "Preparing workspace...",
+    heroCopy:
+      "This workspace is the bridge between project setup and the visual editor. It gives us a durable place for page review, job status, and navigation before the heavier tooling lands.",
+    sourceLanguageLabel: "Source language",
+    targetLanguageLabel: "Target language",
+    pageCountLabel: "Registered pages",
+    statusLabel: "Project status",
+    summaryTitle: "Why this page exists",
+    summaryCopy:
+      "The goal of this slice is to anchor the user inside one project and make page-by-page work feel tangible instead of abstract.",
+    summaryItems: [
+      {
+        label: "Navigation",
+        value: "Active",
+        description: "Projects now have a stable URL and a clear jump point into page-level work.",
+      },
+      {
+        label: "Persistence",
+        value: "Ready",
+        description: "Every page shown here comes from the persisted local API store and survives app restarts.",
+      },
+      {
+        label: "Editor path",
+        value: "Primed",
+        description: "Each uploaded page can already open an editor shell where cleanup and typesetting tools will land next.",
+      },
+    ],
+    pagesTitle: "Page board",
+    pagesCopy:
+      "Open any page to enter the editor shell. This is where region review, cleanup masks, dialogue mapping, and typesetting controls will start to converge.",
+    pageLabel: "Page {index}",
+    emptyPages: "This project has no pages yet. Return to the dashboard and upload the first batch.",
+    stayInProjectAction: "Project overview",
+    openEditorAction: "Open editor shell",
+  },
+  editor: {
+    backToProject: "Back to project",
+    loadErrorFallback: "The editor could not load the selected project page.",
+    loadingEditor: "Loading editor shell...",
+    pageNotFound: "This page could not be found in the selected project.",
+    pageNavigatorTitle: "Page navigator",
+    pageNavigatorCopy:
+      "Switch between uploaded pages without losing the editor context. This is the first step toward chapter-scale review.",
+    pageLabel: "Page {index}",
+    sidebarTitle: "Inspector preview",
+    sidebarCopy:
+      "The sidebar is intentionally simple for now. It marks the zones where masks, OCR, assignments, and typography controls will live.",
+    sidebarItems: [
+      {
+        label: "Cleanup masks",
+        value: "Soon",
+        description: "Detected regions and editable masks will attach to this page panel.",
+      },
+      {
+        label: "Dialogue",
+        value: "Soon",
+        description: "OCR, imported script lines, and balloon assignments will appear here.",
+      },
+      {
+        label: "Typesetting",
+        value: "Soon",
+        description: "Text placement presets and typography controls will be added alongside the canvas.",
+      },
+    ],
+    kicker: "Page editor shell",
+    canvasCopy:
+      "The original uploaded page is now mounted inside a dedicated editor surface. The overlays below are placeholders for the next tooling slices.",
+    toggleMasksAction: "Toggle overlays",
+    openInspectorAction: "Open inspector",
+    overlayDetectedRegions: "Detected regions overlay placeholder",
+    overlayDialogueBlocks: "Dialogue blocks overlay placeholder",
   },
 };

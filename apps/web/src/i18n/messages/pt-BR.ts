@@ -109,7 +109,7 @@ export const ptBRMessages: AppMessages = {
     uploadSuccess: "{count} paginas registradas com sucesso.",
     projectTitle: "Crie um projeto e defina sua direcao de traducao.",
     projectCopy:
-      "Este slice ja conversa com a API. Voce pode criar projetos em draft, inspecionar os existentes e registrar um primeiro lote de upload como metadados de pagina.",
+      "Este slice ja conversa com a API. Voce pode criar projetos em draft, inspecionar os existentes e enviar um primeiro lote que persiste tanto os registros de pagina quanto os arquivos originais.",
     projectNameLabel: "Nome do projeto",
     projectNamePlaceholder: "Capitulo 01 - Revisao",
     sourceLanguageLabel: "Idioma de origem",
@@ -130,6 +130,7 @@ export const ptBRMessages: AppMessages = {
     projectListCopy:
       "Cada card reflete o estado da API. Selecione um projeto para tornalo o destino ativo da fila de upload.",
     projectListEmpty: "Nenhum projeto ainda. Crie o primeiro para liberar a fila de upload.",
+    openProjectAction: "Abrir workspace do projeto",
     pageCountLabel: "{count} paginas registradas",
     uploadTitle: "Prepare o primeiro lote de upload",
     uploadCopy:
@@ -157,5 +158,86 @@ export const ptBRMessages: AppMessages = {
       too_large: "{file}: o arquivo excede o limite atual de 25 MB.",
       duplicate_name: "{file}: nome de arquivo duplicado detectado nesta fila.",
     },
+  },
+  workspace: {
+    kicker: "Workspace do projeto",
+    backToDashboard: "Voltar ao dashboard",
+    loadErrorFallback: "Nao foi possivel carregar o projeto selecionado.",
+    loadingProject: "Carregando workspace do projeto...",
+    loadingProjectTitle: "Preparando workspace...",
+    heroCopy:
+      "Este workspace faz a ponte entre a criacao do projeto e o editor visual. Ele nos da um lugar duravel para revisar paginas, acompanhar status e navegar antes das ferramentas mais pesadas entrarem.",
+    sourceLanguageLabel: "Idioma de origem",
+    targetLanguageLabel: "Idioma de destino",
+    pageCountLabel: "Paginas registradas",
+    statusLabel: "Status do projeto",
+    summaryTitle: "Por que esta pagina existe",
+    summaryCopy:
+      "O objetivo deste slice e ancorar o usuario dentro de um projeto e fazer o trabalho por pagina parecer concreto em vez de abstrato.",
+    summaryItems: [
+      {
+        label: "Navegacao",
+        value: "Ativa",
+        description:
+          "Os projetos agora possuem URL estavel e um ponto claro de entrada para o trabalho em nivel de pagina.",
+      },
+      {
+        label: "Persistencia",
+        value: "Pronta",
+        description:
+          "Cada pagina mostrada aqui vem do store local persistido da API e sobrevive a reinicios do app.",
+      },
+      {
+        label: "Caminho do editor",
+        value: "Preparado",
+        description:
+          "Cada pagina enviada ja pode abrir um shell de editor onde limpeza e diagramacao vao entrar nos proximos slices.",
+      },
+    ],
+    pagesTitle: "Quadro de paginas",
+    pagesCopy:
+      "Abra qualquer pagina para entrar no shell do editor. E aqui que revisao de regioes, mascaras de limpeza, mapeamento de falas e controles de typesetting vao convergir.",
+    pageLabel: "Pagina {index}",
+    emptyPages:
+      "Este projeto ainda nao possui paginas. Volte ao dashboard e envie o primeiro lote.",
+    stayInProjectAction: "Visao do projeto",
+    openEditorAction: "Abrir shell do editor",
+  },
+  editor: {
+    backToProject: "Voltar ao projeto",
+    loadErrorFallback: "O editor nao conseguiu carregar a pagina selecionada.",
+    loadingEditor: "Carregando shell do editor...",
+    pageNotFound: "Esta pagina nao foi encontrada no projeto selecionado.",
+    pageNavigatorTitle: "Navegador de paginas",
+    pageNavigatorCopy:
+      "Troque entre paginas enviadas sem perder o contexto do editor. Este e o primeiro passo para uma revisao em escala de capitulo.",
+    pageLabel: "Pagina {index}",
+    sidebarTitle: "Previa do inspetor",
+    sidebarCopy:
+      "A lateral ainda e simples de proposito. Ela marca as zonas onde mascaras, OCR, atribuicoes e controles tipograficos vao viver.",
+    sidebarItems: [
+      {
+        label: "Mascaras de limpeza",
+        value: "Em breve",
+        description: "Regioes detectadas e mascaras editaveis vao se conectar a este painel da pagina.",
+      },
+      {
+        label: "Dialogos",
+        value: "Em breve",
+        description: "OCR, linhas importadas de roteiro e associacoes com baloes vao aparecer aqui.",
+      },
+      {
+        label: "Typesetting",
+        value: "Em breve",
+        description: "Presets de texto e controles tipograficos vao entrar ao lado do canvas.",
+      },
+    ],
+    kicker: "Shell do editor de pagina",
+    canvasCopy:
+      "A pagina original enviada agora esta montada em uma superficie dedicada do editor. Os overlays abaixo sao placeholders para os proximos slices de ferramenta.",
+    toggleMasksAction: "Alternar overlays",
+    openInspectorAction: "Abrir inspetor",
+    overlayDetectedRegions: "Placeholder do overlay de regioes detectadas",
+    overlayDialogueBlocks: "Placeholder do overlay de blocos de dialogo",
   },
 };
