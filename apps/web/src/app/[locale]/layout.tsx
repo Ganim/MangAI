@@ -18,8 +18,13 @@ export function generateStaticParams() {
 
 export default async function LocaleLayout({ children, params }: LocaleLayoutProps) {
   const { locale } = await params;
-  if (resolveUiLocale(locale) === null) {
+  const resolvedLocale = resolveUiLocale(locale);
+  if (resolvedLocale === null) {
     notFound();
   }
-  return <>{children}</>;
+  return (
+    <div data-ui-locale={resolvedLocale} lang={resolvedLocale}>
+      {children}
+    </div>
+  );
 }
