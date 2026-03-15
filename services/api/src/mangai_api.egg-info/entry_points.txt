@@ -1,0 +1,2 @@
+[console_scripts]
+mangai-api = mangai_api.main:main

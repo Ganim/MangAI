@@ -1,0 +1,4 @@
+SCHEMA_VERSION = 1
+SUPPORTED_UI_LOCALES = ("en-US", "pt-BR")
+SUPPORTED_TEXT_DIRECTIONS = ("ltr", "rtl", "ttb")
+

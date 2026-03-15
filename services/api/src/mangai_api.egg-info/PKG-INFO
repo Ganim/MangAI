@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: mangai-api
+Version: 0.1.0
+Summary: MangAI API service
+Requires-Python: >=3.11
+Requires-Dist: fastapi<1.0,>=0.115
+Requires-Dist: uvicorn<1.0,>=0.34
+Requires-Dist: pydantic<3.0,>=2.10
+Requires-Dist: pydantic-settings<3.0,>=2.8

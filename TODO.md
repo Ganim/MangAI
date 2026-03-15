@@ -30,9 +30,9 @@
 - [x] Create repository documentation base
 - [x] Create monorepo root structure
 - [ ] Add Next.js app bootstrap
-- [ ] Add FastAPI API bootstrap
+- [x] Add FastAPI API bootstrap
 - [ ] Add worker bootstrap
-- [ ] Add shared package contracts
+- [x] Add shared package contracts
 
 ## Architecture
 
@@ -44,9 +44,9 @@
 
 ## Frontend
 
-- [ ] Define UI locale strategy
-- [ ] Add app message catalog structure
-- [ ] Create initial `en-US` and `pt-BR` locale packs
+- [x] Define UI locale strategy
+- [x] Add app message catalog structure
+- [x] Create initial `en-US` and `pt-BR` locale packs
 - [ ] Create project dashboard
 - [ ] Create upload flow
 - [ ] Create page editor shell

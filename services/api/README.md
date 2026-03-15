@@ -1,10 +1,13 @@
 # API Service
 
-This service will expose the main application API for:
+FastAPI service for MangAI.
 
-- projects
-- pages
-- regions
-- dialogue
-- jobs
-- exports
+Current implementation focus:
+
+- application factory
+- settings and environment loading
+- health and system routes
+- initial request and response contracts
+- language and locale normalization helpers
+
+This service is intentionally starting small so the contract layer stabilizes before persistence and job orchestration are added.
