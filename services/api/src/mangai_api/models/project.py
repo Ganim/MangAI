@@ -70,6 +70,26 @@ class ListProjectsResponse(APIModel):
     projects: tuple[ProjectSummary, ...]
 
 
+class ProjectPage(APIModel):
+    id: UUID
+    project_id: UUID
+    index: int = Field(ge=1)
+    file_name: str
+    mime_type: str
+    size_bytes: int = Field(ge=1)
+    width: int | None = Field(default=None, ge=1)
+    height: int | None = Field(default=None, ge=1)
+    status: Literal["uploaded"]
+    original_asset_path: str = Field(min_length=1)
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProjectDetailResponse(APIModel):
+    project: ProjectSummary
+    pages: tuple[ProjectPage, ...]
+
+
 class RegisterProjectPageRequest(APIModel):
     file_name: str = Field(min_length=1, max_length=255)
     mime_type: str = Field(min_length=1, max_length=100)
@@ -90,7 +110,30 @@ class RegisterProjectPagesRequest(APIModel):
     pages: tuple[RegisterProjectPageRequest, ...] = Field(min_length=1)
 
 
-class PageUploadDraft(APIModel):
+class StoredProjectAsset(APIModel):
+    id: UUID
+    project_id: UUID
+    page_id: UUID
+    kind: Literal["original"]
+    file_name: str
+    storage_key: str
+    mime_type: str
+    size_bytes: int = Field(ge=1)
+    created_at: datetime
+    updated_at: datetime
+
+
+class StoredProjectState(APIModel):
+    projects: tuple[ProjectSummary, ...] = ()
+    pages: tuple[ProjectPage, ...] = ()
+    assets: tuple[StoredProjectAsset, ...] = ()
+
+
+class PageUploadDraft(ProjectPage):
+    pass
+
+
+class RegisterUploadedProjectPage(APIModel):
     id: UUID
     project_id: UUID
     index: int = Field(ge=1)
@@ -100,13 +143,14 @@ class PageUploadDraft(APIModel):
     width: int | None = Field(default=None, ge=1)
     height: int | None = Field(default=None, ge=1)
     status: Literal["uploaded"]
+    original_asset_path: str = Field(min_length=1)
     created_at: datetime
     updated_at: datetime
 
 
 class RegisterProjectPagesResponse(APIModel):
     project: ProjectSummary
-    pages: tuple[PageUploadDraft, ...]
+    pages: tuple[RegisterUploadedProjectPage, ...]
 
 
 class CreateProjectResponse(APIModel):

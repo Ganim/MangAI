@@ -1,11 +1,4 @@
-from fastapi.testclient import TestClient
-
-from mangai_api.app import create_app
-
-
-def test_system_meta_exposes_schema_and_locales() -> None:
-    client = TestClient(create_app())
-
+def test_system_meta_exposes_schema_and_locales(client) -> None:
     response = client.get("/api/v1/system/meta")
 
     assert response.status_code == 200

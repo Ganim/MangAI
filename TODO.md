@@ -57,7 +57,7 @@
 
 - [x] Create project and page APIs
 - [ ] Create job API
-- [ ] Create asset storage layer
+- [x] Create asset storage layer
 - [ ] Create cleanup pipeline contract
 - [ ] Create OCR pipeline contract
 

@@ -2,7 +2,7 @@ import {
   parseCreateProjectRequest,
   parseCreateProjectResponse,
   parseListProjectsResponse,
-  parseRegisterProjectPagesRequest,
+  parseProjectDetailResponse,
   parseRegisterProjectPagesResponse,
 } from "@mangai/shared";
 
@@ -26,13 +26,7 @@ type CreateProjectInput = {
 };
 
 type RegisterPagesInput = {
-  pages: Array<{
-    file_name: string;
-    mime_type: string;
-    size_bytes: number;
-    width: number | null;
-    height: number | null;
-  }>;
+  files: File[];
 };
 
 async function readJsonResponse(response: Response): Promise<unknown> {
@@ -76,6 +70,14 @@ export async function listProjects() {
   return requestJson("/projects", { method: "GET" }, parseListProjectsResponse);
 }
 
+export function resolveApiAssetUrl(assetPath: string) {
+  return `${getPublicApiBaseUrl()}${assetPath}`;
+}
+
+export async function getProjectDetail(projectId: string) {
+  return requestJson(`/projects/${projectId}`, { method: "GET" }, parseProjectDetailResponse);
+}
+
 export async function createProject(input: CreateProjectInput) {
   const payload = parseCreateProjectRequest(input);
   return requestJson(
@@ -89,13 +91,27 @@ export async function createProject(input: CreateProjectInput) {
 }
 
 export async function registerProjectPages(projectId: string, input: RegisterPagesInput) {
-  const payload = parseRegisterProjectPagesRequest(input);
-  return requestJson(
-    `/projects/${projectId}/pages`,
-    {
-      method: "POST",
-      body: JSON.stringify(payload),
-    },
-    parseRegisterProjectPagesResponse,
-  );
+  const formData = new FormData();
+  for (const file of input.files) {
+    formData.append("files", file, file.name);
+  }
+
+  const response = await fetch(`${getPublicApiBaseUrl()}/projects/${projectId}/pages/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  const payload = await readJsonResponse(response);
+  if (!response.ok) {
+    const errorPayload =
+      payload && typeof payload === "object"
+        ? (payload as { error_code?: string; message?: string })
+        : undefined;
+    throw new ApiClientError(
+      errorPayload?.error_code ?? "API_REQUEST_FAILED",
+      errorPayload?.message ?? `Request failed with status ${response.status}.`,
+    );
+  }
+
+  return parseRegisterProjectPagesResponse(payload);
 }

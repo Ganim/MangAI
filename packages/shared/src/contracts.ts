@@ -159,8 +159,24 @@ export function parseRegisteredProjectPage(value: unknown, path: Array<string | 
         atPath(path, "height"),
       ) ?? null,
     status: readEnum(objectValue.status, ["uploaded"] as const, atPath(path, "status")),
+    original_asset_path: readString(
+      objectValue.original_asset_path,
+      atPath(path, "original_asset_path"),
+    ),
     created_at: readTimestamp(objectValue.created_at, atPath(path, "created_at")),
     updated_at: readTimestamp(objectValue.updated_at, atPath(path, "updated_at")),
+  };
+}
+
+export function parseProjectDetailResponse(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    project: parseProjectSummary(objectValue.project, atPath(path, "project")),
+    pages: readArray(
+      objectValue.pages,
+      atPath(path, "pages"),
+      (item, itemPath) => parseRegisteredProjectPage(item, itemPath),
+    ),
   };
 }
 

@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 
 from mangai_api.config import get_settings
 from mangai_api.error_handlers import register_error_handlers
-from mangai_api.repositories import InMemoryProjectStore
+from mangai_api.repositories import LocalProjectStore
 from mangai_api.routers import build_api_router
 
 
@@ -22,7 +22,10 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    app.state.project_store = InMemoryProjectStore()
+    app.state.project_store = LocalProjectStore(
+        data_dir=settings.data_dir,
+        api_prefix=settings.api_prefix,
+    )
     register_error_handlers(app)
     app.include_router(build_api_router(), prefix=settings.api_prefix)
     return app

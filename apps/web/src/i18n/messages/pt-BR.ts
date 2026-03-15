@@ -133,7 +133,7 @@ export const ptBRMessages: AppMessages = {
     pageCountLabel: "{count} paginas registradas",
     uploadTitle: "Prepare o primeiro lote de upload",
     uploadCopy:
-      "Escolha arquivos de pagina da sua maquina, revise a fila e registre tudo no projeto selecionado. O armazenamento binario entra no proximo slice; por enquanto estamos fechando o fluxo de metadados.",
+      "Escolha arquivos de pagina da sua maquina, revise a fila e envie tudo para o projeto selecionado. A API agora persiste tanto os metadados quanto o asset binario original localmente.",
     selectedProjectLabel: "Projeto ativo",
     noProjectSelected: "Selecione ou crie um projeto primeiro",
     chooseFilesAction: "Escolher paginas",
@@ -144,7 +144,14 @@ export const ptBRMessages: AppMessages = {
     registerAction: "Registrar paginas",
     registeringAction: "Registrando paginas...",
     uploadHint:
-      "A API atual aceita um lote de metadados por acao e ja incrementa a contagem de paginas do projeto.",
+      "Cada upload salva o arquivo original localmente, persiste o registro da pagina e incrementa a contagem de paginas do projeto.",
+    pagesLoading: "Carregando paginas do projeto...",
+    pagesTitle: "Paginas armazenadas do projeto",
+    pagesCopy:
+      "Estas paginas vem do estado persistido da API. Elas sobrevivem a reinicios do servidor e apontam para o asset original enviado.",
+    pagesEmpty: "Este projeto ainda nao possui paginas armazenadas.",
+    pageIndexLabel: "Pagina {index}",
+    storedOriginalLabel: "Asset original armazenado localmente",
     rejectionReasons: {
       unsupported_type: "{file}: tipo de arquivo nao suportado. Use JPEG, PNG ou WEBP.",
       too_large: "{file}: o arquivo excede o limite atual de 25 MB.",

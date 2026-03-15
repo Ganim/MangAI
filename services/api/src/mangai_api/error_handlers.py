@@ -2,7 +2,11 @@ from fastapi import Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
-from mangai_api.domain_errors import ProjectNotFoundError
+from mangai_api.domain_errors import (
+    ProjectNotFoundError,
+    ProjectPageNotFoundError,
+    UploadValidationError,
+)
 from mangai_api.i18n import LocaleValidationError
 from mangai_api.models.common import ErrorResponse
 
@@ -27,6 +31,28 @@ def register_error_handlers(app) -> None:
         )
         return JSONResponse(
             status_code=status.HTTP_404_NOT_FOUND,
+            content=payload.model_dump(),
+        )
+
+    @app.exception_handler(ProjectPageNotFoundError)
+    async def handle_page_not_found(_: Request, exc: ProjectPageNotFoundError) -> JSONResponse:
+        payload = ErrorResponse(
+            error_code="PAGE_NOT_FOUND",
+            message=str(exc),
+        )
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=payload.model_dump(),
+        )
+
+    @app.exception_handler(UploadValidationError)
+    async def handle_upload_validation(_: Request, exc: UploadValidationError) -> JSONResponse:
+        payload = ErrorResponse(
+            error_code="INVALID_UPLOAD",
+            message=str(exc),
+        )
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content=payload.model_dump(),
         )
 

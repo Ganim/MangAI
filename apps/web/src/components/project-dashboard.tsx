@@ -4,9 +4,15 @@ import { useEffect, useState, useTransition } from "react";
 
 import type { AppMessages } from "../i18n/index.ts";
 import type { SupportedUiLocale } from "../i18n/config.ts";
-import { ApiClientError, createProject, listProjects, registerProjectPages } from "../features/projects/api.ts";
 import {
-  buildRegisterPagesPayload,
+  ApiClientError,
+  createProject,
+  getProjectDetail,
+  listProjects,
+  registerProjectPages,
+  resolveApiAssetUrl,
+} from "../features/projects/api.ts";
+import {
   createUploadQueue,
   formatBytes,
   removeUploadQueueItem,
@@ -16,6 +22,7 @@ import {
 } from "../features/projects/upload.ts";
 
 type ProjectSummary = Awaited<ReturnType<typeof listProjects>>["projects"][number];
+type ProjectPage = Awaited<ReturnType<typeof getProjectDetail>>["pages"][number];
 
 type ProjectDashboardProps = {
   locale: SupportedUiLocale;
@@ -46,7 +53,10 @@ export function ProjectDashboard({ locale, messages }: ProjectDashboardProps) {
   const [createError, setCreateError] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
-  const [queue, setQueue] = useState<UploadQueueItem[]>([]);
+  const [pageLoadError, setPageLoadError] = useState<string | null>(null);
+  const [projectPages, setProjectPages] = useState<ProjectPage[]>([]);
+  const [isLoadingPages, setIsLoadingPages] = useState(false);
+  const [queue, setQueue] = useState<UploadQueueItem<File>[]>([]);
   const [rejections, setRejections] = useState<UploadQueueRejection[]>([]);
   const [isCreating, startCreateTransition] = useTransition();
   const [isUploading, startUploadTransition] = useTransition();
@@ -90,6 +100,47 @@ export function ProjectDashboard({ locale, messages }: ProjectDashboardProps) {
 
   const selectedProject =
     projects.find((project) => project.id === selectedProjectId) ?? projects[0] ?? null;
+
+  useEffect(() => {
+    if (selectedProjectId === null) {
+      setProjectPages([]);
+      setPageLoadError(null);
+      setIsLoadingPages(false);
+      return;
+    }
+
+    const projectId: string = selectedProjectId;
+    let canceled = false;
+
+    async function loadProjectDetail() {
+      setIsLoadingPages(true);
+      setPageLoadError(null);
+
+      try {
+        const response = await getProjectDetail(projectId);
+        if (canceled) {
+          return;
+        }
+        setProjectPages(response.pages);
+        setApiState("online");
+      } catch (error) {
+        if (canceled) {
+          return;
+        }
+        setPageLoadError(getErrorMessage(error, messages.dashboard.loadErrorFallback));
+      } finally {
+        if (!canceled) {
+          setIsLoadingPages(false);
+        }
+      }
+    }
+
+    void loadProjectDetail();
+
+    return () => {
+      canceled = true;
+    };
+  }, [messages.dashboard.loadErrorFallback, selectedProjectId]);
 
   function handleProjectSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -136,12 +187,15 @@ export function ProjectDashboard({ locale, messages }: ProjectDashboardProps) {
       try {
         const response = await registerProjectPages(
           selectedProject.id,
-          buildRegisterPagesPayload(queue),
+          { files: queue.map((item) => item.file) },
         );
         setProjects((currentValue) =>
           currentValue.map((project) =>
             project.id === response.project.id ? response.project : project,
           ),
+        );
+        setProjectPages((currentValue) =>
+          [...currentValue, ...response.pages].sort((left, right) => left.index - right.index),
         );
         setSelectedProjectId(response.project.id);
         setQueue([]);
@@ -311,6 +365,7 @@ export function ProjectDashboard({ locale, messages }: ProjectDashboardProps) {
 
         {uploadError ? <p className="notice notice-error">{uploadError}</p> : null}
         {uploadSuccess ? <p className="notice notice-success">{uploadSuccess}</p> : null}
+        {pageLoadError ? <p className="notice notice-error">{pageLoadError}</p> : null}
 
         {rejections.length > 0 ? (
           <ul className="rejection-list">
@@ -364,6 +419,41 @@ export function ProjectDashboard({ locale, messages }: ProjectDashboardProps) {
           </button>
           <span className="upload-hint">{messages.dashboard.uploadHint}</span>
         </div>
+
+        <div className="section-head section-head-compact">
+          <h3 className="section-title">{messages.dashboard.pagesTitle}</h3>
+          <p className="section-copy">{messages.dashboard.pagesCopy}</p>
+        </div>
+
+        {isLoadingPages ? (
+          <p className="empty-state">{messages.dashboard.pagesLoading}</p>
+        ) : projectPages.length === 0 ? (
+          <p className="empty-state">{messages.dashboard.pagesEmpty}</p>
+        ) : (
+          <div className="stored-pages-grid">
+            {projectPages.map((page) => (
+              <article className="stored-page-card" key={page.id}>
+                <div className="stored-page-preview-frame">
+                  <img
+                    alt={page.file_name}
+                    className="stored-page-preview"
+                    src={resolveApiAssetUrl(page.original_asset_path)}
+                  />
+                </div>
+                <div className="stored-page-body">
+                  <span className="card-step">
+                    {messages.dashboard.pageIndexLabel.replace("{index}", String(page.index))}
+                  </span>
+                  <h3 className="card-title">{page.file_name}</h3>
+                  <p className="card-description">
+                    {page.mime_type} · {formatBytes(page.size_bytes)}
+                  </p>
+                  <p className="card-description">{messages.dashboard.storedOriginalLabel}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </article>
     </section>
   );

@@ -1,4 +1,4 @@
-from mangai_api.repositories.projects import InMemoryProjectStore
+from mangai_api.repositories.projects import LocalProjectStore
 
 
-__all__ = ["InMemoryProjectStore"]
+__all__ = ["LocalProjectStore"]

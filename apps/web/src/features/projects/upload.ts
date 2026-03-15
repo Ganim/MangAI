@@ -9,13 +9,14 @@ export type UploadFileLike = {
   size: number;
 };
 
-export type UploadQueueItem = {
+export type UploadQueueItem<TFile extends UploadFileLike = UploadFileLike> = {
   client_id: string;
   file_name: string;
   mime_type: string;
   size_bytes: number;
   width: number | null;
   height: number | null;
+  file: TFile;
 };
 
 export type UploadQueueRejection = {
@@ -28,11 +29,11 @@ const fileNameCollator = new Intl.Collator(undefined, {
   sensitivity: "base",
 });
 
-export function createUploadQueue(files: readonly UploadFileLike[]): {
-  accepted: UploadQueueItem[];
+export function createUploadQueue<TFile extends UploadFileLike>(files: readonly TFile[]): {
+  accepted: UploadQueueItem<TFile>[];
   rejected: UploadQueueRejection[];
 } {
-  const accepted: UploadQueueItem[] = [];
+  const accepted: UploadQueueItem<TFile>[] = [];
   const rejected: UploadQueueRejection[] = [];
   const seenNames = new Set<string>();
 
@@ -72,16 +73,17 @@ export function createUploadQueue(files: readonly UploadFileLike[]): {
       size_bytes: file.size,
       width: null,
       height: null,
+      file,
     });
   }
 
   return { accepted, rejected };
 }
 
-export function removeUploadQueueItem(
-  queue: readonly UploadQueueItem[],
+export function removeUploadQueueItem<TFile extends UploadFileLike>(
+  queue: readonly UploadQueueItem<TFile>[],
   clientId: string,
-): UploadQueueItem[] {
+): UploadQueueItem<TFile>[] {
   return queue.filter((item) => item.client_id !== clientId);
 }
 
@@ -95,6 +97,16 @@ export function buildRegisterPagesPayload(queue: readonly UploadQueueItem[]) {
       height: item.height,
     })),
   });
+}
+
+export function buildUploadFormData(queue: readonly UploadQueueItem<File>[]) {
+  const formData = new FormData();
+
+  for (const item of queue) {
+    formData.append("files", item.file as Blob, item.file_name);
+  }
+
+  return formData;
 }
 
 export function formatBytes(sizeBytes: number): string {

@@ -73,6 +73,12 @@ export type AppMessages = {
     registerAction: string;
     registeringAction: string;
     uploadHint: string;
+    pagesLoading: string;
+    pagesTitle: string;
+    pagesCopy: string;
+    pagesEmpty: string;
+    pageIndexLabel: string;
+    storedOriginalLabel: string;
     rejectionReasons: {
       unsupported_type: string;
       too_large: string;
@@ -207,7 +213,7 @@ export const enUSMessages: AppMessages = {
     pageCountLabel: "{count} registered pages",
     uploadTitle: "Prepare the first upload batch",
     uploadCopy:
-      "Pick page files from your machine, review the queue, and register them into the selected project. Binary storage will come in the next slice; for now we are locking the metadata flow.",
+      "Pick page files from your machine, review the queue, and upload them into the selected project. The API now persists both metadata and the original binary asset locally.",
     selectedProjectLabel: "Active project",
     noProjectSelected: "Select or create a project first",
     chooseFilesAction: "Choose page files",
@@ -217,7 +223,14 @@ export const enUSMessages: AppMessages = {
     registerAction: "Register pages",
     registeringAction: "Registering pages...",
     uploadHint:
-      "The current API accepts one metadata batch per action and already increments the project page count.",
+      "Each upload stores the original file locally, persists the page record, and increments the project page count.",
+    pagesLoading: "Loading project pages...",
+    pagesTitle: "Stored project pages",
+    pagesCopy:
+      "These pages come from the persisted API state. They survive server restarts and point to the original uploaded asset.",
+    pagesEmpty: "This project still has no stored pages.",
+    pageIndexLabel: "Page {index}",
+    storedOriginalLabel: "Original asset stored locally",
     rejectionReasons: {
       unsupported_type: "{file}: unsupported file type. Use JPEG, PNG, or WEBP.",
       too_large: "{file}: file exceeds the current 25 MB limit.",

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+  buildUploadFormData,
   buildRegisterPagesPayload,
   createUploadQueue,
   formatBytes,
@@ -27,6 +28,19 @@ assert.equal(reducedQueue.length, 1);
 const registerPayload = buildRegisterPagesPayload(queueResult.accepted);
 assert.equal(registerPayload.pages.length, 2);
 assert.equal(registerPayload.pages[0]?.width, null);
+
+if (typeof File !== "undefined") {
+  const uploadFiles = [
+    new File(["alpha"], "002.png", { type: "image/png" }),
+    new File(["beta"], "001.jpg", { type: "image/jpeg" }),
+  ];
+  const uploadQueue = createUploadQueue(uploadFiles).accepted;
+  const formData = buildUploadFormData(uploadQueue);
+  const entries = Array.from(formData.entries());
+
+  assert.equal(entries.length, 2);
+  assert.equal(entries[0]?.[0], "files");
+}
 
 assert.equal(formatBytes(500), "500 B");
 assert.equal(formatBytes(2048), "2.0 KB");
