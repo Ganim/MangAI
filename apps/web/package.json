@@ -1,0 +1,10 @@
+{
+  "name": "@mangai/web",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "echo \"Bootstrap Next.js app here\"",
+    "build": "echo \"Build step not configured yet\"",
+    "lint": "echo \"Lint step not configured yet\""
+  }
+}

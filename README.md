@@ -1,10 +1,10 @@
-# BubbleFlow
+# MangAI
 
-BubbleFlow is an AI-first, human-assisted web tool for cleaning comic and manga pages, translating dialogue, placing text back into balloons, and exporting production-ready files for review and finishing in Photoshop.
+MangAI is an AI-first, human-assisted web tool for cleaning comic and manga pages, translating dialogue, placing text back into balloons, and exporting production-ready files for review and finishing in Photoshop.
 
 ## Vision
 
-BubbleFlow exists to automate the repetitive 70-90% of comic localization work while preserving professional control over the final result.
+MangAI exists to automate the repetitive 70-90% of comic localization work while preserving professional control over the final result.
 
 The product is designed for translators, redrawers, cleaners, typesetters, and studios that need:
 
@@ -64,7 +64,7 @@ Out of scope for MVP:
 
 ## System Overview
 
-BubbleFlow should be built around a canonical project document that stores:
+MangAI should be built around a canonical project document that stores:
 
 - source page assets
 - detected regions

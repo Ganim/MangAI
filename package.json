@@ -1,0 +1,12 @@
+{
+  "name": "mangai",
+  "private": true,
+  "version": "0.1.0",
+  "description": "MangAI monorepo",
+  "packageManager": "pnpm@10.7.0",
+  "scripts": {
+    "dev:web": "pnpm --dir apps/web dev",
+    "lint": "echo \"Lint commands will be added as apps are bootstrapped.\"",
+    "format": "echo \"Format commands will be added as apps are bootstrapped.\""
+  }
+}

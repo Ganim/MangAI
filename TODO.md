@@ -2,10 +2,19 @@
 
 ## Product
 
-- [ ] Confirm product name
+- [x] Confirm product name
 - [ ] Confirm target user personas
 - [ ] Confirm MVP scope
 - [ ] Define success metrics for beta
+
+## Monorepo
+
+- [x] Create repository documentation base
+- [x] Create monorepo root structure
+- [ ] Add Next.js app bootstrap
+- [ ] Add FastAPI API bootstrap
+- [ ] Add worker bootstrap
+- [ ] Add shared package contracts
 
 ## Architecture
 

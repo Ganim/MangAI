@@ -20,6 +20,7 @@ Exit criteria:
 
 Goal: create the application skeleton and baseline infrastructure.
 
+- create the monorepo layout
 - set up monorepo structure
 - create web app shell
 - create API service shell
@@ -32,6 +33,7 @@ Exit criteria:
 - user can create a project
 - user can upload pages
 - jobs can be enqueued and tracked
+- local development structure is ready for implementation
 
 ## Phase 2 - Detection and Review
 
