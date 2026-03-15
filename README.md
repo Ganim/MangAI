@@ -113,14 +113,18 @@ Primary outputs:
 |-- docs/
 |   |-- PRD.md
 |   |-- ARCHITECTURE.md
+|   |-- PLANNING_REVIEW.md
 |   |-- FLOWS.md
 |   |-- MVP.md
 |   |-- DOMAIN_MODEL.md
+|   |-- SCHEMA_V1.md
 |   |-- PIPELINES.md
 |   |-- EDITOR_UX.md
 |   |-- QUALITY.md
 |   |-- RISKS.md
 |   |-- DECISIONS.md
+|   |-- API_CONTRACTS.md
+|   |-- BACKLOG.md
 |   `-- MONOREPO.md
 |-- apps/
 |   `-- web/
@@ -134,8 +138,8 @@ Primary outputs:
 ## Immediate Next Steps
 
 1. Finalize the planning package.
-2. Convert planning docs into implementation tickets.
-3. Define the first shared schemas and contracts.
+2. Freeze schema v1 and layer contracts.
+3. Convert the MVP into implementation tickets and epics.
 4. Bootstrap the implementation stack with the planning guardrails in place.
 
 ## Status

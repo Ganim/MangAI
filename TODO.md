@@ -11,16 +11,18 @@
 
 - [x] Write PRD
 - [x] Write architecture overview
+- [x] Write planning review
 - [x] Write user flows
 - [x] Write MVP definition
 - [x] Write domain model
+- [x] Define schema v1
 - [x] Write pipeline design
 - [x] Write editor UX guidance
 - [x] Write quality standards
 - [x] Write risk map
 - [x] Write decisions log
-- [ ] Turn planning docs into implementation tickets
-- [ ] Define schema v1 from the domain model
+- [x] Turn planning docs into implementation tickets
+- [x] Define layer contracts between web, api, workers, and shared
 
 ## Monorepo
 
@@ -33,8 +35,8 @@
 
 ## Architecture
 
-- [ ] Define canonical project JSON schema
-- [ ] Define page, region, dialogue, and export entities
+- [x] Define canonical project JSON schema
+- [x] Define page, region, dialogue, and export entities
 - [ ] Choose AI providers for cleanup and translation
 - [ ] Decide PSD export strategy
 
