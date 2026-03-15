@@ -1,10 +1,14 @@
 # Shared Package
 
-Shared contracts and utilities for MangAI.
+Shared runtime contracts for MangAI.
 
-Expected contents:
+This package now contains:
 
-- shared types
-- API contracts
-- project schema
-- export manifest schema
+- schema version constant
+- enums
+- locale and language helpers
+- entity validators
+- API request validators
+- worker payload and result validators
+
+The initial implementation avoids external dependencies so the contract layer stays lightweight and easy to adopt across the monorepo.
