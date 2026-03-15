@@ -22,6 +22,7 @@
 - text fitting logic
 - assignment heuristics
 - schema validation
+- locale and language normalization
 
 ### Integration Tests
 
@@ -37,6 +38,7 @@
 - review regions
 - assign dialogue
 - export output
+- verify at least one alternate UI locale
 
 ## Reliability Standards
 
@@ -58,6 +60,7 @@
 - every important action provides feedback
 - every error state provides recovery options
 - preview should reflect export output as closely as possible
+- app UI should remain usable in supported locales without broken layout
 
 ## Done Criteria For Features
 

@@ -11,6 +11,7 @@
 
 - [x] Write PRD
 - [x] Write architecture overview
+- [x] Write internationalization strategy
 - [x] Write planning review
 - [x] Write user flows
 - [x] Write MVP definition
@@ -37,11 +38,15 @@
 
 - [x] Define canonical project JSON schema
 - [x] Define page, region, dialogue, and export entities
+- [ ] Define internationalization and locale model
 - [ ] Choose AI providers for cleanup and translation
 - [ ] Decide PSD export strategy
 
 ## Frontend
 
+- [ ] Define UI locale strategy
+- [ ] Add app message catalog structure
+- [ ] Create initial `en-US` and `pt-BR` locale packs
 - [ ] Create project dashboard
 - [ ] Create upload flow
 - [ ] Create page editor shell
@@ -71,6 +76,7 @@
 - [ ] Define PDF renderer
 - [ ] Define PSD renderer
 - [ ] Define export manifest format
+- [ ] Define font fallback and missing-font behavior
 
 ## Operations
 

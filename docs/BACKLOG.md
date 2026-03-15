@@ -38,6 +38,17 @@ Done when:
 
 - api and workers agree on payload ownership and outputs
 
+### E1-T4 Define i18n contracts
+
+Deliverable:
+
+- UI locale rules, language-tag normalization rules, text-direction contract, and font fallback policy baseline
+- initial supported locale set frozen as `en-US` and `pt-BR`
+
+Done when:
+
+- app, api, workers, and shared have a single source of truth for locale and language metadata
+
 ## Epic 2: Repository And Tooling Bootstrap
 
 ### E2-T1 Bootstrap `packages/shared`
@@ -45,6 +56,7 @@ Done when:
 - add schema source files
 - add enum exports
 - add validation layer
+- add locale and text-direction helpers
 
 ### E2-T2 Bootstrap `services/api`
 
@@ -64,6 +76,8 @@ Done when:
 - Next.js app shell
 - auth placeholder
 - project dashboard shell
+- i18n shell and message catalog structure
+- initial catalogs for `en-US` and `pt-BR`
 
 ## Epic 3: Project And Upload Flow
 
@@ -161,9 +175,13 @@ Done when:
 
 ### E8-T5 Style preset model
 
+### E8-T6 Language-aware font fallback model
+
 Done when:
 
 - auto layout works and is editable
+- the system can apply language-appropriate style defaults
+- English and Portuguese presets are validated first
 
 ## Epic 9: Export
 

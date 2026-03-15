@@ -4,6 +4,16 @@
 
 Define how `web`, `api`, `workers`, and `shared` interact without duplicating logic or drifting on schema interpretation.
 
+## Localization Contract Rules
+
+- UI locale is a product concern and must not be confused with project source or target language
+- language tags in persisted content contracts should use BCP 47
+- API error responses should prefer stable `error_code` values over localized prose
+- `web` is responsible for localizing UI strings shown to users
+- `api` is responsible for validating language and locale fields
+- `workers` must consume normalized language metadata only
+- the initial supported UI locale pair is `en-US` and `pt-BR`
+
 ## Layer Responsibilities
 
 ### `packages/shared`
@@ -86,8 +96,9 @@ Workers must not mutate unrelated entities directly.
 ```json
 {
   "name": "My Project",
-  "source_language": "ja",
-  "target_language": "en"
+  "source_language": "ja-JP",
+  "target_language": "en-US",
+  "target_text_direction": "ltr"
 }
 ```
 
@@ -100,8 +111,9 @@ Workers must not mutate unrelated entities directly.
     "schema_version": 1,
     "name": "My Project",
     "status": "draft",
-    "source_language": "ja",
-    "target_language": "en"
+    "source_language": "ja-JP",
+    "target_language": "en-US",
+    "target_text_direction": "ltr"
   }
 }
 ```
@@ -175,7 +187,7 @@ Workers must not mutate unrelated entities directly.
 {
   "page_id": "uuid",
   "content": "text",
-  "source_language": "ja",
+  "source_language": "ja-JP",
   "reading_order": 1
 }
 ```
@@ -187,7 +199,8 @@ Workers must not mutate unrelated entities directly.
 ```json
 {
   "dialogue_id": "uuid",
-  "target_language": "en",
+  "target_language": "en-US",
+  "text_direction": "ltr",
   "content": "translated text",
   "status": "reviewed"
 }
@@ -221,10 +234,12 @@ Workers must not mutate unrelated entities directly.
   },
   "style": {
     "font_family": "Anime Ace",
+    "font_fallbacks": ["Noto Sans", "Arial Unicode MS"],
     "font_size": 24,
     "leading": 28,
     "tracking": 0,
     "alignment": "center",
+    "direction": "ltr",
     "rotation": 0,
     "fill": "#000000"
   }
@@ -314,8 +329,8 @@ Workers must not mutate unrelated entities directly.
   "job_id": "uuid",
   "project_id": "uuid",
   "dialogue_ids": ["uuid"],
-  "source_language": "ja",
-  "target_language": "en"
+  "source_language": "ja-JP",
+  "target_language": "en-US"
 }
 ```
 
@@ -411,3 +426,4 @@ The first version of `packages/shared` should contain:
 - `workers` never return undocumented fields
 - `api` never persists payloads that fail shared validation
 - breaking schema changes require a version increment
+- locale-sensitive fields must be normalized before persistence

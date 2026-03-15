@@ -6,10 +6,16 @@ Schema V1 defines the canonical project state that all layers must understand co
 
 This schema is product-facing, not database-specific.
 
+MVP language focus:
+
+- first-class target and UI support should be strongest for `en-US` and `pt-BR`
+- the schema remains extensible beyond those locales
+
 ## Global Rules
 
 - all IDs are UUID strings
 - all timestamps use ISO 8601 UTC
+- language and locale values should use BCP 47 strings
 - original assets are immutable
 - derived assets are versioned
 - every persisted object has `id`, `created_at`, and `updated_at`
@@ -74,6 +80,17 @@ This schema is product-facing, not database-specific.
 - `draft`
 - `reviewed`
 - `approved`
+
+### TextDirection
+
+- `ltr`
+- `rtl`
+- `ttb`
+
+MVP default:
+
+- `en-US -> ltr`
+- `pt-BR -> ltr`
 
 ### AssignmentOrigin
 
@@ -143,10 +160,12 @@ This schema is product-facing, not database-specific.
 ```json
 {
   "font_family": "string",
+  "font_fallbacks": ["string"],
   "font_size": 24,
   "leading": 28,
   "tracking": 0,
   "alignment": "center",
+  "direction": "ltr",
   "rotation": 0,
   "fill": "#000000"
 }
@@ -163,8 +182,9 @@ This schema is product-facing, not database-specific.
   "name": "My Project",
   "owner_id": "uuid",
   "status": "draft",
-  "source_language": "ja",
-  "target_language": "en",
+  "source_language": "ja-JP",
+  "target_language": "en-US",
+  "target_text_direction": "ltr",
   "default_style_preset_id": null,
   "created_at": "2026-03-15T00:00:00Z",
   "updated_at": "2026-03-15T00:00:00Z"
@@ -180,6 +200,7 @@ Required fields:
 - `status`
 - `source_language`
 - `target_language`
+- `target_text_direction`
 
 ### Page
 
@@ -296,7 +317,7 @@ Rules:
   "id": "uuid",
   "page_id": "uuid",
   "source": "ocr",
-  "source_language": "ja",
+  "source_language": "ja-JP",
   "content": "....",
   "reading_order": 1,
   "status": "draft",
@@ -317,7 +338,8 @@ Rules:
 {
   "id": "uuid",
   "dialogue_id": "uuid",
-  "target_language": "en",
+  "target_language": "en-US",
+  "text_direction": "ltr",
   "provider": "manual",
   "content": "I can handle this.",
   "status": "draft",
@@ -331,6 +353,7 @@ Rules:
 
 - approved exports should use only approved translations
 - multiple translations may exist, but only one active approved translation should be exportable
+- `text_direction` should be explicit rather than inferred late in the pipeline
 
 ### Assignment
 
@@ -368,10 +391,12 @@ Rules:
   },
   "style": {
     "font_family": "Anime Ace",
+    "font_fallbacks": ["Noto Sans", "Arial Unicode MS"],
     "font_size": 26,
     "leading": 30,
     "tracking": 0,
     "alignment": "center",
+    "direction": "ltr",
     "rotation": 0,
     "fill": "#000000"
   },
@@ -388,6 +413,7 @@ Rules:
 
 - only one active placement per assignment
 - placements are replaceable but previous revisions should remain auditable
+- placement style must remain compatible with target language and text direction
 
 ### Job
 

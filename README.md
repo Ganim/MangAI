@@ -23,6 +23,7 @@ The product is designed for translators, redrawers, cleaners, typesetters, and s
 - PSD export is a first-class workflow
 - Every automated step must remain editable
 - The project file, not the PSD, is the system of record
+- Internationalization must be built in from the start
 
 ## Core Workflow
 
@@ -113,6 +114,7 @@ Primary outputs:
 |-- docs/
 |   |-- PRD.md
 |   |-- ARCHITECTURE.md
+|   |-- I18N.md
 |   |-- PLANNING_REVIEW.md
 |   |-- FLOWS.md
 |   |-- MVP.md

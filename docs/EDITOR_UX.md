@@ -6,6 +6,7 @@
 - AI suggestions must be easy to override
 - users should never lose track of what is original, suggested, or approved
 - the shortest path for common corrections should be obvious
+- UI language and content language must remain conceptually separate
 
 ## Main Editor Layout
 
@@ -15,6 +16,7 @@
 - region list
 - dialogue list
 - filter controls
+- UI locale-aware labels and formatting
 
 ### Center Canvas
 
@@ -31,6 +33,7 @@
 - translation text
 - typesetting controls
 - action buttons
+- language and text-direction metadata where relevant
 
 ## Primary Modes
 
@@ -86,6 +89,7 @@
 - change alignment
 - tweak line breaks
 - apply preset
+- respect language-aware font and direction defaults
 
 ## UX Risks To Avoid
 
@@ -93,3 +97,4 @@
 - editor state that changes without clear feedback
 - AI actions that overwrite manual edits
 - export that looks different from the editor preview
+- confusing UI locale with source or target language settings

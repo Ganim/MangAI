@@ -9,6 +9,8 @@ Prove that MangAI can reduce the time needed to clean, translate, and typeset co
 - project creation
 - page upload
 - page list view
+- multilingual-ready UI architecture
+- initial UI locales: `en-US` and `pt-BR`
 - text region detection
 - manual region and mask correction
 - AI cleanup on selected regions
@@ -40,6 +42,8 @@ Prove that MangAI can reduce the time needed to clean, translate, and typeset co
 - optimize for desktop browsers
 - prioritize manga/comic balloons before free-form text over scenery
 - prefer reliability and editability over aggressive automation
+- treat internationalization as a foundation concern, not a late-stage enhancement
+- focus first-class UX and typesetting support on English and Portuguese
 
 ## MVP Success Criteria
 
