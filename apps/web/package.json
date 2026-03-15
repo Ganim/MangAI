@@ -4,11 +4,20 @@
   "version": "0.1.0",
   "type": "module",
   "dependencies": {
-    "@mangai/shared": "workspace:*"
+    "@mangai/shared": "workspace:*",
+    "next": "^16.1.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
   },
   "scripts": {
     "dev": "echo \"Bootstrap Next.js app here\"",
     "build": "echo \"Build step not configured yet\"",
     "lint": "echo \"Lint step not configured yet\""
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
   }
 }
