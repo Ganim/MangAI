@@ -2,29 +2,60 @@
 
 ## Product
 
-- [ ] Confirm product name
-- [ ] Confirm target user personas
-- [ ] Confirm MVP scope
+- [x] Confirm product name
+- [x] Confirm target user personas
+- [x] Confirm MVP scope
 - [ ] Define success metrics for beta
+
+## Planning
+
+- [x] Write PRD
+- [x] Write architecture overview
+- [x] Write internationalization strategy
+- [x] Write planning review
+- [x] Write user flows
+- [x] Write MVP definition
+- [x] Write domain model
+- [x] Define schema v1
+- [x] Write pipeline design
+- [x] Write editor UX guidance
+- [x] Write quality standards
+- [x] Write risk map
+- [x] Write decisions log
+- [x] Turn planning docs into implementation tickets
+- [x] Define layer contracts between web, api, workers, and shared
+
+## Monorepo
+
+- [x] Create repository documentation base
+- [x] Create monorepo root structure
+- [x] Add Next.js app bootstrap
+- [x] Add FastAPI API bootstrap
+- [ ] Add worker bootstrap
+- [x] Add shared package contracts
 
 ## Architecture
 
-- [ ] Define canonical project JSON schema
-- [ ] Define page, region, dialogue, and export entities
+- [x] Define canonical project JSON schema
+- [x] Define page, region, dialogue, and export entities
+- [x] Define internationalization and locale model
 - [ ] Choose AI providers for cleanup and translation
 - [ ] Decide PSD export strategy
 
 ## Frontend
 
-- [ ] Create project dashboard
-- [ ] Create upload flow
+- [x] Define UI locale strategy
+- [x] Add app message catalog structure
+- [x] Create initial `en-US` and `pt-BR` locale packs
+- [x] Create project dashboard
+- [x] Create upload flow
 - [ ] Create page editor shell
 - [ ] Create overlay and mask editing interactions
 - [ ] Create dialogue side panel
 
 ## Backend
 
-- [ ] Create project and page APIs
+- [x] Create project and page APIs
 - [ ] Create job API
 - [ ] Create asset storage layer
 - [ ] Create cleanup pipeline contract
@@ -45,10 +76,11 @@
 - [ ] Define PDF renderer
 - [ ] Define PSD renderer
 - [ ] Define export manifest format
+- [ ] Define font fallback and missing-font behavior
 
 ## Operations
 
 - [ ] Add linting and formatting
 - [ ] Add CI
-- [ ] Add environment templates
+- [x] Add environment templates
 - [ ] Add local dev orchestration

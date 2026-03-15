@@ -5,21 +5,27 @@
 Goal: turn the concept into a buildable product plan.
 
 - define product scope and user roles
+- define detailed user flows
+- define MVP boundaries and acceptance criteria
 - define project data model
+- define pipeline stages and review checkpoints
+- define editor UX model
 - define AI provider abstraction
 - define export strategy for PSD, JPG, and PDF
-- define the MVP editor flow
+- define quality standards and risk mitigations
 
 Exit criteria:
 
 - PRD approved
 - architecture approved
+- planning docs approved
 - MVP backlog prioritized
 
 ## Phase 1 - Project Skeleton
 
 Goal: create the application skeleton and baseline infrastructure.
 
+- create the monorepo layout
 - set up monorepo structure
 - create web app shell
 - create API service shell
@@ -32,6 +38,7 @@ Exit criteria:
 - user can create a project
 - user can upload pages
 - jobs can be enqueued and tracked
+- local development structure is ready for implementation
 
 ## Phase 2 - Detection and Review
 
@@ -143,6 +150,19 @@ The fastest credible MVP is:
 - auto typesetting
 - JPG export
 - PSD export
+
+## Planning Deliverables Before Full Build
+
+- PRD
+- Architecture
+- User flows
+- MVP definition
+- Domain model
+- Pipelines
+- Editor UX
+- Quality standards
+- Risks
+- Decisions log
 
 ## Post-MVP Expansion
 

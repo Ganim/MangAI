@@ -1,10 +1,10 @@
-# BubbleFlow
+# MangAI
 
-BubbleFlow is an AI-first, human-assisted web tool for cleaning comic and manga pages, translating dialogue, placing text back into balloons, and exporting production-ready files for review and finishing in Photoshop.
+MangAI is an AI-first, human-assisted web tool for cleaning comic and manga pages, translating dialogue, placing text back into balloons, and exporting production-ready files for review and finishing in Photoshop.
 
 ## Vision
 
-BubbleFlow exists to automate the repetitive 70-90% of comic localization work while preserving professional control over the final result.
+MangAI exists to automate the repetitive 70-90% of comic localization work while preserving professional control over the final result.
 
 The product is designed for translators, redrawers, cleaners, typesetters, and studios that need:
 
@@ -23,6 +23,7 @@ The product is designed for translators, redrawers, cleaners, typesetters, and s
 - PSD export is a first-class workflow
 - Every automated step must remain editable
 - The project file, not the PSD, is the system of record
+- Internationalization must be built in from the start
 
 ## Core Workflow
 
@@ -64,7 +65,7 @@ Out of scope for MVP:
 
 ## System Overview
 
-BubbleFlow should be built around a canonical project document that stores:
+MangAI should be built around a canonical project document that stores:
 
 - source page assets
 - detected regions
@@ -112,7 +113,21 @@ Primary outputs:
 |-- TODO.md
 |-- docs/
 |   |-- PRD.md
-|   `-- ARCHITECTURE.md
+|   |-- ARCHITECTURE.md
+|   |-- I18N.md
+|   |-- PLANNING_REVIEW.md
+|   |-- FLOWS.md
+|   |-- MVP.md
+|   |-- DOMAIN_MODEL.md
+|   |-- SCHEMA_V1.md
+|   |-- PIPELINES.md
+|   |-- EDITOR_UX.md
+|   |-- QUALITY.md
+|   |-- RISKS.md
+|   |-- DECISIONS.md
+|   |-- API_CONTRACTS.md
+|   |-- BACKLOG.md
+|   `-- MONOREPO.md
 |-- apps/
 |   `-- web/
 |-- services/
@@ -124,10 +139,10 @@ Primary outputs:
 
 ## Immediate Next Steps
 
-1. Finalize product scope and vocabulary.
-2. Define the canonical project schema.
-3. Design the first editor flow.
-4. Build the upload -> detect -> review -> export happy path.
+1. Finalize the planning package.
+2. Freeze schema v1 and layer contracts.
+3. Convert the MVP into implementation tickets and epics.
+4. Bootstrap the implementation stack with the planning guardrails in place.
 
 ## Status
 

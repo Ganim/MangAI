@@ -1,0 +1,5 @@
+SCHEMA_VERSION = 1
+SUPPORTED_UI_LOCALES = ("en-US", "pt-BR")
+SUPPORTED_TEXT_DIRECTIONS = ("ltr", "rtl", "ttb")
+SUPPORTED_SOURCE_LANGUAGE_CODES = ("ja", "ko", "zh", "en")
+SUPPORTED_TARGET_LANGUAGE_CODES = ("pt", "en")

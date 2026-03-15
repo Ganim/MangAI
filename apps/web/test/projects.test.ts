@@ -1,0 +1,34 @@
+import assert from "node:assert/strict";
+
+import {
+  buildRegisterPagesPayload,
+  createUploadQueue,
+  formatBytes,
+  removeUploadQueueItem,
+} from "../src/features/projects/upload.ts";
+
+const queueResult = createUploadQueue([
+  { name: "002.png", type: "image/png", size: 4096 },
+  { name: "001.jpg", type: "image/jpeg", size: 1024 },
+  { name: "001.jpg", type: "image/jpeg", size: 1024 },
+  { name: "script.txt", type: "text/plain", size: 100 },
+]);
+
+assert.equal(queueResult.accepted.length, 2);
+assert.equal(queueResult.accepted[0]?.file_name, "001.jpg");
+assert.equal(queueResult.accepted[1]?.file_name, "002.png");
+assert.equal(queueResult.rejected.length, 2);
+assert.equal(queueResult.rejected[0]?.reason, "duplicate_name");
+assert.equal(queueResult.rejected[1]?.reason, "unsupported_type");
+
+const reducedQueue = removeUploadQueueItem(queueResult.accepted, queueResult.accepted[0]!.client_id);
+assert.equal(reducedQueue.length, 1);
+
+const registerPayload = buildRegisterPagesPayload(queueResult.accepted);
+assert.equal(registerPayload.pages.length, 2);
+assert.equal(registerPayload.pages[0]?.width, null);
+
+assert.equal(formatBytes(500), "500 B");
+assert.equal(formatBytes(2048), "2.0 KB");
+
+console.log("WEB_PROJECT_TESTS_OK");

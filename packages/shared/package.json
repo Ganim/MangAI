@@ -1,0 +1,13 @@
+{
+  "name": "@mangai/shared",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Shared contracts, enums, and validators for MangAI",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "node --experimental-strip-types ./test/contracts.test.ts"
+  }
+}

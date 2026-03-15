@@ -1,0 +1,2 @@
+"""MangAI API package."""
+

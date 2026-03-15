@@ -1,0 +1,26 @@
+{
+  "name": "@mangai/web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@mangai/shared": "workspace:*",
+    "next": "^16.1.6",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test:unit": "node --experimental-strip-types ./test/run-tests.ts",
+    "test": "pnpm run typecheck && pnpm run test:unit && pnpm run build",
+    "lint": "echo \"ESLint will be configured with the first interactive UI feature slice.\""
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
+  }
+}

@@ -3,6 +3,7 @@ node_modules/
 .next/
 dist/
 coverage/
+*.tsbuildinfo
 
 # Python
 __pycache__/
@@ -11,6 +12,7 @@ __pycache__/
 .ruff_cache/
 .venv/
 venv/
+*.egg-info/
 
 # Env
 .env
