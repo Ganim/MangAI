@@ -44,6 +44,40 @@ def test_create_project_rejects_invalid_language_tag() -> None:
     assert payload["error_code"] == "INVALID_REQUEST"
 
 
+def test_create_project_rejects_unsupported_source_language() -> None:
+    client = TestClient(create_app())
+
+    response = client.post(
+        "/api/v1/projects",
+        json={
+            "name": "My Project",
+            "source_language": "pt-BR",
+            "target_language": "en-US",
+        },
+    )
+
+    assert response.status_code == 422
+    payload = response.json()
+    assert payload["error_code"] == "INVALID_REQUEST"
+
+
+def test_create_project_rejects_unsupported_target_language() -> None:
+    client = TestClient(create_app())
+
+    response = client.post(
+        "/api/v1/projects",
+        json={
+            "name": "My Project",
+            "source_language": "ja-JP",
+            "target_language": "ko-KR",
+        },
+    )
+
+    assert response.status_code == 422
+    payload = response.json()
+    assert payload["error_code"] == "INVALID_REQUEST"
+
+
 def test_list_projects_returns_created_projects() -> None:
     client = TestClient(create_app())
 

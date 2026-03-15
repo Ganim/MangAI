@@ -49,3 +49,26 @@ Decision:
 Reason:
 
 - this product has high UX and architecture risk if built too quickly without clear contracts
+
+## D-006: Rust Is Allowed For Focused Acceleration, Not As Default Product Runtime
+
+Decision:
+
+- MangAI may use Rust in focused subsystems where profiling or runtime constraints justify it
+- Rust is not the default language for general product implementation
+
+Reason:
+
+- the project benefits more from fast iteration and mature AI tooling first
+- Rust should be introduced where it materially improves performance, safety, or systems-level behavior
+
+## D-007: Initial Content Language Scope Is Constrained
+
+Decision:
+
+- initial source-language support is limited to Japanese, Korean, Chinese, and English
+- initial target-language support is limited to Portuguese and English
+
+Reason:
+
+- the MVP needs a narrow language matrix to keep OCR, translation, typesetting, QA, and font fallback behavior reliable

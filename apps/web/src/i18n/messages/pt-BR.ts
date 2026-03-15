@@ -114,6 +114,16 @@ export const ptBRMessages: AppMessages = {
     projectNamePlaceholder: "Capitulo 01 - Revisao",
     sourceLanguageLabel: "Idioma de origem",
     targetLanguageLabel: "Idioma de destino",
+    sourceLanguageOptions: [
+      { value: "ja-JP", label: "Japones" },
+      { value: "ko-KR", label: "Coreano" },
+      { value: "zh-CN", label: "Chines" },
+      { value: "en-US", label: "Ingles" },
+    ],
+    targetLanguageOptions: [
+      { value: "pt-BR", label: "Portugues" },
+      { value: "en-US", label: "Ingles" },
+    ],
     createAction: "Criar projeto",
     creatingAction: "Criando projeto...",
     projectListTitle: "Quadro atual de projetos",

@@ -52,7 +52,7 @@ export function ProjectDashboard({ locale, messages }: ProjectDashboardProps) {
   const [isUploading, startUploadTransition] = useTransition();
   const [formState, setFormState] = useState<ProjectFormState>({
     name: "",
-    source_language: "ja-JP",
+    source_language: messages.dashboard.sourceLanguageOptions[0]?.value ?? "ja-JP",
     target_language: locale,
   });
 
@@ -103,7 +103,7 @@ export function ProjectDashboard({ locale, messages }: ProjectDashboardProps) {
         setSelectedProjectId(response.project.id);
         setFormState({
           name: "",
-          source_language: "ja-JP",
+          source_language: messages.dashboard.sourceLanguageOptions[0]?.value ?? "ja-JP",
           target_language: locale,
         });
         setApiState("online");
@@ -198,7 +198,7 @@ export function ProjectDashboard({ locale, messages }: ProjectDashboardProps) {
           <div className="field-row">
             <label className="field">
               <span className="field-label">{messages.dashboard.sourceLanguageLabel}</span>
-              <input
+              <select
                 className="field-input"
                 name="source_language"
                 value={formState.source_language}
@@ -208,14 +208,19 @@ export function ProjectDashboard({ locale, messages }: ProjectDashboardProps) {
                     source_language: event.target.value,
                   }))
                 }
-                placeholder="ja-JP"
                 required
-              />
+              >
+                {messages.dashboard.sourceLanguageOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label} ({option.value})
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label className="field">
               <span className="field-label">{messages.dashboard.targetLanguageLabel}</span>
-              <input
+              <select
                 className="field-input"
                 name="target_language"
                 value={formState.target_language}
@@ -225,9 +230,14 @@ export function ProjectDashboard({ locale, messages }: ProjectDashboardProps) {
                     target_language: event.target.value,
                   }))
                 }
-                placeholder={locale}
                 required
-              />
+              >
+                {messages.dashboard.targetLanguageOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label} ({option.value})
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 

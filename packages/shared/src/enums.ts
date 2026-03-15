@@ -1,6 +1,8 @@
 export const SCHEMA_VERSION = 1;
 
 export const SUPPORTED_UI_LOCALES = ["en-US", "pt-BR"] as const;
+export const SUPPORTED_SOURCE_LANGUAGE_CODES = ["ja", "ko", "zh", "en"] as const;
+export const SUPPORTED_TARGET_LANGUAGE_CODES = ["pt", "en"] as const;
 
 export const ProjectStatus = ["draft", "active", "archived"] as const;
 export const PageStatus = [

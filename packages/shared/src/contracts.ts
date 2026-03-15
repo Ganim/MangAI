@@ -1,5 +1,11 @@
 import { AssignmentOrigin, ExportFormat, TextDirection, TranslationStatus } from "./enums.ts";
-import { canonicalizeLanguageTag, inferTextDirectionForLanguage, normalizeUiLocale } from "./i18n.ts";
+import {
+  canonicalizeLanguageTag,
+  inferTextDirectionForLanguage,
+  normalizeProjectSourceLanguage,
+  normalizeProjectTargetLanguage,
+  normalizeUiLocale,
+} from "./i18n.ts";
 import {
   atPath,
   readArray,
@@ -17,14 +23,14 @@ import { parseBoundingBox, parseTextStyle } from "./entities.ts";
 
 export function parseCreateProjectRequest(value: unknown, path: Array<string | number> = []) {
   const objectValue = readObject<Record<string, unknown>>(value, path);
-  const targetLanguage = canonicalizeLanguageTag(
+  const targetLanguage = normalizeProjectTargetLanguage(
     objectValue.target_language,
     atPath(path, "target_language"),
   );
 
   return {
     name: readString(objectValue.name, atPath(path, "name")),
-    source_language: canonicalizeLanguageTag(
+    source_language: normalizeProjectSourceLanguage(
       objectValue.source_language,
       atPath(path, "source_language"),
     ),
@@ -178,7 +184,7 @@ export function parseManualDialogueRequest(value: unknown, path: Array<string | 
   return {
     page_id: readUuid(objectValue.page_id, atPath(path, "page_id")),
     content: readString(objectValue.content, atPath(path, "content"), { allowEmpty: true }),
-    source_language: canonicalizeLanguageTag(
+    source_language: normalizeProjectSourceLanguage(
       objectValue.source_language,
       atPath(path, "source_language"),
     ),
@@ -191,7 +197,7 @@ export function parseManualDialogueRequest(value: unknown, path: Array<string | 
 
 export function parseUpsertTranslationRequest(value: unknown, path: Array<string | number> = []) {
   const objectValue = readObject<Record<string, unknown>>(value, path);
-  const targetLanguage = canonicalizeLanguageTag(
+  const targetLanguage = normalizeProjectTargetLanguage(
     objectValue.target_language,
     atPath(path, "target_language"),
   );
@@ -330,11 +336,11 @@ export function parseTranslationJobPayload(value: unknown, path: Array<string | 
       (item, itemPath) => readUuid(item, itemPath),
       { minLength: 1 },
     ),
-    source_language: canonicalizeLanguageTag(
+    source_language: normalizeProjectSourceLanguage(
       objectValue.source_language,
       atPath(path, "source_language"),
     ),
-    target_language: canonicalizeLanguageTag(
+    target_language: normalizeProjectTargetLanguage(
       objectValue.target_language,
       atPath(path, "target_language"),
     ),

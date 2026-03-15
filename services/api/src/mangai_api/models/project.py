@@ -7,7 +7,11 @@ from uuid import UUID
 from pydantic import Field, field_validator, model_validator
 
 from mangai_api.constants import SCHEMA_VERSION, SUPPORTED_TEXT_DIRECTIONS
-from mangai_api.i18n import infer_text_direction, normalize_language_tag
+from mangai_api.i18n import (
+    infer_text_direction,
+    normalize_project_source_language,
+    normalize_project_target_language,
+)
 from mangai_api.models.common import APIModel
 
 
@@ -31,8 +35,10 @@ class CreateProjectRequest(APIModel):
 
     @field_validator("source_language", "target_language")
     @classmethod
-    def validate_language_tag(cls, value: str) -> str:
-        return normalize_language_tag(value)
+    def validate_language_tag(cls, value: str, info) -> str:
+        if info.field_name == "source_language":
+            return normalize_project_source_language(value)
+        return normalize_project_target_language(value)
 
     @model_validator(mode="after")
     def apply_direction_default(self) -> "CreateProjectRequest":

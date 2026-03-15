@@ -10,6 +10,11 @@ type TimelineItem = {
   description: string;
 };
 
+type LanguageOption = {
+  value: string;
+  label: string;
+};
+
 export type AppMessages = {
   common: {
     appName: string;
@@ -49,6 +54,8 @@ export type AppMessages = {
     projectNamePlaceholder: string;
     sourceLanguageLabel: string;
     targetLanguageLabel: string;
+    sourceLanguageOptions: ReadonlyArray<LanguageOption>;
+    targetLanguageOptions: ReadonlyArray<LanguageOption>;
     createAction: string;
     creatingAction: string;
     projectListTitle: string;
@@ -181,6 +188,16 @@ export const enUSMessages: AppMessages = {
     projectNamePlaceholder: "Chapter 01 - Review pass",
     sourceLanguageLabel: "Source language",
     targetLanguageLabel: "Target language",
+    sourceLanguageOptions: [
+      { value: "ja-JP", label: "Japanese" },
+      { value: "ko-KR", label: "Korean" },
+      { value: "zh-CN", label: "Chinese" },
+      { value: "en-US", label: "English" },
+    ],
+    targetLanguageOptions: [
+      { value: "pt-BR", label: "Portuguese" },
+      { value: "en-US", label: "English" },
+    ],
     createAction: "Create project",
     creatingAction: "Creating project...",
     projectListTitle: "Current project board",

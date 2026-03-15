@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import re
 
-from mangai_api.constants import SUPPORTED_TEXT_DIRECTIONS, SUPPORTED_UI_LOCALES
+from mangai_api.constants import (
+    SUPPORTED_SOURCE_LANGUAGE_CODES,
+    SUPPORTED_TARGET_LANGUAGE_CODES,
+    SUPPORTED_TEXT_DIRECTIONS,
+    SUPPORTED_UI_LOCALES,
+)
 
 
 LANGUAGE_TAG_RE = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$")
@@ -40,6 +45,24 @@ def normalize_ui_locale(value: str) -> str:
             f"Unsupported UI locale. Expected one of: {', '.join(SUPPORTED_UI_LOCALES)}."
         )
     return normalized
+
+
+def _normalize_project_language(value: str, supported_codes: tuple[str, ...], label: str) -> str:
+    normalized = normalize_language_tag(value)
+    primary_language = normalized.split("-")[0]
+    if primary_language not in supported_codes:
+        raise LocaleValidationError(
+            f"Unsupported {label}. Expected primary language one of: {', '.join(supported_codes)}."
+        )
+    return normalized
+
+
+def normalize_project_source_language(value: str) -> str:
+    return _normalize_project_language(value, SUPPORTED_SOURCE_LANGUAGE_CODES, "source language")
+
+
+def normalize_project_target_language(value: str) -> str:
+    return _normalize_project_language(value, SUPPORTED_TARGET_LANGUAGE_CODES, "target language")
 
 
 def infer_text_direction(language_tag: str) -> str:

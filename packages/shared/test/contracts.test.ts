@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
 
 import {
+  SUPPORTED_SOURCE_LANGUAGE_CODES,
+  SUPPORTED_TARGET_LANGUAGE_CODES,
   SUPPORTED_UI_LOCALES,
   ValidationError,
   canonicalizeLanguageTag,
   inferTextDirectionForLanguage,
+  normalizeProjectSourceLanguage,
+  normalizeProjectTargetLanguage,
   parseCreateProjectResponse,
   normalizeUiLocale,
   parseCreateProjectRequest,
@@ -21,8 +25,14 @@ const UUID_3 = "33333333-3333-4333-8333-333333333333";
 
 assert.equal(canonicalizeLanguageTag("pt-br"), "pt-BR");
 assert.deepEqual(SUPPORTED_UI_LOCALES, ["en-US", "pt-BR"]);
+assert.deepEqual(SUPPORTED_SOURCE_LANGUAGE_CODES, ["ja", "ko", "zh", "en"]);
+assert.deepEqual(SUPPORTED_TARGET_LANGUAGE_CODES, ["pt", "en"]);
 
 assert.throws(() => normalizeUiLocale("es-ES"), ValidationError);
+assert.equal(normalizeProjectSourceLanguage("ko-kr"), "ko-KR");
+assert.equal(normalizeProjectTargetLanguage("en-gb"), "en-GB");
+assert.throws(() => normalizeProjectSourceLanguage("pt-BR"), ValidationError);
+assert.throws(() => normalizeProjectTargetLanguage("ja-JP"), ValidationError);
 
 assert.equal(inferTextDirectionForLanguage("en-US"), "ltr");
 assert.equal(inferTextDirectionForLanguage("pt-BR"), "ltr");
