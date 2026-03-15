@@ -3,9 +3,24 @@
 ## Product
 
 - [x] Confirm product name
-- [ ] Confirm target user personas
-- [ ] Confirm MVP scope
+- [x] Confirm target user personas
+- [x] Confirm MVP scope
 - [ ] Define success metrics for beta
+
+## Planning
+
+- [x] Write PRD
+- [x] Write architecture overview
+- [x] Write user flows
+- [x] Write MVP definition
+- [x] Write domain model
+- [x] Write pipeline design
+- [x] Write editor UX guidance
+- [x] Write quality standards
+- [x] Write risk map
+- [x] Write decisions log
+- [ ] Turn planning docs into implementation tickets
+- [ ] Define schema v1 from the domain model
 
 ## Monorepo
 

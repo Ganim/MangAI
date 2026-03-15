@@ -112,7 +112,16 @@ Primary outputs:
 |-- TODO.md
 |-- docs/
 |   |-- PRD.md
-|   `-- ARCHITECTURE.md
+|   |-- ARCHITECTURE.md
+|   |-- FLOWS.md
+|   |-- MVP.md
+|   |-- DOMAIN_MODEL.md
+|   |-- PIPELINES.md
+|   |-- EDITOR_UX.md
+|   |-- QUALITY.md
+|   |-- RISKS.md
+|   |-- DECISIONS.md
+|   `-- MONOREPO.md
 |-- apps/
 |   `-- web/
 |-- services/
@@ -124,10 +133,10 @@ Primary outputs:
 
 ## Immediate Next Steps
 
-1. Finalize product scope and vocabulary.
-2. Define the canonical project schema.
-3. Design the first editor flow.
-4. Build the upload -> detect -> review -> export happy path.
+1. Finalize the planning package.
+2. Convert planning docs into implementation tickets.
+3. Define the first shared schemas and contracts.
+4. Bootstrap the implementation stack with the planning guardrails in place.
 
 ## Status
 
