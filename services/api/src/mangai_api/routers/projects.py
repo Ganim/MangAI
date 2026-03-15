@@ -14,6 +14,12 @@ from mangai_api.models.project import (
     RegisterProjectPagesRequest,
     RegisterProjectPagesResponse,
 )
+from mangai_api.models.region import (
+    CreateRegionRequest,
+    ListRegionsResponse,
+    RegionResponse,
+    UpdateRegionRequest,
+)
 from mangai_api.repositories.projects import LocalProjectStore, UploadedPageFile
 
 
@@ -45,6 +51,21 @@ def get_project_detail(
     store: LocalProjectStore = Depends(get_project_store),
 ) -> ProjectDetailResponse:
     return store.get_project_detail(project_id)
+
+
+@router.get(
+    "/{project_id}/pages/{page_id}/regions",
+    response_model=ListRegionsResponse,
+    summary="List page regions",
+)
+def list_page_regions(
+    project_id: UUID,
+    page_id: UUID,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> ListRegionsResponse:
+    return ListRegionsResponse(
+        regions=tuple(store.list_page_regions(project_id=project_id, page_id=page_id))
+    )
 
 
 @router.post(
@@ -103,6 +124,43 @@ async def upload_project_pages(
 
     project, pages = store.upload_project_pages(project_id=project_id, uploads=uploads)
     return RegisterProjectPagesResponse(project=project, pages=tuple(pages))
+
+
+@router.post(
+    "/{project_id}/pages/{page_id}/regions",
+    response_model=RegionResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create page region",
+)
+def create_page_region(
+    project_id: UUID,
+    page_id: UUID,
+    payload: CreateRegionRequest,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> RegionResponse:
+    region = store.create_page_region(project_id=project_id, page_id=page_id, payload=payload)
+    return RegionResponse(region=region)
+
+
+@router.patch(
+    "/{project_id}/pages/{page_id}/regions/{region_id}",
+    response_model=RegionResponse,
+    summary="Update page region",
+)
+def update_page_region(
+    project_id: UUID,
+    page_id: UUID,
+    region_id: UUID,
+    payload: UpdateRegionRequest,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> RegionResponse:
+    region = store.update_page_region(
+        project_id=project_id,
+        page_id=page_id,
+        region_id=region_id,
+        payload=payload,
+    )
+    return RegionResponse(region=region)
 
 
 @router.get(

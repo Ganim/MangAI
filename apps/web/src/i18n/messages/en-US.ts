@@ -15,6 +15,28 @@ type LanguageOption = {
   label: string;
 };
 
+type RegionTypeLabels = {
+  speech_balloon: string;
+  narration_box: string;
+  free_text: string;
+  sfx: string;
+  unknown: string;
+};
+
+type RegionStateLabels = {
+  draft: string;
+  reviewed: string;
+  approved: string;
+  rejected: string;
+};
+
+type RegionOriginLabels = {
+  detected: string;
+  user_created: string;
+  user_split: string;
+  user_merged: string;
+};
+
 export type AppMessages = {
   common: {
     appName: string;
@@ -110,6 +132,9 @@ export type AppMessages = {
   editor: {
     backToProject: string;
     loadErrorFallback: string;
+    regionLoadErrorFallback: string;
+    regionCreateErrorFallback: string;
+    regionUpdateErrorFallback: string;
     loadingEditor: string;
     pageNotFound: string;
     pageNavigatorTitle: string;
@@ -117,13 +142,32 @@ export type AppMessages = {
     pageLabel: string;
     sidebarTitle: string;
     sidebarCopy: string;
-    sidebarItems: ReadonlyArray<StatusItem>;
+    regionsLoading: string;
+    regionsEmpty: string;
+    selectRegionAction: string;
+    selectedRegionAction: string;
+    selectionTitle: string;
+    selectionCopy: string;
+    selectionEmpty: string;
+    regionTypeLabel: string;
+    regionStateLabel: string;
+    regionOriginLabel: string;
+    regionBoundsLabel: string;
+    regionTypeLabels: RegionTypeLabels;
+    regionStateLabels: RegionStateLabels;
+    regionOriginLabels: RegionOriginLabels;
     kicker: string;
     canvasCopy: string;
-    toggleMasksAction: string;
-    openInspectorAction: string;
-    overlayDetectedRegions: string;
-    overlayDialogueBlocks: string;
+    showRegionsAction: string;
+    hideRegionsAction: string;
+    addRegionAction: string;
+    creatingRegionAction: string;
+    markReviewedAction: string;
+    approveRegionAction: string;
+    resetRegionAction: string;
+    overlayRegionCount: string;
+    canvasEmptyState: string;
+    dimensionsFallbackNotice: string;
   };
 };
 
@@ -321,38 +365,62 @@ export const enUSMessages: AppMessages = {
   editor: {
     backToProject: "Back to project",
     loadErrorFallback: "The editor could not load the selected project page.",
+    regionLoadErrorFallback: "The editor could not load the saved review regions for this page.",
+    regionCreateErrorFallback: "The editor could not create a new review region right now.",
+    regionUpdateErrorFallback: "The editor could not update the selected region right now.",
     loadingEditor: "Loading editor shell...",
     pageNotFound: "This page could not be found in the selected project.",
     pageNavigatorTitle: "Page navigator",
     pageNavigatorCopy:
       "Switch between uploaded pages without losing the editor context. This is the first step toward chapter-scale review.",
     pageLabel: "Page {index}",
-    sidebarTitle: "Inspector preview",
+    sidebarTitle: "Region review",
     sidebarCopy:
-      "The sidebar is intentionally simple for now. It marks the zones where masks, OCR, assignments, and typography controls will live.",
-    sidebarItems: [
-      {
-        label: "Cleanup masks",
-        value: "Soon",
-        description: "Detected regions and editable masks will attach to this page panel.",
-      },
-      {
-        label: "Dialogue",
-        value: "Soon",
-        description: "OCR, imported script lines, and balloon assignments will appear here.",
-      },
-      {
-        label: "Typesetting",
-        value: "Soon",
-        description: "Text placement presets and typography controls will be added alongside the canvas.",
-      },
-    ],
+      "This first review layer persists page regions, lets you select them, and gives the editor a concrete surface for the next cleanup and dialogue tools.",
+    regionsLoading: "Loading saved regions...",
+    regionsEmpty: "No regions exist yet for this page. Add the first one to begin the review pass.",
+    selectRegionAction: "Select region",
+    selectedRegionAction: "Selected",
+    selectionTitle: "Selected region",
+    selectionCopy:
+      "Keep the review loop lightweight: inspect one region, confirm its state, then move to the next without leaving the page.",
+    selectionEmpty: "Select a region from the list or create a new one from the canvas toolbar.",
+    regionTypeLabel: "Type",
+    regionStateLabel: "State",
+    regionOriginLabel: "Origin",
+    regionBoundsLabel: "Bounds",
+    regionTypeLabels: {
+      speech_balloon: "Speech balloon",
+      narration_box: "Narration box",
+      free_text: "Free text",
+      sfx: "SFX",
+      unknown: "Unknown",
+    },
+    regionStateLabels: {
+      draft: "Draft",
+      reviewed: "Reviewed",
+      approved: "Approved",
+      rejected: "Rejected",
+    },
+    regionOriginLabels: {
+      detected: "Detected",
+      user_created: "User created",
+      user_split: "User split",
+      user_merged: "User merged",
+    },
     kicker: "Page editor shell",
     canvasCopy:
-      "The original uploaded page is now mounted inside a dedicated editor surface. The overlays below are placeholders for the next tooling slices.",
-    toggleMasksAction: "Toggle overlays",
-    openInspectorAction: "Open inspector",
-    overlayDetectedRegions: "Detected regions overlay placeholder",
-    overlayDialogueBlocks: "Dialogue blocks overlay placeholder",
+      "The original uploaded page now carries real persisted review regions. This gives us a dependable base for cleanup masks, dialogue mapping, and later automation.",
+    showRegionsAction: "Show overlays",
+    hideRegionsAction: "Hide overlays",
+    addRegionAction: "Add review region",
+    creatingRegionAction: "Adding region...",
+    markReviewedAction: "Mark reviewed",
+    approveRegionAction: "Approve region",
+    resetRegionAction: "Reset to draft",
+    overlayRegionCount: "{count} saved regions",
+    canvasEmptyState: "No review regions yet. Create one to anchor the editor workflow.",
+    dimensionsFallbackNotice:
+      "This page does not have stored dimensions yet, so the editor is using a fallback canvas proportion until a real image size is available.",
   },
 };

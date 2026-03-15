@@ -11,5 +11,12 @@ class ProjectPageNotFoundError(Exception):
         self.page_id = page_id
 
 
+class RegionNotFoundError(Exception):
+    def __init__(self, page_id: str, region_id: str) -> None:
+        super().__init__(f"Region '{region_id}' was not found in page '{page_id}'.")
+        self.page_id = page_id
+        self.region_id = region_id
+
+
 class UploadValidationError(ValueError):
     pass

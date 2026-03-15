@@ -9,7 +9,10 @@ import {
   inferTextDirectionForLanguage,
   normalizeProjectSourceLanguage,
   normalizeProjectTargetLanguage,
+  parseCreatePageRegionRequest,
   parseCreateProjectResponse,
+  parseListPageRegionsResponse,
+  parsePageRegionResponse,
   parseProjectDetailResponse,
   normalizeUiLocale,
   parseCreateProjectRequest,
@@ -18,6 +21,7 @@ import {
   parseProject,
   parseRegisterProjectPagesRequest,
   parseRegisterProjectPagesResponse,
+  parseUpdatePageRegionRequest,
 } from "../src/index.ts";
 
 const UUID = "11111111-1111-4111-8111-111111111111";
@@ -184,6 +188,88 @@ const parsedProjectDetail = parseProjectDetailResponse({
 });
 
 assert.equal(parsedProjectDetail.pages[0]?.index, 1);
+
+const parsedCreateRegionRequest = parseCreatePageRegionRequest({
+  type: "speech_balloon",
+  bounding_box: {
+    x: 100,
+    y: 80,
+    width: 320,
+    height: 180,
+  },
+});
+
+assert.equal(parsedCreateRegionRequest.type, "speech_balloon");
+assert.equal(parsedCreateRegionRequest.bounding_box.width, 320);
+
+const parsedUpdateRegionRequest = parseUpdatePageRegionRequest({
+  state: "approved",
+});
+
+assert.equal(parsedUpdateRegionRequest.state, "approved");
+assert.throws(() => parseUpdatePageRegionRequest({}), ValidationError);
+
+const parsedRegionsResponse = parseListPageRegionsResponse({
+  regions: [
+    {
+      id: UUID_3,
+      page_id: UUID_2,
+      type: "speech_balloon",
+      origin: "user_created",
+      state: "draft",
+      confidence: null,
+      bounding_box: {
+        x: 10,
+        y: 20,
+        width: 100,
+        height: 60,
+      },
+      shape: {
+        type: "polygon",
+        points: [
+          { x: 10, y: 20 },
+          { x: 110, y: 20 },
+          { x: 110, y: 80 },
+          { x: 10, y: 80 },
+        ],
+      },
+      created_at: "2026-03-15T00:00:00Z",
+      updated_at: "2026-03-15T00:00:00Z",
+    },
+  ],
+});
+
+assert.equal(parsedRegionsResponse.regions[0]?.type, "speech_balloon");
+
+const parsedRegionResponse = parsePageRegionResponse({
+  region: {
+    id: UUID_3,
+    page_id: UUID_2,
+    type: "speech_balloon",
+    origin: "user_created",
+    state: "approved",
+    confidence: null,
+    bounding_box: {
+      x: 10,
+      y: 20,
+      width: 100,
+      height: 60,
+    },
+    shape: {
+      type: "polygon",
+      points: [
+        { x: 10, y: 20 },
+        { x: 110, y: 20 },
+        { x: 110, y: 80 },
+        { x: 10, y: 80 },
+      ],
+    },
+    created_at: "2026-03-15T00:00:00Z",
+    updated_at: "2026-03-15T00:00:00Z",
+  },
+});
+
+assert.equal(parsedRegionResponse.region.state, "approved");
 
 const detectPayload = parseDetectRegionsJobPayload({
   job_id: UUID,

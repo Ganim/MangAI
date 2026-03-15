@@ -1,4 +1,12 @@
-import { AssignmentOrigin, ExportFormat, TextDirection, TranslationStatus } from "./enums.ts";
+import {
+  AssignmentOrigin,
+  ExportFormat,
+  RegionState,
+  RegionType,
+  TextDirection,
+  TranslationStatus,
+} from "./enums.ts";
+import { ValidationError } from "./errors.ts";
 import {
   canonicalizeLanguageTag,
   inferTextDirectionForLanguage,
@@ -19,7 +27,7 @@ import {
   readNullable,
   readUuid,
 } from "./validate.ts";
-import { parseBoundingBox, parseTextStyle } from "./entities.ts";
+import { parseBoundingBox, parseRegion, parseTextStyle } from "./entities.ts";
 
 export function parseCreateProjectRequest(value: unknown, path: Array<string | number> = []) {
   const objectValue = readObject<Record<string, unknown>>(value, path);
@@ -177,6 +185,63 @@ export function parseProjectDetailResponse(value: unknown, path: Array<string | 
       atPath(path, "pages"),
       (item, itemPath) => parseRegisteredProjectPage(item, itemPath),
     ),
+  };
+}
+
+export function parseCreatePageRegionRequest(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    type: readEnum(objectValue.type, RegionType, atPath(path, "type")),
+    bounding_box: parseBoundingBox(objectValue.bounding_box, atPath(path, "bounding_box")),
+  };
+}
+
+export function parseUpdatePageRegionRequest(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  const parsedValue = {
+    type: readOptional(
+      objectValue.type,
+      (input, inputPath) => readEnum(input, RegionType, inputPath),
+      atPath(path, "type"),
+    ),
+    state: readOptional(
+      objectValue.state,
+      (input, inputPath) => readEnum(input, RegionState, inputPath),
+      atPath(path, "state"),
+    ),
+    bounding_box: readOptional(
+      objectValue.bounding_box,
+      (input, inputPath) => parseBoundingBox(input, inputPath),
+      atPath(path, "bounding_box"),
+    ),
+  };
+
+  if (
+    parsedValue.type === undefined &&
+    parsedValue.state === undefined &&
+    parsedValue.bounding_box === undefined
+  ) {
+    throw new ValidationError("At least one region field must be updated", path);
+  }
+
+  return parsedValue;
+}
+
+export function parseListPageRegionsResponse(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    regions: readArray(
+      objectValue.regions,
+      atPath(path, "regions"),
+      (item, itemPath) => parseRegion(item, itemPath),
+    ),
+  };
+}
+
+export function parsePageRegionResponse(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    region: parseRegion(objectValue.region, atPath(path, "region")),
   };
 }
 

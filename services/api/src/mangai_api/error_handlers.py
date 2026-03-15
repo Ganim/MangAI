@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from mangai_api.domain_errors import (
     ProjectNotFoundError,
     ProjectPageNotFoundError,
+    RegionNotFoundError,
     UploadValidationError,
 )
 from mangai_api.i18n import LocaleValidationError
@@ -38,6 +39,17 @@ def register_error_handlers(app) -> None:
     async def handle_page_not_found(_: Request, exc: ProjectPageNotFoundError) -> JSONResponse:
         payload = ErrorResponse(
             error_code="PAGE_NOT_FOUND",
+            message=str(exc),
+        )
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=payload.model_dump(),
+        )
+
+    @app.exception_handler(RegionNotFoundError)
+    async def handle_region_not_found(_: Request, exc: RegionNotFoundError) -> JSONResponse:
+        payload = ErrorResponse(
+            error_code="REGION_NOT_FOUND",
             message=str(exc),
         )
         return JSONResponse(

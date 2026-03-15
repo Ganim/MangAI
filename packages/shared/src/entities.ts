@@ -172,13 +172,13 @@ export function parseAsset(value: unknown, path: Array<string | number> = []) {
 export function parseRegion(value: unknown, path: Array<string | number> = []) {
   const objectValue = readObject<Record<string, unknown>>(value, path);
   const origin = readEnum(objectValue.origin, RegionOrigin, atPath(path, "origin"));
-  const confidence = readOptional(
+  const confidence = readNullable(
     objectValue.confidence,
     (input, inputPath) => readNumber(input, inputPath, { min: 0, max: 1 }),
     atPath(path, "confidence"),
   );
 
-  if (origin === "detected" && confidence === undefined) {
+  if (origin === "detected" && confidence === null) {
     throw new ValidationError("Detected regions must include confidence", path);
   }
 
@@ -188,7 +188,7 @@ export function parseRegion(value: unknown, path: Array<string | number> = []) {
     type: readEnum(objectValue.type, RegionType, atPath(path, "type")),
     origin,
     state: readEnum(objectValue.state, RegionState, atPath(path, "state")),
-    confidence: confidence ?? null,
+    confidence,
     bounding_box: parseBoundingBox(objectValue.bounding_box, atPath(path, "bounding_box")),
     shape: parsePolygonShape(objectValue.shape, atPath(path, "shape")),
     ...parseEntityTimestamps(objectValue, path),

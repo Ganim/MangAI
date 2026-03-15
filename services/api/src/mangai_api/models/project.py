@@ -13,6 +13,7 @@ from mangai_api.i18n import (
     normalize_project_target_language,
 )
 from mangai_api.models.common import APIModel
+from mangai_api.models.region import RegionRecord
 
 
 ProjectStatus = Literal["draft", "active", "archived"]
@@ -127,6 +128,7 @@ class StoredProjectState(APIModel):
     projects: tuple[ProjectSummary, ...] = ()
     pages: tuple[ProjectPage, ...] = ()
     assets: tuple[StoredProjectAsset, ...] = ()
+    regions: tuple[RegionRecord, ...] = ()
 
 
 class PageUploadDraft(ProjectPage):

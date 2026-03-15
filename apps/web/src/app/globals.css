@@ -472,9 +472,8 @@ button:hover {
 }
 
 .editor-canvas-frame {
-  position: relative;
   overflow: hidden;
-  min-height: 720px;
+  padding: 18px;
   border-radius: 24px;
   border: 1px solid rgba(78, 49, 25, 0.1);
   background:
@@ -485,16 +484,27 @@ button:hover {
       rgba(78, 49, 25, 0.025) 18px,
       transparent 18px,
       transparent 36px
-    );
+  );
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
+.editor-page-stage {
+  position: relative;
+  width: min(100%, 980px);
+  margin: 0 auto;
+  border-radius: 20px;
+  overflow: hidden;
+  background: rgba(255, 252, 247, 0.92);
+  box-shadow: 0 16px 38px rgba(78, 49, 25, 0.12);
+}
+
 .editor-page-image {
-  display: block;
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  max-height: 1040px;
-  object-fit: contain;
+  display: block;
+  object-fit: fill;
 }
 
 .editor-overlay {
@@ -518,12 +528,139 @@ button:hover {
   border: 1px solid rgba(20, 90, 50, 0.16);
 }
 
-.editor-overlay-text {
-  right: 18px;
-  bottom: 18px;
-  background: rgba(181, 72, 33, 0.14);
-  color: var(--accent-deep);
-  border: 1px solid rgba(181, 72, 33, 0.16);
+.editor-canvas-empty {
+  position: absolute;
+  inset: auto 18px 18px 18px;
+  display: grid;
+  place-items: center;
+  min-height: 88px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px dashed rgba(78, 49, 25, 0.14);
+  background: rgba(255, 250, 242, 0.78);
+  color: var(--muted);
+  text-align: center;
+}
+
+.editor-region-list {
+  display: grid;
+  gap: 12px;
+}
+
+.editor-region-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(78, 49, 25, 0.1);
+  background: var(--panel-strong);
+}
+
+.editor-region-card-selected {
+  border-color: rgba(181, 72, 33, 0.34);
+  box-shadow: 0 12px 22px rgba(181, 72, 33, 0.12);
+}
+
+.editor-region-card-draft,
+.editor-region-overlay-draft {
+  --region-accent: rgba(181, 72, 33, 0.82);
+  --region-fill: rgba(181, 72, 33, 0.12);
+}
+
+.editor-region-card-reviewed,
+.editor-region-overlay-reviewed {
+  --region-accent: rgba(165, 111, 31, 0.88);
+  --region-fill: rgba(165, 111, 31, 0.14);
+}
+
+.editor-region-card-approved,
+.editor-region-overlay-approved {
+  --region-accent: rgba(20, 90, 50, 0.88);
+  --region-fill: rgba(20, 90, 50, 0.14);
+}
+
+.editor-region-card-rejected,
+.editor-region-overlay-rejected {
+  --region-accent: rgba(113, 42, 42, 0.88);
+  --region-fill: rgba(113, 42, 42, 0.14);
+}
+
+.editor-region-card-header,
+.editor-selection-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.editor-region-state-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--region-fill, rgba(181, 72, 33, 0.12));
+  color: var(--region-accent, var(--accent-deep));
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.editor-selection-panel {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(78, 49, 25, 0.1);
+  background: var(--panel-strong);
+}
+
+.editor-selection-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.editor-region-overlay {
+  position: absolute;
+  display: grid;
+  align-content: space-between;
+  justify-items: start;
+  padding: 10px;
+  border-radius: 16px;
+  border: 2px solid var(--region-accent, rgba(181, 72, 33, 0.82));
+  background: var(--region-fill, rgba(181, 72, 33, 0.12));
+  color: var(--text);
+  cursor: pointer;
+}
+
+.editor-region-overlay-selected {
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.8),
+    0 16px 30px rgba(78, 49, 25, 0.18);
+}
+
+.editor-region-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(255, 252, 247, 0.92);
+  color: var(--region-accent, var(--accent-deep));
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.editor-region-caption {
+  margin-top: auto;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: rgba(255, 252, 247, 0.84);
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
 .dashboard-span-2 {
@@ -892,6 +1029,14 @@ button:hover {
   }
 
   .editor-canvas-frame {
-    min-height: 420px;
+    padding: 12px;
+  }
+
+  .editor-selection-actions {
+    flex-direction: column;
+  }
+
+  .editor-page-stage {
+    width: 100%;
   }
 }

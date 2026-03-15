@@ -16,8 +16,10 @@ from mangai_api.constants import (
 from mangai_api.domain_errors import (
     ProjectNotFoundError,
     ProjectPageNotFoundError,
+    RegionNotFoundError,
     UploadValidationError,
 )
+from mangai_api.image_metadata import infer_image_dimensions
 from mangai_api.models.project import (
     CreateProjectRequest,
     ProjectDetailResponse,
@@ -27,6 +29,14 @@ from mangai_api.models.project import (
     RegisterUploadedProjectPage,
     StoredProjectAsset,
     StoredProjectState,
+)
+from mangai_api.models.region import (
+    BoundingBox,
+    CreateRegionRequest,
+    PolygonPoint,
+    PolygonShape,
+    RegionRecord,
+    UpdateRegionRequest,
 )
 
 
@@ -66,6 +76,73 @@ class LocalProjectStore:
             project=project.model_copy(deep=True),
             pages=tuple(page.model_copy(deep=True) for page in pages),
         )
+
+    def list_page_regions(self, project_id: UUID, page_id: UUID) -> list[RegionRecord]:
+        state = self._load_state()
+        self._require_project(state, project_id)
+        self._require_page(state, project_id, page_id)
+        return [
+            region.model_copy(deep=True)
+            for region in sorted(
+                [candidate for candidate in state.regions if candidate.page_id == page_id],
+                key=lambda region: region.created_at,
+            )
+        ]
+
+    def create_page_region(
+        self,
+        project_id: UUID,
+        page_id: UUID,
+        payload: CreateRegionRequest,
+    ) -> RegionRecord:
+        with self._lock:
+            state = self._load_state_unlocked()
+            self._require_project(state, project_id)
+            self._require_page(state, project_id, page_id)
+            now = _utcnow()
+            region = RegionRecord(
+                id=uuid4(),
+                page_id=page_id,
+                type=payload.type,
+                origin="user_created",
+                state="draft",
+                confidence=None,
+                bounding_box=payload.bounding_box,
+                shape=self._polygon_shape_from_bounding_box(payload.bounding_box),
+                created_at=now,
+                updated_at=now,
+            )
+            next_state = state.model_copy(update={"regions": (*state.regions, region)})
+            self._save_state_unlocked(next_state)
+            return region.model_copy(deep=True)
+
+    def update_page_region(
+        self,
+        project_id: UUID,
+        page_id: UUID,
+        region_id: UUID,
+        payload: UpdateRegionRequest,
+    ) -> RegionRecord:
+        with self._lock:
+            state = self._load_state_unlocked()
+            self._require_project(state, project_id)
+            self._require_page(state, project_id, page_id)
+            region = self._require_region(state, page_id, region_id)
+            next_bounding_box = payload.bounding_box or region.bounding_box
+            next_region = region.model_copy(
+                update={
+                    "type": payload.type or region.type,
+                    "state": payload.state or region.state,
+                    "bounding_box": next_bounding_box,
+                    "shape": self._polygon_shape_from_bounding_box(next_bounding_box),
+                    "updated_at": _utcnow(),
+                }
+            )
+            next_regions = tuple(
+                next_region if candidate.id == region_id else candidate for candidate in state.regions
+            )
+            self._save_state_unlocked(state.model_copy(update={"regions": next_regions}))
+            return next_region.model_copy(deep=True)
 
     def create_project(self, payload: CreateProjectRequest) -> ProjectSummary:
         with self._lock:
@@ -169,6 +246,9 @@ class LocalProjectStore:
 
             for offset, upload in enumerate(uploads):
                 self._validate_upload(upload)
+                inferred_width, inferred_height = infer_image_dimensions(upload.content, upload.mime_type)
+                page_width = upload.width if upload.width is not None else inferred_width
+                page_height = upload.height if upload.height is not None else inferred_height
                 page_id = uuid4()
                 asset_id = uuid4()
                 storage_key = self._build_storage_key(project_id, asset_id, upload)
@@ -184,8 +264,8 @@ class LocalProjectStore:
                     file_name=upload.file_name,
                     mime_type=upload.mime_type,
                     size_bytes=upload.size_bytes,
-                    width=upload.width,
-                    height=upload.height,
+                    width=page_width,
+                    height=page_height,
                     status="uploaded",
                     original_asset_path=self._build_original_asset_path(project_id, page_id),
                     created_at=now,
@@ -259,6 +339,42 @@ class LocalProjectStore:
             raise ProjectNotFoundError(str(project_id))
         return project
 
+    def _require_page(
+        self,
+        state: StoredProjectState,
+        project_id: UUID,
+        page_id: UUID,
+    ) -> ProjectPage:
+        page = next(
+            (
+                candidate
+                for candidate in state.pages
+                if candidate.project_id == project_id and candidate.id == page_id
+            ),
+            None,
+        )
+        if page is None:
+            raise ProjectPageNotFoundError(str(project_id), str(page_id))
+        return page
+
+    def _require_region(
+        self,
+        state: StoredProjectState,
+        page_id: UUID,
+        region_id: UUID,
+    ) -> RegionRecord:
+        region = next(
+            (
+                candidate
+                for candidate in state.regions
+                if candidate.page_id == page_id and candidate.id == region_id
+            ),
+            None,
+        )
+        if region is None:
+            raise RegionNotFoundError(str(page_id), str(region_id))
+        return region
+
     def _get_pages_for_project(
         self,
         state: StoredProjectState,
@@ -295,3 +411,18 @@ class LocalProjectStore:
         temp_file = self._state_file.with_suffix(".tmp")
         temp_file.write_text(state.model_dump_json(indent=2), encoding="utf-8")
         temp_file.replace(self._state_file)
+
+    def _polygon_shape_from_bounding_box(self, bounding_box: BoundingBox) -> PolygonShape:
+        x = bounding_box.x
+        y = bounding_box.y
+        width = bounding_box.width
+        height = bounding_box.height
+        return PolygonShape(
+            type="polygon",
+            points=(
+                PolygonPoint(x=x, y=y),
+                PolygonPoint(x=x + width, y=y),
+                PolygonPoint(x=x + width, y=y + height),
+                PolygonPoint(x=x, y=y + height),
+            ),
+        )

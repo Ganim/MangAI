@@ -1,9 +1,13 @@
 import {
+  parseCreatePageRegionRequest,
   parseCreateProjectRequest,
   parseCreateProjectResponse,
   parseListProjectsResponse,
+  parseListPageRegionsResponse,
+  parsePageRegionResponse,
   parseProjectDetailResponse,
   parseRegisterProjectPagesResponse,
+  parseUpdatePageRegionRequest,
 } from "@mangai/shared";
 
 import { getPublicApiBaseUrl } from "../../config/env.ts";
@@ -27,6 +31,27 @@ type CreateProjectInput = {
 
 type RegisterPagesInput = {
   files: File[];
+};
+
+type CreatePageRegionInput = {
+  type: "speech_balloon" | "narration_box" | "free_text" | "sfx" | "unknown";
+  bounding_box: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+};
+
+type UpdatePageRegionInput = {
+  type?: "speech_balloon" | "narration_box" | "free_text" | "sfx" | "unknown";
+  state?: "draft" | "reviewed" | "approved" | "rejected";
+  bounding_box?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
 };
 
 async function readJsonResponse(response: Response): Promise<unknown> {
@@ -78,6 +103,14 @@ export async function getProjectDetail(projectId: string) {
   return requestJson(`/projects/${projectId}`, { method: "GET" }, parseProjectDetailResponse);
 }
 
+export async function getPageRegions(projectId: string, pageId: string) {
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/regions`,
+    { method: "GET" },
+    parseListPageRegionsResponse,
+  );
+}
+
 export async function createProject(input: CreateProjectInput) {
   const payload = parseCreateProjectRequest(input);
   return requestJson(
@@ -114,4 +147,37 @@ export async function registerProjectPages(projectId: string, input: RegisterPag
   }
 
   return parseRegisterProjectPagesResponse(payload);
+}
+
+export async function createPageRegion(
+  projectId: string,
+  pageId: string,
+  input: CreatePageRegionInput,
+) {
+  const payload = parseCreatePageRegionRequest(input);
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/regions`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    parsePageRegionResponse,
+  );
+}
+
+export async function updatePageRegion(
+  projectId: string,
+  pageId: string,
+  regionId: string,
+  input: UpdatePageRegionInput,
+) {
+  const payload = parseUpdatePageRegionRequest(input);
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/regions/${regionId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+    parsePageRegionResponse,
+  );
 }
