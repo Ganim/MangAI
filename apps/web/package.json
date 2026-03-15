@@ -10,9 +10,12 @@
     "react-dom": "^19.2.4"
   },
   "scripts": {
-    "dev": "echo \"Bootstrap Next.js app here\"",
-    "build": "echo \"Build step not configured yet\"",
-    "lint": "echo \"Lint step not configured yet\""
+    "dev": "next dev",
+    "build": "next build",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test:unit": "node --experimental-strip-types ./test/i18n.test.ts",
+    "test": "pnpm run typecheck && pnpm run test:unit && pnpm run build",
+    "lint": "echo \"ESLint will be configured with the first interactive UI feature slice.\""
   },
   "devDependencies": {
     "@types/node": "^25.5.0",

@@ -29,7 +29,7 @@
 
 - [x] Create repository documentation base
 - [x] Create monorepo root structure
-- [ ] Add Next.js app bootstrap
+- [x] Add Next.js app bootstrap
 - [x] Add FastAPI API bootstrap
 - [ ] Add worker bootstrap
 - [x] Add shared package contracts
@@ -38,7 +38,7 @@
 
 - [x] Define canonical project JSON schema
 - [x] Define page, region, dialogue, and export entities
-- [ ] Define internationalization and locale model
+- [x] Define internationalization and locale model
 - [ ] Choose AI providers for cleanup and translation
 - [ ] Decide PSD export strategy
 
@@ -47,7 +47,7 @@
 - [x] Define UI locale strategy
 - [x] Add app message catalog structure
 - [x] Create initial `en-US` and `pt-BR` locale packs
-- [ ] Create project dashboard
+- [x] Create project dashboard
 - [ ] Create upload flow
 - [ ] Create page editor shell
 - [ ] Create overlay and mask editing interactions
