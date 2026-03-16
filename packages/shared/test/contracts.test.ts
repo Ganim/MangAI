@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 
 import {
+  parseAssignmentResponse,
   parseCreateMaskRevisionRequest,
   parseCreatePageJobRequest,
+  parseDialogueResponse,
+  parseListPageAssignmentsResponse,
+  parseListPageDialoguesResponse,
   SUPPORTED_SOURCE_LANGUAGE_CODES,
   SUPPORTED_TARGET_LANGUAGE_CODES,
   SUPPORTED_UI_LOCALES,
+  parseListPagePlacementsResponse,
   ValidationError,
   canonicalizeLanguageTag,
   inferTextDirectionForLanguage,
@@ -16,7 +21,9 @@ import {
   parseListPageMaskRevisionsResponse,
   parseListPageJobsResponse,
   parseListPageRegionsResponse,
+  parseListPageTranslationsResponse,
   parseMaskRevisionResponse,
+  parsePlacementResponse,
   parsePageRegionResponse,
   parsePageJobResponse,
   parseProjectDetailResponse,
@@ -27,8 +34,13 @@ import {
   parseProject,
   parseRegisterProjectPagesRequest,
   parseRegisterProjectPagesResponse,
+  parseTranslationResponse,
   parseUpdateMaskRevisionRequest,
   parseUpdatePageRegionRequest,
+  parseUpsertAssignmentRequest,
+  parseUpsertPlacementRequest,
+  parseUpsertTranslationRequest,
+  parseManualDialogueRequest,
 } from "../src/index.ts";
 
 const UUID = "11111111-1111-4111-8111-111111111111";
@@ -392,6 +404,228 @@ const parsedCreateJobRequest = parseCreatePageJobRequest({
 });
 
 assert.equal(parsedCreateJobRequest.type, "detect_regions");
+
+const parsedManualDialogueRequest = parseManualDialogueRequest({
+  page_id: UUID_2,
+  content: "Original line",
+  source_language: "ja-JP",
+  reading_order: 1,
+});
+
+assert.equal(parsedManualDialogueRequest.page_id, UUID_2);
+
+const parsedDialoguesResponse = parseListPageDialoguesResponse({
+  dialogues: [
+    {
+      id: UUID,
+      page_id: UUID_2,
+      source: "manual",
+      source_language: "ja-JP",
+      content: "Original line",
+      reading_order: 1,
+      status: "draft",
+      source_region_id: UUID_3,
+      created_at: "2026-03-15T00:00:00Z",
+      updated_at: "2026-03-15T00:00:00Z",
+    },
+  ],
+});
+
+assert.equal(parsedDialoguesResponse.dialogues[0]?.content, "Original line");
+
+const parsedDialogueResponse = parseDialogueResponse({
+  dialogue: {
+    id: UUID,
+    page_id: UUID_2,
+    source: "manual",
+    source_language: "ja-JP",
+    content: "Original line",
+    reading_order: 1,
+    status: "reviewed",
+    source_region_id: UUID_3,
+    created_at: "2026-03-15T00:00:00Z",
+    updated_at: "2026-03-15T00:00:00Z",
+  },
+});
+
+assert.equal(parsedDialogueResponse.dialogue.status, "reviewed");
+
+const parsedTranslationRequest = parseUpsertTranslationRequest({
+  dialogue_id: UUID,
+  target_language: "pt-BR",
+  content: "Linha traduzida",
+  status: "draft",
+});
+
+assert.equal(parsedTranslationRequest.text_direction, "ltr");
+
+const parsedTranslationsResponse = parseListPageTranslationsResponse({
+  translations: [
+    {
+      id: UUID_2,
+      dialogue_id: UUID,
+      target_language: "pt-BR",
+      text_direction: "ltr",
+      provider: "manual",
+      content: "Linha traduzida",
+      status: "approved",
+      edited_by_user: true,
+      created_at: "2026-03-15T00:00:00Z",
+      updated_at: "2026-03-15T00:00:00Z",
+    },
+  ],
+});
+
+assert.equal(parsedTranslationsResponse.translations[0]?.provider, "manual");
+
+const parsedTranslationResponse = parseTranslationResponse({
+  translation: {
+    id: UUID_2,
+    dialogue_id: UUID,
+    target_language: "pt-BR",
+    text_direction: "ltr",
+    provider: "manual",
+    content: "Linha traduzida",
+    status: "reviewed",
+    edited_by_user: true,
+    created_at: "2026-03-15T00:00:00Z",
+    updated_at: "2026-03-15T00:00:00Z",
+  },
+});
+
+assert.equal(parsedTranslationResponse.translation.status, "reviewed");
+
+const parsedAssignmentRequest = parseUpsertAssignmentRequest({
+  dialogue_id: UUID,
+  region_id: UUID_3,
+  origin: "manual",
+  approved: true,
+});
+
+assert.equal(parsedAssignmentRequest.approved, true);
+
+const parsedAssignmentsResponse = parseListPageAssignmentsResponse({
+  assignments: [
+    {
+      id: UUID_2,
+      page_id: UUID_3,
+      dialogue_id: UUID,
+      region_id: UUID_3,
+      origin: "manual",
+      confidence: null,
+      approved: true,
+      created_at: "2026-03-15T00:00:00Z",
+      updated_at: "2026-03-15T00:00:00Z",
+    },
+  ],
+});
+
+assert.equal(parsedAssignmentsResponse.assignments[0]?.origin, "manual");
+
+const parsedAssignmentResponse = parseAssignmentResponse({
+  assignment: {
+    id: UUID_2,
+    page_id: UUID_3,
+    dialogue_id: UUID,
+    region_id: UUID_3,
+    origin: "manual",
+    confidence: null,
+    approved: false,
+    created_at: "2026-03-15T00:00:00Z",
+    updated_at: "2026-03-15T00:00:00Z",
+  },
+});
+
+assert.equal(parsedAssignmentResponse.assignment.approved, false);
+
+const parsedPlacementRequest = parseUpsertPlacementRequest({
+  assignment_id: UUID_2,
+  text_box: {
+    x: 12,
+    y: 20,
+    width: 130,
+    height: 90,
+  },
+  style: {
+    font_family: "Komika",
+    font_fallbacks: ["Arial"],
+    font_size: 24,
+    leading: 28,
+    tracking: 0,
+    alignment: "center",
+    direction: "ltr",
+    rotation: 0,
+    fill: "#000000",
+  },
+});
+
+assert.equal(parsedPlacementRequest.style.font_size, 24);
+
+const parsedPlacementsResponse = parseListPagePlacementsResponse({
+  placements: [
+    {
+      id: UUID_3,
+      assignment_id: UUID_2,
+      is_active: true,
+      text_box: {
+        x: 12,
+        y: 20,
+        width: 130,
+        height: 90,
+      },
+      style: {
+        font_family: "Komika",
+        font_fallbacks: ["Arial"],
+        font_size: 24,
+        leading: 28,
+        tracking: 0,
+        alignment: "center",
+        direction: "ltr",
+        rotation: 0,
+        fill: "#000000",
+      },
+      layout_metrics: {
+        mode: "manual",
+      },
+      created_at: "2026-03-15T00:00:00Z",
+      updated_at: "2026-03-15T00:00:00Z",
+    },
+  ],
+});
+
+assert.equal(parsedPlacementsResponse.placements[0]?.is_active, true);
+
+const parsedPlacementResponse = parsePlacementResponse({
+  placement: {
+    id: UUID_3,
+    assignment_id: UUID_2,
+    is_active: true,
+    text_box: {
+      x: 12,
+      y: 20,
+      width: 130,
+      height: 90,
+    },
+    style: {
+      font_family: "Komika",
+      font_fallbacks: ["Arial"],
+      font_size: 24,
+      leading: 28,
+      tracking: 0,
+      alignment: "center",
+      direction: "ltr",
+      rotation: 0,
+      fill: "#000000",
+    },
+    layout_metrics: {
+      mode: "manual",
+    },
+    created_at: "2026-03-15T00:00:00Z",
+    updated_at: "2026-03-15T00:00:00Z",
+  },
+});
+
+assert.equal(parsedPlacementResponse.placement.style.font_family, "Komika");
 
 const parsedJobsResponse = parseListPageJobsResponse({
   jobs: [

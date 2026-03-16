@@ -30,12 +30,16 @@ import {
   readUuid,
 } from "./validate.ts";
 import {
+  parseAssignment,
   parseBoundingBox,
+  parseDialogue,
   parseJob,
   parseMaskRevision,
   parsePolygonShape,
   parseRegion,
   parseTextStyle,
+  parseTextPlacement,
+  parseTranslation,
 } from "./entities.ts";
 
 export function parseCreateProjectRequest(value: unknown, path: Array<string | number> = []) {
@@ -376,6 +380,24 @@ export function parseManualDialogueRequest(value: unknown, path: Array<string | 
   };
 }
 
+export function parseListPageDialoguesResponse(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    dialogues: readArray(
+      objectValue.dialogues,
+      atPath(path, "dialogues"),
+      (item, itemPath) => parseDialogue(item, itemPath),
+    ),
+  };
+}
+
+export function parseDialogueResponse(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    dialogue: parseDialogue(objectValue.dialogue, atPath(path, "dialogue")),
+  };
+}
+
 export function parseUpsertTranslationRequest(value: unknown, path: Array<string | number> = []) {
   const objectValue = readObject<Record<string, unknown>>(value, path);
   const targetLanguage = normalizeProjectTargetLanguage(
@@ -397,6 +419,27 @@ export function parseUpsertTranslationRequest(value: unknown, path: Array<string
   };
 }
 
+export function parseListPageTranslationsResponse(
+  value: unknown,
+  path: Array<string | number> = [],
+) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    translations: readArray(
+      objectValue.translations,
+      atPath(path, "translations"),
+      (item, itemPath) => parseTranslation(item, itemPath),
+    ),
+  };
+}
+
+export function parseTranslationResponse(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    translation: parseTranslation(objectValue.translation, atPath(path, "translation")),
+  };
+}
+
 export function parseUpsertAssignmentRequest(value: unknown, path: Array<string | number> = []) {
   const objectValue = readObject<Record<string, unknown>>(value, path);
   return {
@@ -407,12 +450,54 @@ export function parseUpsertAssignmentRequest(value: unknown, path: Array<string 
   };
 }
 
+export function parseListPageAssignmentsResponse(
+  value: unknown,
+  path: Array<string | number> = [],
+) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    assignments: readArray(
+      objectValue.assignments,
+      atPath(path, "assignments"),
+      (item, itemPath) => parseAssignment(item, itemPath),
+    ),
+  };
+}
+
+export function parseAssignmentResponse(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    assignment: parseAssignment(objectValue.assignment, atPath(path, "assignment")),
+  };
+}
+
 export function parseUpsertPlacementRequest(value: unknown, path: Array<string | number> = []) {
   const objectValue = readObject<Record<string, unknown>>(value, path);
   return {
     assignment_id: readUuid(objectValue.assignment_id, atPath(path, "assignment_id")),
     text_box: parseBoundingBox(objectValue.text_box, atPath(path, "text_box")),
     style: parseTextStyle(objectValue.style, atPath(path, "style")),
+  };
+}
+
+export function parseListPagePlacementsResponse(
+  value: unknown,
+  path: Array<string | number> = [],
+) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    placements: readArray(
+      objectValue.placements,
+      atPath(path, "placements"),
+      (item, itemPath) => parseTextPlacement(item, itemPath),
+    ),
+  };
+}
+
+export function parsePlacementResponse(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    placement: parseTextPlacement(objectValue.placement, atPath(path, "placement")),
   };
 }
 

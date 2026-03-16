@@ -702,6 +702,34 @@ button:hover {
   background: rgba(255, 252, 247, 0.94);
 }
 
+.editor-text-overlay {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(255, 250, 242, 0.76);
+  border: 1px dashed rgba(78, 49, 25, 0.12);
+  font-weight: 700;
+  text-transform: uppercase;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.editor-text-overlay > span {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
+
+.editor-textarea {
+  min-height: 112px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  resize: vertical;
+}
+
 .editor-region-overlay {
   position: absolute;
   display: grid;

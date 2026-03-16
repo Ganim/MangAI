@@ -46,6 +46,17 @@ from mangai_api.models.region import (
     RegionRecord,
     UpdateRegionRequest,
 )
+from mangai_api.models.text import (
+    AssignmentRecord,
+    DialogueRecord,
+    ManualDialogueRequest,
+    TextPlacementRecord,
+    TextStyle,
+    TranslationRecord,
+    UpsertAssignmentRequest,
+    UpsertPlacementRequest,
+    UpsertTranslationRequest,
+)
 
 
 def _utcnow() -> datetime:
@@ -296,6 +307,307 @@ class LocalProjectStore:
             )
             self._save_state_unlocked(next_state)
             return updated_mask_revision.model_copy(deep=True)
+
+    def list_page_dialogues(self, project_id: UUID, page_id: UUID) -> list[DialogueRecord]:
+        state = self._load_state()
+        self._require_project(state, project_id)
+        self._require_page(state, project_id, page_id)
+        return [
+            dialogue.model_copy(deep=True)
+            for dialogue in sorted(
+                [candidate for candidate in state.dialogues if candidate.page_id == page_id],
+                key=lambda candidate: candidate.reading_order,
+            )
+        ]
+
+    def create_manual_dialogue(
+        self,
+        project_id: UUID,
+        page_id: UUID,
+        payload: ManualDialogueRequest,
+    ) -> DialogueRecord:
+        with self._lock:
+            state = self._load_state_unlocked()
+            self._require_project(state, project_id)
+            page = self._require_page(state, project_id, page_id)
+            now = _utcnow()
+            dialogue = DialogueRecord(
+                id=uuid4(),
+                page_id=page_id,
+                source="manual",
+                source_language=payload.source_language,
+                content=payload.content,
+                reading_order=payload.reading_order,
+                status="draft",
+                source_region_id=None,
+                created_at=now,
+                updated_at=now,
+            )
+            next_state = state.model_copy(
+                update={
+                    "pages": self._replace_page_status(state, page, "text_ready"),
+                    "dialogues": (*state.dialogues, dialogue),
+                }
+            )
+            self._save_state_unlocked(next_state)
+            return dialogue.model_copy(deep=True)
+
+    def update_manual_dialogue(
+        self,
+        project_id: UUID,
+        page_id: UUID,
+        dialogue_id: UUID,
+        payload: ManualDialogueRequest,
+    ) -> DialogueRecord:
+        with self._lock:
+            state = self._load_state_unlocked()
+            self._require_project(state, project_id)
+            page = self._require_page(state, project_id, page_id)
+            dialogue = self._require_dialogue(state, page_id, dialogue_id)
+            updated_dialogue = dialogue.model_copy(
+                update={
+                    "source_language": payload.source_language,
+                    "content": payload.content,
+                    "reading_order": payload.reading_order,
+                    "updated_at": _utcnow(),
+                }
+            )
+            next_dialogues = tuple(
+                updated_dialogue if candidate.id == dialogue_id else candidate
+                for candidate in state.dialogues
+            )
+            next_state = state.model_copy(
+                update={
+                    "pages": self._replace_page_status(state, page, "text_ready"),
+                    "dialogues": next_dialogues,
+                }
+            )
+            self._save_state_unlocked(next_state)
+            return updated_dialogue.model_copy(deep=True)
+
+    def list_page_translations(self, project_id: UUID, page_id: UUID) -> list[TranslationRecord]:
+        state = self._load_state()
+        self._require_project(state, project_id)
+        self._require_page(state, project_id, page_id)
+        dialogue_ids = {dialogue.id for dialogue in state.dialogues if dialogue.page_id == page_id}
+        return [
+            translation.model_copy(deep=True)
+            for translation in sorted(
+                [
+                    candidate
+                    for candidate in state.translations
+                    if candidate.dialogue_id in dialogue_ids
+                ],
+                key=lambda candidate: candidate.created_at,
+            )
+        ]
+
+    def upsert_translation(
+        self,
+        project_id: UUID,
+        page_id: UUID,
+        payload: UpsertTranslationRequest,
+    ) -> TranslationRecord:
+        with self._lock:
+            state = self._load_state_unlocked()
+            self._require_project(state, project_id)
+            page = self._require_page(state, project_id, page_id)
+            dialogue = self._require_dialogue(state, page_id, payload.dialogue_id)
+            existing_translation = next(
+                (
+                    candidate
+                    for candidate in state.translations
+                    if candidate.dialogue_id == dialogue.id
+                    and candidate.target_language == payload.target_language
+                ),
+                None,
+            )
+            now = _utcnow()
+            if existing_translation is None:
+                translation = TranslationRecord(
+                    id=uuid4(),
+                    dialogue_id=dialogue.id,
+                    target_language=payload.target_language,
+                    text_direction=payload.text_direction,
+                    provider="manual",
+                    content=payload.content,
+                    status=payload.status,
+                    edited_by_user=True,
+                    created_at=now,
+                    updated_at=now,
+                )
+                next_translations = (*state.translations, translation)
+            else:
+                translation = existing_translation.model_copy(
+                    update={
+                        "text_direction": payload.text_direction,
+                        "provider": "manual",
+                        "content": payload.content,
+                        "status": payload.status,
+                        "edited_by_user": True,
+                        "updated_at": now,
+                    }
+                )
+                next_translations = tuple(
+                    translation if candidate.id == existing_translation.id else candidate
+                    for candidate in state.translations
+                )
+
+            next_state = state.model_copy(
+                update={
+                    "pages": self._replace_page_status(state, page, "text_ready"),
+                    "translations": next_translations,
+                }
+            )
+            self._save_state_unlocked(next_state)
+            return translation.model_copy(deep=True)
+
+    def list_page_assignments(self, project_id: UUID, page_id: UUID) -> list[AssignmentRecord]:
+        state = self._load_state()
+        self._require_project(state, project_id)
+        self._require_page(state, project_id, page_id)
+        return [
+            assignment.model_copy(deep=True)
+            for assignment in sorted(
+                [candidate for candidate in state.assignments if candidate.page_id == page_id],
+                key=lambda candidate: candidate.created_at,
+            )
+        ]
+
+    def upsert_assignment(
+        self,
+        project_id: UUID,
+        page_id: UUID,
+        payload: UpsertAssignmentRequest,
+    ) -> AssignmentRecord:
+        with self._lock:
+            state = self._load_state_unlocked()
+            self._require_project(state, project_id)
+            page = self._require_page(state, project_id, page_id)
+            dialogue = self._require_dialogue(state, page_id, payload.dialogue_id)
+            region = self._require_region(state, page_id, payload.region_id)
+            existing_assignment = next(
+                (
+                    candidate
+                    for candidate in state.assignments
+                    if candidate.page_id == page_id and candidate.dialogue_id == dialogue.id
+                ),
+                None,
+            )
+            now = _utcnow()
+            if existing_assignment is None:
+                assignment = AssignmentRecord(
+                    id=uuid4(),
+                    page_id=page_id,
+                    dialogue_id=dialogue.id,
+                    region_id=region.id,
+                    origin=payload.origin,
+                    confidence=None,
+                    approved=payload.approved,
+                    created_at=now,
+                    updated_at=now,
+                )
+                next_assignments = (*state.assignments, assignment)
+            else:
+                assignment = existing_assignment.model_copy(
+                    update={
+                        "region_id": region.id,
+                        "origin": payload.origin,
+                        "approved": payload.approved,
+                        "updated_at": now,
+                    }
+                )
+                next_assignments = tuple(
+                    assignment if candidate.id == existing_assignment.id else candidate
+                    for candidate in state.assignments
+                )
+
+            next_state = state.model_copy(
+                update={
+                    "pages": self._replace_page_status(state, page, "text_ready"),
+                    "assignments": next_assignments,
+                }
+            )
+            self._save_state_unlocked(next_state)
+            return assignment.model_copy(deep=True)
+
+    def list_page_placements(self, project_id: UUID, page_id: UUID) -> list[TextPlacementRecord]:
+        state = self._load_state()
+        self._require_project(state, project_id)
+        self._require_page(state, project_id, page_id)
+        assignment_ids = {
+            assignment.id for assignment in state.assignments if assignment.page_id == page_id
+        }
+        return [
+            placement.model_copy(deep=True)
+            for placement in sorted(
+                [
+                    candidate
+                    for candidate in state.placements
+                    if candidate.assignment_id in assignment_ids
+                ],
+                key=lambda candidate: candidate.created_at,
+            )
+        ]
+
+    def upsert_placement(
+        self,
+        project_id: UUID,
+        page_id: UUID,
+        payload: UpsertPlacementRequest,
+    ) -> TextPlacementRecord:
+        with self._lock:
+            state = self._load_state_unlocked()
+            self._require_project(state, project_id)
+            page = self._require_page(state, project_id, page_id)
+            assignment = self._require_assignment(state, page_id, payload.assignment_id)
+            existing_placement = next(
+                (
+                    candidate
+                    for candidate in state.placements
+                    if candidate.assignment_id == assignment.id and candidate.is_active
+                ),
+                None,
+            )
+            now = _utcnow()
+            layout_metrics = {
+                "mode": "manual",
+                "font_size": payload.style.font_size,
+            }
+            if existing_placement is None:
+                placement = TextPlacementRecord(
+                    id=uuid4(),
+                    assignment_id=assignment.id,
+                    is_active=True,
+                    text_box=payload.text_box,
+                    style=payload.style,
+                    layout_metrics=layout_metrics,
+                    created_at=now,
+                    updated_at=now,
+                )
+                next_placements = (*state.placements, placement)
+            else:
+                placement = existing_placement.model_copy(
+                    update={
+                        "text_box": payload.text_box,
+                        "style": payload.style,
+                        "layout_metrics": layout_metrics,
+                        "updated_at": now,
+                    }
+                )
+                next_placements = tuple(
+                    placement if candidate.id == existing_placement.id else candidate
+                    for candidate in state.placements
+                )
+
+            next_state = state.model_copy(
+                update={
+                    "pages": self._replace_page_status(state, page, "typeset_ready"),
+                    "placements": next_placements,
+                }
+            )
+            self._save_state_unlocked(next_state)
+            return placement.model_copy(deep=True)
 
     def create_page_region(
         self,
@@ -639,6 +951,42 @@ class LocalProjectStore:
             raise MaskRevisionNotFoundError(str(page_id), str(mask_revision_id))
         return mask_revision
 
+    def _require_dialogue(
+        self,
+        state: StoredProjectState,
+        page_id: UUID,
+        dialogue_id: UUID,
+    ) -> DialogueRecord:
+        dialogue = next(
+            (
+                candidate
+                for candidate in state.dialogues
+                if candidate.page_id == page_id and candidate.id == dialogue_id
+            ),
+            None,
+        )
+        if dialogue is None:
+            raise ProjectPageNotFoundError(str(page_id), str(dialogue_id))
+        return dialogue
+
+    def _require_assignment(
+        self,
+        state: StoredProjectState,
+        page_id: UUID,
+        assignment_id: UUID,
+    ) -> AssignmentRecord:
+        assignment = next(
+            (
+                candidate
+                for candidate in state.assignments
+                if candidate.page_id == page_id and candidate.id == assignment_id
+            ),
+            None,
+        )
+        if assignment is None:
+            raise ProjectPageNotFoundError(str(page_id), str(assignment_id))
+        return assignment
+
     def _require_asset(
         self,
         state: StoredProjectState,
@@ -692,6 +1040,39 @@ class LocalProjectStore:
         )
         return tuple(
             next_page if candidate.id == page.id else candidate
+            for candidate in state.pages
+        )
+
+    def _replace_page_status(
+        self,
+        state: StoredProjectState,
+        page: ProjectPage,
+        next_status: str,
+    ) -> tuple[ProjectPage, ...]:
+        ordered_statuses = {
+            "uploaded": 0,
+            "analyzed": 1,
+            "cleanup_ready": 2,
+            "cleaned": 3,
+            "text_ready": 4,
+            "typeset_ready": 5,
+            "export_ready": 6,
+            "error": 7,
+        }
+        current_status = page.status
+        effective_status = (
+            current_status
+            if ordered_statuses[current_status] > ordered_statuses[next_status]
+            else next_status
+        )
+        updated_page = page.model_copy(
+            update={
+                "status": effective_status,
+                "updated_at": _utcnow(),
+            }
+        )
+        return tuple(
+            updated_page if candidate.id == page.id else candidate
             for candidate in state.pages
         )
 

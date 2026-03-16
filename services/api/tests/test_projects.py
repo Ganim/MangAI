@@ -432,6 +432,116 @@ def test_generate_cleanup_job_can_be_queued_with_approved_active_mask_revision(
     assert job["payload"]["mask_revision_ids"] == [mask_revision["id"]]
 
 
+def test_manual_text_flow_persists_dialogues_translations_assignments_and_placements(
+    client: TestClient,
+) -> None:
+    project_id = create_project(client)
+    page_payload = upload_single_page(client, project_id)
+    page_id = page_payload["id"]
+    region = create_region(client, project_id, page_id)
+
+    create_dialogue_response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/dialogues",
+        json={
+            "page_id": page_id,
+            "content": "Original line",
+            "source_language": "ja-JP",
+            "reading_order": 1,
+        },
+    )
+    assert create_dialogue_response.status_code == 201
+    dialogue = create_dialogue_response.json()["dialogue"]
+    assert dialogue["source"] == "manual"
+
+    update_dialogue_response = client.put(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/dialogues/{dialogue['id']}",
+        json={
+            "page_id": page_id,
+            "content": "Original line updated",
+            "source_language": "ja-JP",
+            "reading_order": 1,
+        },
+    )
+    assert update_dialogue_response.status_code == 200
+    assert update_dialogue_response.json()["dialogue"]["content"] == "Original line updated"
+
+    translation_response = client.put(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/translations",
+        json={
+            "dialogue_id": dialogue["id"],
+            "target_language": "pt-BR",
+            "text_direction": "ltr",
+            "content": "Linha traduzida",
+            "status": "approved",
+        },
+    )
+    assert translation_response.status_code == 200
+    translation = translation_response.json()["translation"]
+    assert translation["provider"] == "manual"
+    assert translation["edited_by_user"] is True
+
+    assignment_response = client.put(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/assignments",
+        json={
+            "dialogue_id": dialogue["id"],
+            "region_id": region["id"],
+            "origin": "manual",
+            "approved": True,
+        },
+    )
+    assert assignment_response.status_code == 200
+    assignment = assignment_response.json()["assignment"]
+    assert assignment["region_id"] == region["id"]
+
+    placement_response = client.put(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/placements",
+        json={
+            "assignment_id": assignment["id"],
+            "text_box": region["bounding_box"],
+            "style": {
+                "font_family": "Komika",
+                "font_fallbacks": ["Arial"],
+                "font_size": 24,
+                "leading": 28,
+                "tracking": 0,
+                "alignment": "center",
+                "direction": "ltr",
+                "rotation": 0,
+                "fill": "#000000",
+            },
+        },
+    )
+    assert placement_response.status_code == 200
+    placement = placement_response.json()["placement"]
+    assert placement["assignment_id"] == assignment["id"]
+    assert placement["layout_metrics"]["mode"] == "manual"
+
+    dialogues_response = client.get(f"/api/v1/projects/{project_id}/pages/{page_id}/dialogues")
+    translations_response = client.get(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/translations"
+    )
+    assignments_response = client.get(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/assignments"
+    )
+    placements_response = client.get(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/placements"
+    )
+
+    assert dialogues_response.status_code == 200
+    assert translations_response.status_code == 200
+    assert assignments_response.status_code == 200
+    assert placements_response.status_code == 200
+    assert len(dialogues_response.json()["dialogues"]) == 1
+    assert len(translations_response.json()["translations"]) == 1
+    assert len(assignments_response.json()["assignments"]) == 1
+    assert len(placements_response.json()["placements"]) == 1
+
+    detail_response = client.get(f"/api/v1/projects/{project_id}")
+    assert detail_response.status_code == 200
+    detail_page = detail_response.json()["pages"][0]
+    assert detail_page["status"] == "typeset_ready"
+
+
 def test_page_jobs_reject_unsupported_job_type(client: TestClient) -> None:
     project_id = create_project(client)
     page_payload = upload_single_page(client, project_id)

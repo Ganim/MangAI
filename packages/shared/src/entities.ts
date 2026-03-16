@@ -264,7 +264,7 @@ export function parseAssignment(value: unknown, path: Array<string | number> = [
     region_id: readUuid(objectValue.region_id, atPath(path, "region_id")),
     origin: readEnum(objectValue.origin, AssignmentOrigin, atPath(path, "origin")),
     confidence:
-      readOptional(
+      readNullable(
         objectValue.confidence,
         (input, inputPath) => readNumber(input, inputPath, { min: 0, max: 1 }),
         atPath(path, "confidence"),

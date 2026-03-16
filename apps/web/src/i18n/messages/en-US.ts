@@ -209,6 +209,8 @@ export type AppMessages = {
     jobsEmpty: string;
     jobLoadErrorFallback: string;
     jobCreateErrorFallback: string;
+    textLoadErrorFallback: string;
+    textSaveErrorFallback: string;
     approvedMasksSummary: string;
     queueDetectionAction: string;
     queuingDetectionAction: string;
@@ -225,6 +227,28 @@ export type AppMessages = {
     markReviewedAction: string;
     approveRegionAction: string;
     resetRegionAction: string;
+    textSectionTitle: string;
+    textSectionCopy: string;
+    textLoading: string;
+    dialoguesEmpty: string;
+    dialogueOrderLabel: string;
+    dialogueAssignedValue: string;
+    dialogueUnassignedValue: string;
+    translationEmptyValue: string;
+    selectDialogueAction: string;
+    selectedDialogueAction: string;
+    dialogueEditingLabel: string;
+    editingDialogueValue: string;
+    newDialogueValue: string;
+    sourceTextLabel: string;
+    translationTextLabel: string;
+    dialogueRegionHint: string;
+    dialogueRegionMissingHint: string;
+    sourceTextRequired: string;
+    createDialogueAction: string;
+    updateDialogueAction: string;
+    savingDialogueAction: string;
+    newDialogueAction: string;
     overlayRegionCount: string;
     canvasEmptyState: string;
     dimensionsFallbackNotice: string;
@@ -510,6 +534,8 @@ export const enUSMessages: AppMessages = {
     jobsEmpty: "No jobs have been queued for this page yet.",
     jobLoadErrorFallback: "The editor could not load the page job history.",
     jobCreateErrorFallback: "The editor could not queue the selected automation right now.",
+    textLoadErrorFallback: "The editor could not load the saved dialogue workflow for this page.",
+    textSaveErrorFallback: "The editor could not save the selected dialogue workflow right now.",
     approvedMasksSummary: "{count} approved active cleanup masks ready",
     queueDetectionAction: "Queue region detection",
     queuingDetectionAction: "Queuing detection...",
@@ -541,6 +567,30 @@ export const enUSMessages: AppMessages = {
     markReviewedAction: "Mark reviewed",
     approveRegionAction: "Approve region",
     resetRegionAction: "Reset to draft",
+    textSectionTitle: "Dialogue workflow",
+    textSectionCopy:
+      "Manual dialogue, translation, assignment, and first-pass placement now live together in one review loop.",
+    textLoading: "Loading page dialogue workflow...",
+    dialoguesEmpty: "No dialogue has been saved for this page yet. Start a new one from the form below.",
+    dialogueOrderLabel: "Line {order}",
+    dialogueAssignedValue: "Assigned",
+    dialogueUnassignedValue: "Unassigned",
+    translationEmptyValue: "No translated text yet.",
+    selectDialogueAction: "Select dialogue",
+    selectedDialogueAction: "Selected dialogue",
+    dialogueEditingLabel: "Editing target",
+    editingDialogueValue: "Line {order}",
+    newDialogueValue: "New dialogue",
+    sourceTextLabel: "Source text",
+    translationTextLabel: "Translated text",
+    dialogueRegionHint: "This save will assign the dialogue to the selected {region}.",
+    dialogueRegionMissingHint:
+      "Select a region first if you want this dialogue to create an assignment and text placement automatically.",
+    sourceTextRequired: "Source text is required before saving a dialogue.",
+    createDialogueAction: "Create dialogue workflow",
+    updateDialogueAction: "Update dialogue workflow",
+    savingDialogueAction: "Saving dialogue workflow...",
+    newDialogueAction: "Start new dialogue",
     overlayRegionCount: "{count} saved regions",
     canvasEmptyState: "No review regions yet. Create one to anchor the editor workflow.",
     dimensionsFallbackNotice:

@@ -8,14 +8,23 @@ import type { SupportedUiLocale } from "../i18n/config.ts";
 import {
   ApiClientError,
   createMaskRevision,
+  createManualDialogue,
   createPageJob,
   createPageRegion,
+  getPageAssignments,
+  getPageDialogues,
   getPageJobs,
   getPageMaskRevisions,
+  getPagePlacements,
   getPageRegions,
+  getPageTranslations,
   getProjectDetail,
   resolveApiAssetUrl,
+  updateManualDialogue,
   updateMaskRevision,
+  upsertPageAssignment,
+  upsertPagePlacement,
+  upsertPageTranslation,
   updatePageRegion,
 } from "../features/projects/api.ts";
 import {
@@ -27,6 +36,12 @@ import {
   getActiveMaskRevisionForRegion,
   hasApprovedActiveMaskRevisions,
 } from "../features/projects/masks.ts";
+import {
+  buildDefaultPlacementInput,
+  buildTextPreviewEntries,
+  getNextReadingOrder,
+  getPlacementOverlayStyle,
+} from "../features/projects/text.ts";
 import {
   buildDefaultRegionInput,
   formatRegionBounds,
@@ -58,6 +73,14 @@ type PageJobsResponse = Awaited<ReturnType<typeof getPageJobs>>;
 type PageJob = PageJobsResponse["jobs"][number];
 type PageMaskRevisionsResponse = Awaited<ReturnType<typeof getPageMaskRevisions>>;
 type PageMaskRevision = PageMaskRevisionsResponse["mask_revisions"][number];
+type PageDialoguesResponse = Awaited<ReturnType<typeof getPageDialogues>>;
+type PageDialogue = PageDialoguesResponse["dialogues"][number];
+type PageTranslationsResponse = Awaited<ReturnType<typeof getPageTranslations>>;
+type PageTranslation = PageTranslationsResponse["translations"][number];
+type PageAssignmentsResponse = Awaited<ReturnType<typeof getPageAssignments>>;
+type PageAssignment = PageAssignmentsResponse["assignments"][number];
+type PagePlacementsResponse = Awaited<ReturnType<typeof getPagePlacements>>;
+type PagePlacement = PagePlacementsResponse["placements"][number];
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiClientError) {
@@ -89,14 +112,20 @@ export function PageEditorShell({
   const [regions, setRegions] = useState<PageRegion[]>([]);
   const [jobs, setJobs] = useState<PageJob[]>([]);
   const [maskRevisions, setMaskRevisions] = useState<PageMaskRevision[]>([]);
+  const [dialogues, setDialogues] = useState<PageDialogue[]>([]);
+  const [translations, setTranslations] = useState<PageTranslation[]>([]);
+  const [assignments, setAssignments] = useState<PageAssignment[]>([]);
+  const [placements, setPlacements] = useState<PagePlacement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRegionsLoading, setIsRegionsLoading] = useState(false);
   const [isMaskRevisionsLoading, setIsMaskRevisionsLoading] = useState(false);
+  const [isTextLoading, setIsTextLoading] = useState(false);
   const [isCreatingRegion, setIsCreatingRegion] = useState(false);
   const [isJobsLoading, setIsJobsLoading] = useState(false);
   const [isQueueingDetection, setIsQueueingDetection] = useState(false);
   const [isQueueingCleanup, setIsQueueingCleanup] = useState(false);
   const [isCreatingMaskRevision, setIsCreatingMaskRevision] = useState(false);
+  const [isSavingDialogue, setIsSavingDialogue] = useState(false);
   const [updatingRegionId, setUpdatingRegionId] = useState<string | null>(null);
   const [updatingMaskRevisionId, setUpdatingMaskRevisionId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -106,7 +135,12 @@ export function PageEditorShell({
   const [jobActionError, setJobActionError] = useState<string | null>(null);
   const [maskLoadError, setMaskLoadError] = useState<string | null>(null);
   const [maskActionError, setMaskActionError] = useState<string | null>(null);
+  const [textLoadError, setTextLoadError] = useState<string | null>(null);
+  const [textActionError, setTextActionError] = useState<string | null>(null);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
+  const [selectedDialogueId, setSelectedDialogueId] = useState<string | null>(null);
+  const [dialogueDraft, setDialogueDraft] = useState("");
+  const [translationDraft, setTranslationDraft] = useState("");
   const [showRegions, setShowRegions] = useState(true);
 
   useEffect(() => {
@@ -148,12 +182,35 @@ export function PageEditorShell({
     return response;
   }
 
+  async function fetchTextStateSnapshot(nextPageId: string) {
+    const [dialoguesResponse, translationsResponse, assignmentsResponse, placementsResponse] =
+      await Promise.all([
+        getPageDialogues(projectId, nextPageId),
+        getPageTranslations(projectId, nextPageId),
+        getPageAssignments(projectId, nextPageId),
+        getPagePlacements(projectId, nextPageId),
+      ]);
+    return {
+      dialogues: dialoguesResponse.dialogues,
+      translations: translationsResponse.translations,
+      assignments: assignmentsResponse.assignments,
+      placements: placementsResponse.placements,
+    };
+  }
+
   useEffect(() => {
     if (currentPage === null) {
       setRegions([]);
       setJobs([]);
       setMaskRevisions([]);
+      setDialogues([]);
+      setTranslations([]);
+      setAssignments([]);
+      setPlacements([]);
       setSelectedRegionId(null);
+      setSelectedDialogueId(null);
+      setDialogueDraft("");
+      setTranslationDraft("");
       return;
     }
 
@@ -265,6 +322,53 @@ export function PageEditorShell({
   }, [currentPage, messages.editor.maskLoadErrorFallback, projectId]);
 
   useEffect(() => {
+    if (currentPage === null) {
+      setDialogues([]);
+      setTranslations([]);
+      setAssignments([]);
+      setPlacements([]);
+      return;
+    }
+
+    const nextPage = currentPage;
+    let canceled = false;
+
+    async function loadTextState() {
+      setIsTextLoading(true);
+      setTextLoadError(null);
+      try {
+        const response = await fetchTextStateSnapshot(nextPage.id);
+        if (canceled) {
+          return;
+        }
+        setDialogues(response.dialogues);
+        setTranslations(response.translations);
+        setAssignments(response.assignments);
+        setPlacements(response.placements);
+        setSelectedDialogueId((currentSelectedDialogueId) =>
+          response.dialogues.some((dialogue) => dialogue.id === currentSelectedDialogueId)
+            ? currentSelectedDialogueId
+            : (response.dialogues[0]?.id ?? null),
+        );
+      } catch (error) {
+        if (canceled) {
+          return;
+        }
+        setTextLoadError(getErrorMessage(error, messages.editor.textLoadErrorFallback));
+      } finally {
+        if (!canceled) {
+          setIsTextLoading(false);
+        }
+      }
+    }
+
+    void loadTextState();
+    return () => {
+      canceled = true;
+    };
+  }, [currentPage, messages.editor.textLoadErrorFallback, projectId]);
+
+  useEffect(() => {
     if (currentPage === null || !hasPendingPageJobs(jobs)) {
       return;
     }
@@ -274,11 +378,24 @@ export function PageEditorShell({
 
     async function pollPageAutomationState() {
       try {
-        const [projectResponse, jobsResponse, regionsResponse, maskRevisionsResponse] = await Promise.all([
+        const [
+          projectResponse,
+          jobsResponse,
+          regionsResponse,
+          maskRevisionsResponse,
+          dialoguesResponse,
+          translationsResponse,
+          assignmentsResponse,
+          placementsResponse,
+        ] = await Promise.all([
           getProjectDetail(projectId),
           getPageJobs(projectId, nextPage.id),
           getPageRegions(projectId, nextPage.id),
           getPageMaskRevisions(projectId, nextPage.id),
+          getPageDialogues(projectId, nextPage.id),
+          getPageTranslations(projectId, nextPage.id),
+          getPageAssignments(projectId, nextPage.id),
+          getPagePlacements(projectId, nextPage.id),
         ]);
         if (canceled) {
           return;
@@ -287,14 +404,24 @@ export function PageEditorShell({
         setJobs(jobsResponse.jobs);
         setRegions(regionsResponse.regions);
         setMaskRevisions(maskRevisionsResponse.mask_revisions);
+        setDialogues(dialoguesResponse.dialogues);
+        setTranslations(translationsResponse.translations);
+        setAssignments(assignmentsResponse.assignments);
+        setPlacements(placementsResponse.placements);
         setSelectedRegionId((currentSelectedRegionId) =>
           regionsResponse.regions.some((region) => region.id === currentSelectedRegionId)
             ? currentSelectedRegionId
             : (regionsResponse.regions[0]?.id ?? null),
         );
+        setSelectedDialogueId((currentSelectedDialogueId) =>
+          dialoguesResponse.dialogues.some((dialogue) => dialogue.id === currentSelectedDialogueId)
+            ? currentSelectedDialogueId
+            : (dialoguesResponse.dialogues[0]?.id ?? null),
+        );
         setJobLoadError(null);
         setRegionLoadError(null);
         setMaskLoadError(null);
+        setTextLoadError(null);
       } catch (error) {
         if (canceled) {
           return;
@@ -317,11 +444,29 @@ export function PageEditorShell({
     jobs,
     messages.editor.jobLoadErrorFallback,
     messages.editor.maskLoadErrorFallback,
+    messages.editor.textLoadErrorFallback,
     projectId,
   ]);
 
+  useEffect(() => {
+    const selectedDialogue =
+      dialogues.find((candidate) => candidate.id === selectedDialogueId) ?? null;
+    if (selectedDialogue === null) {
+      setDialogueDraft("");
+      setTranslationDraft("");
+      return;
+    }
+
+    const selectedTranslation =
+      translations.find((candidate) => candidate.dialogue_id === selectedDialogue.id) ?? null;
+    setDialogueDraft(selectedDialogue.content);
+    setTranslationDraft(selectedTranslation?.content ?? "");
+  }, [dialogues, selectedDialogueId, translations]);
+
   const selectedRegion =
     regions.find((candidate) => candidate.id === selectedRegionId) ?? null;
+  const selectedDialogue =
+    dialogues.find((candidate) => candidate.id === selectedDialogueId) ?? null;
   const currentCanvasSize = currentPage
     ? getPageCanvasSize({ width: currentPage.width, height: currentPage.height })
     : null;
@@ -333,6 +478,12 @@ export function PageEditorShell({
       ? null
       : getActiveMaskRevisionForRegion(maskRevisions, selectedRegion.id);
   const approvedActiveMaskRevisionCount = countApprovedActiveMaskRevisions(maskRevisions);
+  const textPreviewEntries = buildTextPreviewEntries({
+    dialogues,
+    translations,
+    assignments,
+    placements,
+  });
 
   async function handleCreateRegion() {
     if (currentPage === null) {
@@ -501,6 +652,99 @@ export function PageEditorShell({
       setJobActionError(getErrorMessage(error, messages.editor.jobCreateErrorFallback));
     } finally {
       setIsQueueingCleanup(false);
+    }
+  }
+
+  function handleStartNewDialogue() {
+    setSelectedDialogueId(null);
+    setDialogueDraft("");
+    setTranslationDraft("");
+  }
+
+  async function handleSaveDialogueWorkflow() {
+    if (currentPage === null || projectDetail === null) {
+      return;
+    }
+
+    const trimmedSourceText = dialogueDraft.trim();
+    const trimmedTranslationText = translationDraft.trim();
+    if (trimmedSourceText.length === 0) {
+      setTextActionError(messages.editor.sourceTextRequired);
+      return;
+    }
+
+    setIsSavingDialogue(true);
+    setTextActionError(null);
+
+    try {
+      const readingOrder =
+        selectedDialogue?.reading_order ?? getNextReadingOrder(dialogues);
+      const dialogueResponse = selectedDialogue
+        ? await updateManualDialogue(projectId, currentPage.id, selectedDialogue.id, {
+            page_id: currentPage.id,
+            content: trimmedSourceText,
+            source_language: projectDetail.project.source_language,
+            reading_order: readingOrder,
+          })
+        : await createManualDialogue(projectId, currentPage.id, {
+            page_id: currentPage.id,
+            content: trimmedSourceText,
+            source_language: projectDetail.project.source_language,
+            reading_order: readingOrder,
+          });
+
+      const translationResponse = await upsertPageTranslation(projectId, currentPage.id, {
+        dialogue_id: dialogueResponse.dialogue.id,
+        target_language: projectDetail.project.target_language,
+        text_direction: projectDetail.project.target_text_direction,
+        content: trimmedTranslationText,
+        status: "approved",
+      });
+
+      if (selectedRegion !== null) {
+        const assignmentResponse = await upsertPageAssignment(projectId, currentPage.id, {
+          dialogue_id: dialogueResponse.dialogue.id,
+          region_id: selectedRegion.id,
+          origin: "manual",
+          approved: true,
+        });
+        const existingPlacement = placements.find(
+          (placement) => placement.assignment_id === assignmentResponse.assignment.id,
+        );
+        const placementInput =
+          existingPlacement === undefined
+            ? buildDefaultPlacementInput({
+                assignmentId: assignmentResponse.assignment.id,
+                region: selectedRegion,
+                targetLanguage: projectDetail.project.target_language,
+                textDirection: projectDetail.project.target_text_direction,
+              })
+            : {
+                assignment_id: assignmentResponse.assignment.id,
+                text_box: existingPlacement.text_box,
+                style: existingPlacement.style,
+              };
+        await upsertPagePlacement(projectId, currentPage.id, placementInput);
+      }
+
+      await refreshProjectDetailState();
+      const refreshedTextState = await fetchTextStateSnapshot(currentPage.id);
+      setDialogues(refreshedTextState.dialogues);
+      setTranslations(refreshedTextState.translations);
+      setAssignments(refreshedTextState.assignments);
+      setPlacements(refreshedTextState.placements);
+      setSelectedDialogueId(dialogueResponse.dialogue.id);
+      setDialogueDraft(dialogueResponse.dialogue.content);
+      setTranslationDraft(translationResponse.translation.content);
+      setSelectedDialogueId((currentSelectedDialogueId) =>
+        refreshedTextState.dialogues.some((dialogue) => dialogue.id === currentSelectedDialogueId)
+          ? currentSelectedDialogueId
+          : dialogueResponse.dialogue.id,
+      );
+    } catch (error) {
+      setTextActionError(getErrorMessage(error, messages.editor.textSaveErrorFallback));
+    } finally {
+      setIsSavingDialogue(false);
     }
   }
 
@@ -925,6 +1169,127 @@ export function PageEditorShell({
                 ))}
               </div>
             )}
+
+            <div className="section-head section-head-compact">
+              <h2 className="section-title">{messages.editor.textSectionTitle}</h2>
+              <p className="section-copy">{messages.editor.textSectionCopy}</p>
+            </div>
+
+            {textLoadError ? <p className="notice notice-error">{textLoadError}</p> : null}
+            {textActionError ? <p className="notice notice-error">{textActionError}</p> : null}
+
+            <div className="editor-selection-actions">
+              <button
+                className="ghost-button"
+                onClick={handleStartNewDialogue}
+                type="button"
+              >
+                {messages.editor.newDialogueAction}
+              </button>
+            </div>
+
+            {isTextLoading ? (
+              <p className="empty-state">{messages.editor.textLoading}</p>
+            ) : dialogues.length === 0 ? (
+              <p className="empty-state">{messages.editor.dialoguesEmpty}</p>
+            ) : (
+              <div className="editor-region-list">
+                {dialogues.map((dialogue) => {
+                  const translation =
+                    translations.find((candidate) => candidate.dialogue_id === dialogue.id) ?? null;
+                  const assignment =
+                    assignments.find((candidate) => candidate.dialogue_id === dialogue.id) ?? null;
+                  const isSelected = dialogue.id === selectedDialogueId;
+                  return (
+                    <article
+                      className={isSelected ? "editor-region-card editor-region-card-selected" : "editor-region-card"}
+                      key={dialogue.id}
+                    >
+                      <div className="editor-region-card-header">
+                        <span className="card-step">
+                          {messages.editor.dialogueOrderLabel.replace(
+                            "{order}",
+                            String(dialogue.reading_order),
+                          )}
+                        </span>
+                        <span className="editor-region-state-pill">
+                          {assignment
+                            ? messages.editor.dialogueAssignedValue
+                            : messages.editor.dialogueUnassignedValue}
+                        </span>
+                      </div>
+                      <strong>{dialogue.content}</strong>
+                      <p className="card-description">
+                        {translation?.content || messages.editor.translationEmptyValue}
+                      </p>
+                      <button
+                        className={isSelected ? "secondary-button" : "ghost-button"}
+                        onClick={() => setSelectedDialogueId(dialogue.id)}
+                        type="button"
+                      >
+                        {isSelected
+                          ? messages.editor.selectedDialogueAction
+                          : messages.editor.selectDialogueAction}
+                      </button>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+
+            <div className="editor-selection-panel">
+              <div className="editor-selection-meta">
+                <span className="status-item-label">{messages.editor.dialogueEditingLabel}</span>
+                <strong>
+                  {selectedDialogue
+                    ? messages.editor.editingDialogueValue.replace(
+                        "{order}",
+                        String(selectedDialogue.reading_order),
+                      )
+                    : messages.editor.newDialogueValue}
+                </strong>
+              </div>
+              <label className="field-label" htmlFor="dialogue-source">
+                {messages.editor.sourceTextLabel}
+              </label>
+              <textarea
+                className="field-input editor-textarea"
+                id="dialogue-source"
+                onChange={(event) => setDialogueDraft(event.target.value)}
+                rows={4}
+                value={dialogueDraft}
+              />
+              <label className="field-label" htmlFor="dialogue-translation">
+                {messages.editor.translationTextLabel}
+              </label>
+              <textarea
+                className="field-input editor-textarea"
+                id="dialogue-translation"
+                onChange={(event) => setTranslationDraft(event.target.value)}
+                rows={4}
+                value={translationDraft}
+              />
+              <p className="card-description">
+                {selectedRegion
+                  ? messages.editor.dialogueRegionHint.replace(
+                      "{region}",
+                      messages.editor.regionTypeLabels[selectedRegion.type],
+                    )
+                  : messages.editor.dialogueRegionMissingHint}
+              </p>
+              <button
+                className="primary-button"
+                disabled={isSavingDialogue}
+                onClick={() => void handleSaveDialogueWorkflow()}
+                type="button"
+              >
+                {isSavingDialogue
+                  ? messages.editor.savingDialogueAction
+                  : selectedDialogue
+                    ? messages.editor.updateDialogueAction
+                    : messages.editor.createDialogueAction}
+              </button>
+            </div>
           </aside>
 
           <section className="section-panel editor-canvas-panel">
@@ -1006,6 +1371,16 @@ export function PageEditorShell({
                       );
                     })
                   : null}
+
+                {textPreviewEntries.map((entry) => (
+                  <div
+                    className="editor-text-overlay"
+                    key={entry.id}
+                    style={getPlacementOverlayStyle(entry.placement, currentPage)}
+                  >
+                    <span>{entry.text}</span>
+                  </div>
+                ))}
               </div>
             </div>
 

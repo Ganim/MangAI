@@ -16,6 +16,12 @@ from mangai_api.models.common import APIModel
 from mangai_api.models.job import JobRecord
 from mangai_api.models.mask import MaskRevisionRecord
 from mangai_api.models.region import RegionRecord
+from mangai_api.models.text import (
+    AssignmentRecord,
+    DialogueRecord,
+    TextPlacementRecord,
+    TranslationRecord,
+)
 
 
 ProjectStatus = Literal["draft", "active", "archived"]
@@ -143,6 +149,10 @@ class StoredProjectState(APIModel):
     assets: tuple[StoredProjectAsset, ...] = ()
     regions: tuple[RegionRecord, ...] = ()
     mask_revisions: tuple[MaskRevisionRecord, ...] = ()
+    dialogues: tuple[DialogueRecord, ...] = ()
+    translations: tuple[TranslationRecord, ...] = ()
+    assignments: tuple[AssignmentRecord, ...] = ()
+    placements: tuple[TextPlacementRecord, ...] = ()
     jobs: tuple[JobRecord, ...] = ()
 
 

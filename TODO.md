@@ -50,21 +50,21 @@
 - [x] Create project dashboard
 - [x] Create upload flow
 - [x] Create page editor shell
-- [ ] Create overlay and mask editing interactions
-- [ ] Create dialogue side panel
+- [x] Create overlay and mask editing interactions
+- [x] Create dialogue side panel
 
 ## Backend
 
 - [x] Create project and page APIs
 - [x] Create job API
 - [x] Create asset storage layer
-- [ ] Create cleanup pipeline contract
+- [x] Create cleanup pipeline contract
 - [ ] Create OCR pipeline contract
 
 ## AI
 
-- [ ] Create region detection adapter
-- [ ] Create cleanup adapter
+- [x] Create region detection adapter
+- [x] Create cleanup adapter
 - [ ] Create OCR adapter
 - [ ] Create translation adapter
 - [ ] Create matching heuristics

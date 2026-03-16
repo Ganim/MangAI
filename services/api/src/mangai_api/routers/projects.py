@@ -27,6 +27,20 @@ from mangai_api.models.region import (
     RegionResponse,
     UpdateRegionRequest,
 )
+from mangai_api.models.text import (
+    AssignmentResponse,
+    DialogueResponse,
+    ListAssignmentsResponse,
+    ListDialoguesResponse,
+    ListPlacementsResponse,
+    ListTranslationsResponse,
+    ManualDialogueRequest,
+    PlacementResponse,
+    TranslationResponse,
+    UpsertAssignmentRequest,
+    UpsertPlacementRequest,
+    UpsertTranslationRequest,
+)
 from mangai_api.repositories.projects import LocalProjectStore, UploadedPageFile
 
 
@@ -102,6 +116,66 @@ def list_page_mask_revisions(
         mask_revisions=tuple(
             store.list_page_mask_revisions(project_id=project_id, page_id=page_id)
         )
+    )
+
+
+@router.get(
+    "/{project_id}/pages/{page_id}/dialogues",
+    response_model=ListDialoguesResponse,
+    summary="List page dialogues",
+)
+def list_page_dialogues(
+    project_id: UUID,
+    page_id: UUID,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> ListDialoguesResponse:
+    return ListDialoguesResponse(
+        dialogues=tuple(store.list_page_dialogues(project_id=project_id, page_id=page_id))
+    )
+
+
+@router.get(
+    "/{project_id}/pages/{page_id}/translations",
+    response_model=ListTranslationsResponse,
+    summary="List page translations",
+)
+def list_page_translations(
+    project_id: UUID,
+    page_id: UUID,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> ListTranslationsResponse:
+    return ListTranslationsResponse(
+        translations=tuple(store.list_page_translations(project_id=project_id, page_id=page_id))
+    )
+
+
+@router.get(
+    "/{project_id}/pages/{page_id}/assignments",
+    response_model=ListAssignmentsResponse,
+    summary="List page assignments",
+)
+def list_page_assignments(
+    project_id: UUID,
+    page_id: UUID,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> ListAssignmentsResponse:
+    return ListAssignmentsResponse(
+        assignments=tuple(store.list_page_assignments(project_id=project_id, page_id=page_id))
+    )
+
+
+@router.get(
+    "/{project_id}/pages/{page_id}/placements",
+    response_model=ListPlacementsResponse,
+    summary="List page text placements",
+)
+def list_page_placements(
+    project_id: UUID,
+    page_id: UUID,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> ListPlacementsResponse:
+    return ListPlacementsResponse(
+        placements=tuple(store.list_page_placements(project_id=project_id, page_id=page_id))
     )
 
 
@@ -200,6 +274,26 @@ def create_page_mask_revision(
 
 
 @router.post(
+    "/{project_id}/pages/{page_id}/dialogues",
+    response_model=DialogueResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create manual page dialogue",
+)
+def create_page_dialogue(
+    project_id: UUID,
+    page_id: UUID,
+    payload: ManualDialogueRequest,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> DialogueResponse:
+    dialogue = store.create_manual_dialogue(
+        project_id=project_id,
+        page_id=page_id,
+        payload=payload,
+    )
+    return DialogueResponse(dialogue=dialogue)
+
+
+@router.post(
     "/{project_id}/pages/{page_id}/jobs",
     response_model=JobResponse,
     status_code=status.HTTP_201_CREATED,
@@ -255,6 +349,84 @@ def update_page_mask_revision(
         payload=payload,
     )
     return MaskRevisionResponse(mask_revision=mask_revision)
+
+
+@router.put(
+    "/{project_id}/pages/{page_id}/dialogues/{dialogue_id}",
+    response_model=DialogueResponse,
+    summary="Update manual page dialogue",
+)
+def update_page_dialogue(
+    project_id: UUID,
+    page_id: UUID,
+    dialogue_id: UUID,
+    payload: ManualDialogueRequest,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> DialogueResponse:
+    dialogue = store.update_manual_dialogue(
+        project_id=project_id,
+        page_id=page_id,
+        dialogue_id=dialogue_id,
+        payload=payload,
+    )
+    return DialogueResponse(dialogue=dialogue)
+
+
+@router.put(
+    "/{project_id}/pages/{page_id}/translations",
+    response_model=TranslationResponse,
+    summary="Upsert page translation",
+)
+def upsert_page_translation(
+    project_id: UUID,
+    page_id: UUID,
+    payload: UpsertTranslationRequest,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> TranslationResponse:
+    translation = store.upsert_translation(
+        project_id=project_id,
+        page_id=page_id,
+        payload=payload,
+    )
+    return TranslationResponse(translation=translation)
+
+
+@router.put(
+    "/{project_id}/pages/{page_id}/assignments",
+    response_model=AssignmentResponse,
+    summary="Upsert page dialogue assignment",
+)
+def upsert_page_assignment(
+    project_id: UUID,
+    page_id: UUID,
+    payload: UpsertAssignmentRequest,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> AssignmentResponse:
+    assignment = store.upsert_assignment(
+        project_id=project_id,
+        page_id=page_id,
+        payload=payload,
+    )
+    return AssignmentResponse(assignment=assignment)
+
+
+@router.put(
+    "/{project_id}/pages/{page_id}/placements",
+    response_model=PlacementResponse,
+    summary="Upsert page text placement",
+)
+def upsert_page_placement(
+    project_id: UUID,
+    page_id: UUID,
+    payload: UpsertPlacementRequest,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> PlacementResponse:
+    placement = store.upsert_placement(
+        project_id=project_id,
+        page_id=page_id,
+        payload=payload,
+    )
+    return PlacementResponse(placement=placement)
 
 
 @router.get(

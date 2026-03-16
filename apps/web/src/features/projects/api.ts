@@ -1,20 +1,32 @@
 import {
+  parseAssignmentResponse,
   parseCreateMaskRevisionRequest,
   parseCreatePageRegionRequest,
   parseCreatePageJobRequest,
   parseCreateProjectRequest,
   parseCreateProjectResponse,
+  parseDialogueResponse,
+  parseListPageAssignmentsResponse,
+  parseListPageDialoguesResponse,
   parseListPageJobsResponse,
   parseListPageMaskRevisionsResponse,
+  parseListPagePlacementsResponse,
   parseListProjectsResponse,
   parseListPageRegionsResponse,
+  parseListPageTranslationsResponse,
   parseMaskRevisionResponse,
+  parsePlacementResponse,
   parsePageJobResponse,
   parsePageRegionResponse,
   parseProjectDetailResponse,
   parseRegisterProjectPagesResponse,
+  parseTranslationResponse,
   parseUpdateMaskRevisionRequest,
   parseUpdatePageRegionRequest,
+  parseManualDialogueRequest,
+  parseUpsertAssignmentRequest,
+  parseUpsertPlacementRequest,
+  parseUpsertTranslationRequest,
 } from "@mangai/shared";
 
 import { getPublicApiBaseUrl } from "../../config/env.ts";
@@ -93,6 +105,49 @@ type CreatePageJobInput = {
     | "export_project";
 };
 
+type ManualDialogueInput = {
+  page_id: string;
+  content: string;
+  source_language: string;
+  reading_order: number;
+};
+
+type UpsertTranslationInput = {
+  dialogue_id: string;
+  target_language: string;
+  text_direction?: "ltr" | "rtl" | "ttb";
+  content: string;
+  status: "draft" | "reviewed" | "approved";
+};
+
+type UpsertAssignmentInput = {
+  dialogue_id: string;
+  region_id: string;
+  origin: "automatic" | "manual";
+  approved: boolean;
+};
+
+type UpsertPlacementInput = {
+  assignment_id: string;
+  text_box: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  style: {
+    font_family: string;
+    font_fallbacks?: string[];
+    font_size: number;
+    leading: number;
+    tracking: number;
+    alignment: string;
+    direction: "ltr" | "rtl" | "ttb";
+    rotation: number;
+    fill: string;
+  };
+};
+
 async function readJsonResponse(response: Response): Promise<unknown> {
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) {
@@ -163,6 +218,38 @@ export async function getPageMaskRevisions(projectId: string, pageId: string) {
     `/projects/${projectId}/pages/${pageId}/mask-revisions`,
     { method: "GET" },
     parseListPageMaskRevisionsResponse,
+  );
+}
+
+export async function getPageDialogues(projectId: string, pageId: string) {
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/dialogues`,
+    { method: "GET" },
+    parseListPageDialoguesResponse,
+  );
+}
+
+export async function getPageTranslations(projectId: string, pageId: string) {
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/translations`,
+    { method: "GET" },
+    parseListPageTranslationsResponse,
+  );
+}
+
+export async function getPageAssignments(projectId: string, pageId: string) {
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/assignments`,
+    { method: "GET" },
+    parseListPageAssignmentsResponse,
+  );
+}
+
+export async function getPagePlacements(projectId: string, pageId: string) {
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/placements`,
+    { method: "GET" },
+    parseListPagePlacementsResponse,
   );
 }
 
@@ -267,6 +354,87 @@ export async function updateMaskRevision(
       body: JSON.stringify(payload),
     },
     parseMaskRevisionResponse,
+  );
+}
+
+export async function createManualDialogue(
+  projectId: string,
+  pageId: string,
+  input: ManualDialogueInput,
+) {
+  const payload = parseManualDialogueRequest(input);
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/dialogues`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    parseDialogueResponse,
+  );
+}
+
+export async function updateManualDialogue(
+  projectId: string,
+  pageId: string,
+  dialogueId: string,
+  input: ManualDialogueInput,
+) {
+  const payload = parseManualDialogueRequest(input);
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/dialogues/${dialogueId}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+    parseDialogueResponse,
+  );
+}
+
+export async function upsertPageTranslation(
+  projectId: string,
+  pageId: string,
+  input: UpsertTranslationInput,
+) {
+  const payload = parseUpsertTranslationRequest(input);
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/translations`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+    parseTranslationResponse,
+  );
+}
+
+export async function upsertPageAssignment(
+  projectId: string,
+  pageId: string,
+  input: UpsertAssignmentInput,
+) {
+  const payload = parseUpsertAssignmentRequest(input);
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/assignments`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+    parseAssignmentResponse,
+  );
+}
+
+export async function upsertPagePlacement(
+  projectId: string,
+  pageId: string,
+  input: UpsertPlacementInput,
+) {
+  const payload = parseUpsertPlacementRequest(input);
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/placements`,
+    {
+      method: "PUT",
+      body: JSON.stringify(payload),
+    },
+    parsePlacementResponse,
   );
 }
 
