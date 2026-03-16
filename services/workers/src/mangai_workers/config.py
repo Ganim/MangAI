@@ -31,6 +31,7 @@ class WorkerSettings:
 
 @lru_cache(maxsize=1)
 def get_settings() -> WorkerSettings:
+    _load_local_env_file()
     data_dir = Path(environ.get("MANGAI_DATA_DIR", str(SERVICE_ROOT / ".data")))
     poll_interval_seconds = float(environ.get("MANGAI_WORKER_POLL_INTERVAL_SECONDS", "2.0"))
     return WorkerSettings(
@@ -64,6 +65,36 @@ def get_settings() -> WorkerSettings:
 
 def clear_settings_cache() -> None:
     get_settings.cache_clear()
+
+
+def _load_local_env_file() -> None:
+    env_file_override = environ.get("MANGAI_ENV_FILE")
+    env_file_path = (
+        Path(env_file_override).expanduser()
+        if env_file_override
+        else SERVICE_ROOT / ".env"
+    )
+    if not env_file_path.exists():
+        return
+
+    for raw_line in env_file_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if line == "" or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].strip()
+        if "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        env_key = key.strip()
+        if env_key == "" or env_key in environ:
+            continue
+
+        normalized_value = value.strip()
+        if len(normalized_value) >= 2 and normalized_value[0] == normalized_value[-1] and normalized_value[0] in {"'", '"'}:
+            normalized_value = normalized_value[1:-1]
+        environ[env_key] = normalized_value
 
 
 def _read_optional_env(name: str) -> str | None:

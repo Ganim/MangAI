@@ -33,3 +33,29 @@ def test_worker_settings_read_environment(monkeypatch, tmp_path) -> None:
     assert settings.deepl_api_key == "deepl-key"
 
     clear_settings_cache()
+
+
+def test_worker_settings_load_local_env_file(monkeypatch, tmp_path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "\n".join(
+            [
+                "MANGAI_OCR_PROVIDER=fallback",
+                "MANGAI_TRANSLATION_PROVIDER=azure_translator",
+                "MANGAI_AZURE_TRANSLATOR_API_KEY=test-key",
+                "MANGAI_AZURE_TRANSLATOR_REGION=brazilsouth",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("MANGAI_ENV_FILE", str(env_file))
+    clear_settings_cache()
+
+    settings = get_settings()
+
+    assert settings.ocr_provider == "fallback"
+    assert settings.translation_provider == "azure_translator"
+    assert settings.azure_translator_api_key == "test-key"
+    assert settings.azure_translator_region == "brazilsouth"
+
+    clear_settings_cache()
