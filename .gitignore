@@ -5,6 +5,8 @@ dist/
 coverage/
 *.tsbuildinfo
 .data/
+services/workers/.cache/
+services/workers/.cache-test/
 
 # Python
 __pycache__/

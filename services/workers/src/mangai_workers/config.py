@@ -9,6 +9,7 @@ from pathlib import Path
 SERVICE_ROOT = Path(__file__).resolve().parents[2]
 REPO_ROOT = SERVICE_ROOT.parent.parent
 DEFAULT_SHARED_DATA_DIR = REPO_ROOT / "services" / "api" / ".data"
+DEFAULT_WORKER_CACHE_DIR = SERVICE_ROOT / ".cache"
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,7 @@ class WorkerSettings:
     app_name: str = "MangAI Workers"
     environment: str = "development"
     data_dir: Path = DEFAULT_SHARED_DATA_DIR
+    cache_dir: Path = DEFAULT_WORKER_CACHE_DIR
     poll_interval_seconds: float = 2.0
     stalled_job_timeout_seconds: float = 30.0
     ocr_provider: str = "fallback"
@@ -36,11 +38,13 @@ class WorkerSettings:
 def get_settings() -> WorkerSettings:
     _load_local_env_file()
     data_dir = Path(environ.get("MANGAI_DATA_DIR", str(DEFAULT_SHARED_DATA_DIR)))
+    cache_dir = Path(environ.get("MANGAI_WORKER_CACHE_DIR", str(DEFAULT_WORKER_CACHE_DIR)))
     poll_interval_seconds = float(environ.get("MANGAI_WORKER_POLL_INTERVAL_SECONDS", "2.0"))
     return WorkerSettings(
         app_name=environ.get("MANGAI_WORKERS_APP_NAME", "MangAI Workers"),
         environment=environ.get("MANGAI_ENVIRONMENT", "development"),
         data_dir=data_dir,
+        cache_dir=cache_dir,
         poll_interval_seconds=poll_interval_seconds,
         stalled_job_timeout_seconds=float(
             environ.get("MANGAI_WORKER_STALLED_JOB_TIMEOUT_SECONDS", "30.0")

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from time import monotonic, sleep
 from typing import TYPE_CHECKING, Protocol
@@ -37,6 +38,8 @@ class RecognizedLine:
     confidence: float
     x: float
     y: float
+    width: float
+    height: float
 
 
 class OcrProviderError(Exception):
@@ -93,7 +96,7 @@ def build_ocr_provider(settings: WorkerSettings) -> OcrProvider:
         if provider_name == "fallback":
             return FallbackOcrProvider()
         if provider_name == "paddleocr":
-            return PaddleOcrProvider()
+            return PaddleOcrProvider(settings)
         if provider_name == "azure_vision":
             return AzureVisionOcrProvider(settings)
         raise OcrProviderError(f"Unsupported OCR provider '{provider_name}'.")
@@ -101,6 +104,35 @@ def build_ocr_provider(settings: WorkerSettings) -> OcrProvider:
         if settings.strict_provider_selection:
             raise
         return FallbackOcrProvider()
+
+
+def extract_paddle_recognized_lines(
+    *,
+    asset_path: Path,
+    source_language: str,
+    settings: WorkerSettings,
+) -> list[RecognizedLine]:
+    if not asset_path.exists():
+        raise FileNotFoundError(f"Could not find OCR source asset '{asset_path}'.")
+
+    _configure_local_model_caches(settings)
+    try:
+        ocr_engine = _get_cached_paddle_ocr_engine(
+            source_language=source_language,
+            cache_dir=str(settings.cache_dir),
+        )
+    except Exception as exc:  # noqa: BLE001 - optional dependency bootstrap errors should be recoverable
+        raise OcrProviderError("PaddleOCR could not initialize the current worker runtime.") from exc
+
+    try:
+        if hasattr(ocr_engine, "predict"):
+            raw_result = ocr_engine.predict(input=str(asset_path))
+            return _flatten_paddle_predict_output(raw_result)
+
+        raw_result = ocr_engine.ocr(str(asset_path), cls=True)
+        return _flatten_paddle_legacy_output(raw_result)
+    except Exception as exc:  # noqa: BLE001 - provider/runtime failures should be recoverable
+        raise OcrProviderError("PaddleOCR could not process the current asset.") from exc
 
 
 class FallbackOcrProvider:
@@ -117,6 +149,9 @@ class FallbackOcrProvider:
 
 
 class PaddleOcrProvider:
+    def __init__(self, settings: WorkerSettings) -> None:
+        self._settings = settings
+
     def extract(
         self,
         *,
@@ -124,33 +159,11 @@ class PaddleOcrProvider:
         source_language: str,
         regions: list[OcrCandidateRegion],
     ) -> list[OcrLine]:
-        try:
-            from paddleocr import PaddleOCR
-        except ImportError as exc:
-            raise OcrProviderError(
-                "PaddleOCR is not installed in this worker environment."
-            ) from exc
-
-        if not asset_path.exists():
-            raise FileNotFoundError(f"Could not find OCR source asset '{asset_path}'.")
-
-        os.environ.setdefault("PADDLE_PDX_MODEL_SOURCE", "BOS")
-        os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
-        ocr_engine = PaddleOCR(
-            lang=_map_source_language_to_paddle(source_language),
-            use_doc_orientation_classify=False,
-            use_doc_unwarping=False,
-            use_textline_orientation=False,
+        recognized_lines = extract_paddle_recognized_lines(
+            asset_path=asset_path,
+            source_language=source_language,
+            settings=self._settings,
         )
-        try:
-            if hasattr(ocr_engine, "predict"):
-                raw_result = ocr_engine.predict(input=str(asset_path))
-                recognized_lines = _flatten_paddle_predict_output(raw_result)
-            else:
-                raw_result = ocr_engine.ocr(str(asset_path), cls=True)
-                recognized_lines = _flatten_paddle_legacy_output(raw_result)
-        except Exception as exc:  # noqa: BLE001 - optional dependency runtime failures should be recoverable
-            raise OcrProviderError("PaddleOCR could not process the current asset.") from exc
         if len(recognized_lines) == 0:
             return _build_fallback_lines(source_language=source_language, regions=regions)
         return _group_recognized_lines_to_regions(
@@ -158,6 +171,51 @@ class PaddleOcrProvider:
             regions=regions,
             recognized_lines=recognized_lines,
         )
+
+
+def _configure_local_model_caches(settings: WorkerSettings) -> None:
+    cache_root = settings.cache_dir
+    paddlex_cache_dir = cache_root / "paddlex"
+    huggingface_home = cache_root / "hf"
+    huggingface_hub_cache = huggingface_home / "hub"
+    modelscope_cache_dir = cache_root / "modelscope"
+
+    for directory in [
+        cache_root,
+        paddlex_cache_dir,
+        huggingface_home,
+        huggingface_hub_cache,
+        modelscope_cache_dir,
+    ]:
+        directory.mkdir(parents=True, exist_ok=True)
+
+    os.environ["PADDLE_PDX_MODEL_SOURCE"] = "BOS"
+    os.environ["PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK"] = "True"
+    os.environ["PADDLE_PDX_CACHE_HOME"] = str(paddlex_cache_dir)
+    os.environ["HF_HOME"] = str(huggingface_home)
+    os.environ["HUGGINGFACE_HUB_CACHE"] = str(huggingface_hub_cache)
+    os.environ["MODELSCOPE_CACHE"] = str(modelscope_cache_dir)
+
+
+@lru_cache(maxsize=8)
+def _get_cached_paddle_ocr_engine(
+    *,
+    source_language: str,
+    cache_dir: str,
+):
+    try:
+        from paddleocr import PaddleOCR
+    except ImportError as exc:
+        raise OcrProviderError(
+            "PaddleOCR is not installed in this worker environment."
+        ) from exc
+
+    return PaddleOCR(
+        lang=_map_source_language_to_paddle(source_language),
+        use_doc_orientation_classify=False,
+        use_doc_unwarping=False,
+        use_textline_orientation=False,
+    )
 
 
 class AzureVisionOcrProvider:
@@ -346,13 +404,17 @@ def _flatten_paddle_predict_output(raw_result: object) -> list[RecognizedLine]:
                 continue
             polygon = rec_polys[index] if index < len(rec_polys) else None
             score = float(normalized_scores[index]) if index < len(normalized_scores) else 1.0
-            center_x, center_y = _get_polygon_center(polygon)
+            bounds_x, bounds_y, bounds_width, bounds_height = _get_polygon_bounds(polygon)
+            center_x = bounds_x + (bounds_width / 2)
+            center_y = bounds_y + (bounds_height / 2)
             recognized_lines.append(
                 RecognizedLine(
                     text=text,
                     confidence=score,
                     x=center_x,
                     y=center_y,
+                    width=bounds_width,
+                    height=bounds_height,
                 )
             )
     return recognized_lines
@@ -379,13 +441,17 @@ def _flatten_paddle_legacy_output(raw_result: object) -> list[RecognizedLine]:
             if text == "":
                 continue
             score = float(text_info[1])
-            center_x, center_y = _get_polygon_center(polygon)
+            bounds_x, bounds_y, bounds_width, bounds_height = _get_polygon_bounds(polygon)
+            center_x = bounds_x + (bounds_width / 2)
+            center_y = bounds_y + (bounds_height / 2)
             recognized_lines.append(
                 RecognizedLine(
                     text=text,
                     confidence=score,
                     x=center_x,
                     y=center_y,
+                    width=bounds_width,
+                    height=bounds_height,
                 )
             )
     return recognized_lines
@@ -428,28 +494,44 @@ def _extract_azure_page_lines(
             polygon = line.get(polygon_key)
             if text == "" or not isinstance(polygon, list):
                 continue
-            center_x, center_y = _get_polygon_center(polygon)
+            bounds_x, bounds_y, bounds_width, bounds_height = _get_polygon_bounds(polygon)
+            center_x = bounds_x + (bounds_width / 2)
+            center_y = bounds_y + (bounds_height / 2)
             recognized_lines.append(
                 RecognizedLine(
                     text=text,
                     confidence=0.9,
                     x=center_x,
                     y=center_y,
+                    width=bounds_width,
+                    height=bounds_height,
                 )
             )
     return recognized_lines
 
 
 def _get_polygon_center(polygon: object) -> tuple[float, float]:
+    bounds_x, bounds_y, bounds_width, bounds_height = _get_polygon_bounds(polygon)
+    return bounds_x + (bounds_width / 2), bounds_y + (bounds_height / 2)
+
+
+def _get_polygon_bounds(polygon: object) -> tuple[float, float, float, float]:
     points = list(_iterate_polygon_points(polygon))
     if len(points) == 0:
-        return 0.0, 0.0
-    x_total = sum(point[0] for point in points)
-    y_total = sum(point[1] for point in points)
-    return x_total / len(points), y_total / len(points)
+        return 0.0, 0.0, 0.0, 0.0
+
+    x_values = [point[0] for point in points]
+    y_values = [point[1] for point in points]
+    min_x = min(x_values)
+    max_x = max(x_values)
+    min_y = min(y_values)
+    max_y = max(y_values)
+    return min_x, min_y, max_x - min_x, max_y - min_y
 
 
 def _iterate_polygon_points(polygon: object):
+    if hasattr(polygon, "tolist"):
+        polygon = polygon.tolist()
     if not isinstance(polygon, (list, tuple)):
         return
     if len(polygon) == 0:

@@ -151,6 +151,7 @@ def _apply_detect_regions_result(
     payload = _require_dict(job.get("payload"), "job payload")
     asset_id = str(payload["asset_id"])
 
+    project = _find_by_id(state.get("projects", []), project_id, "project")
     page = _find_by_id(state.get("pages", []), page_id, "page")
     asset = _find_by_id(state.get("assets", []), asset_id, "asset")
 
@@ -162,6 +163,8 @@ def _apply_detect_regions_result(
         asset_path=source_asset_path,
         page_width=width,
         page_height=height,
+        source_language=str(project.get("source_language") or "ja-JP"),
+        settings=settings,
     )
     detected_regions = _build_detected_regions(
         page_id=page_id,

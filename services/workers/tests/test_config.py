@@ -3,6 +3,7 @@ from mangai_workers.config import DEFAULT_SHARED_DATA_DIR, clear_settings_cache,
 
 def test_worker_settings_read_environment(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("MANGAI_DATA_DIR", str(tmp_path / "worker-data"))
+    monkeypatch.setenv("MANGAI_WORKER_CACHE_DIR", str(tmp_path / "worker-cache"))
     monkeypatch.setenv("MANGAI_WORKER_POLL_INTERVAL_SECONDS", "5.5")
     monkeypatch.setenv("MANGAI_WORKER_STALLED_JOB_TIMEOUT_SECONDS", "12.5")
     monkeypatch.setenv("MANGAI_WORKERS_APP_NAME", "MangAI Worker Test")
@@ -24,6 +25,7 @@ def test_worker_settings_read_environment(monkeypatch, tmp_path) -> None:
 
     assert settings.app_name == "MangAI Worker Test"
     assert settings.data_dir == tmp_path / "worker-data"
+    assert settings.cache_dir == tmp_path / "worker-cache"
     assert settings.poll_interval_seconds == 5.5
     assert settings.stalled_job_timeout_seconds == 12.5
     assert settings.ocr_provider == "paddleocr"
@@ -59,6 +61,7 @@ def test_worker_settings_load_local_env_file(monkeypatch, tmp_path) -> None:
     assert settings.translation_provider == "azure_translator"
     assert settings.azure_translator_api_key == "test-key"
     assert settings.azure_translator_region == "brazilsouth"
+    assert settings.cache_dir.name == ".cache"
 
     clear_settings_cache()
 
