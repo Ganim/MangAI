@@ -2,12 +2,16 @@ import assert from "node:assert/strict";
 
 import {
   buildJpegExportFileName,
+  buildPdfExportFileName,
+  buildPsdExportFileName,
   getPreferredExportAssetPath,
   wrapTextForPlacement,
 } from "../src/features/projects/export.ts";
 
 assert.equal(buildJpegExportFileName("001.png"), "001-export.jpg");
 assert.equal(buildJpegExportFileName("page"), "page-export.jpg");
+assert.equal(buildPdfExportFileName("001.png"), "001-export.pdf");
+assert.equal(buildPsdExportFileName("001.png"), "001-export.psd");
 
 assert.equal(
   getPreferredExportAssetPath({

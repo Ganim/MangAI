@@ -73,8 +73,8 @@
 ## Export
 
 - [x] Define JPG renderer
-- [ ] Define PDF renderer
-- [ ] Define PSD renderer
+- [x] Define PDF renderer
+- [x] Define PSD renderer
 - [ ] Define export manifest format
 - [ ] Define font fallback and missing-font behavior
 

@@ -253,6 +253,12 @@ export type AppMessages = {
     exportJpegAction: string;
     exportingJpegAction: string;
     exportJpegErrorFallback: string;
+    exportPdfAction: string;
+    exportingPdfAction: string;
+    exportPdfErrorFallback: string;
+    exportPsdAction: string;
+    exportingPsdAction: string;
+    exportPsdErrorFallback: string;
     overlayRegionCount: string;
     canvasEmptyState: string;
     dimensionsFallbackNotice: string;
@@ -599,6 +605,12 @@ export const enUSMessages: AppMessages = {
     exportJpegAction: "Export JPG",
     exportingJpegAction: "Exporting JPG...",
     exportJpegErrorFallback: "The editor could not export the current page as JPG right now.",
+    exportPdfAction: "Export PDF",
+    exportingPdfAction: "Exporting PDF...",
+    exportPdfErrorFallback: "The editor could not export the current page as PDF right now.",
+    exportPsdAction: "Export PSD",
+    exportingPsdAction: "Exporting PSD...",
+    exportPsdErrorFallback: "The editor could not export the current page as PSD right now.",
     overlayRegionCount: "{count} saved regions",
     canvasEmptyState: "No review regions yet. Create one to anchor the editor workflow.",
     dimensionsFallbackNotice:

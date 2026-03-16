@@ -32,7 +32,11 @@ import {
 } from "../features/projects/jobs.ts";
 import {
   buildJpegExportFileName,
+  buildPdfExportFileName,
+  buildPsdExportFileName,
   exportPageAsJpeg,
+  exportPageAsPdf,
+  exportPageAsPsd,
   getPreferredExportAssetPath,
 } from "../features/projects/export.ts";
 import {
@@ -132,6 +136,8 @@ export function PageEditorShell({
   const [isCreatingMaskRevision, setIsCreatingMaskRevision] = useState(false);
   const [isSavingDialogue, setIsSavingDialogue] = useState(false);
   const [isExportingJpeg, setIsExportingJpeg] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingPsd, setIsExportingPsd] = useState(false);
   const [updatingRegionId, setUpdatingRegionId] = useState<string | null>(null);
   const [updatingMaskRevisionId, setUpdatingMaskRevisionId] = useState<string | null>(null);
   const [updatingPlacementId, setUpdatingPlacementId] = useState<string | null>(null);
@@ -814,6 +820,53 @@ export function PageEditorShell({
       setTextActionError(getErrorMessage(error, messages.editor.exportJpegErrorFallback));
     } finally {
       setIsExportingJpeg(false);
+    }
+  }
+
+  async function handleExportCurrentPagePdf() {
+    if (currentPage === null) {
+      return;
+    }
+
+    setIsExportingPdf(true);
+    setTextActionError(null);
+
+    try {
+      await exportPageAsPdf({
+        imageSrc: resolveApiAssetUrl(getPreferredExportAssetPath(currentPage)),
+        fileName: buildPdfExportFileName(currentPage.file_name),
+        width: currentPage.width,
+        height: currentPage.height,
+        entries: textPreviewEntries,
+      });
+    } catch (error) {
+      setTextActionError(getErrorMessage(error, messages.editor.exportPdfErrorFallback));
+    } finally {
+      setIsExportingPdf(false);
+    }
+  }
+
+  async function handleExportCurrentPagePsd() {
+    if (currentPage === null) {
+      return;
+    }
+
+    setIsExportingPsd(true);
+    setTextActionError(null);
+
+    try {
+      await exportPageAsPsd({
+        originalImageSrc: resolveApiAssetUrl(currentPage.original_asset_path),
+        workingImageSrc: resolveApiAssetUrl(getPreferredExportAssetPath(currentPage)),
+        fileName: buildPsdExportFileName(currentPage.file_name),
+        width: currentPage.width,
+        height: currentPage.height,
+        entries: textPreviewEntries,
+      });
+    } catch (error) {
+      setTextActionError(getErrorMessage(error, messages.editor.exportPsdErrorFallback));
+    } finally {
+      setIsExportingPsd(false);
     }
   }
 
@@ -1542,6 +1595,26 @@ export function PageEditorShell({
                   {isExportingJpeg
                     ? messages.editor.exportingJpegAction
                     : messages.editor.exportJpegAction}
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={isExportingPdf}
+                  onClick={() => void handleExportCurrentPagePdf()}
+                  type="button"
+                >
+                  {isExportingPdf
+                    ? messages.editor.exportingPdfAction
+                    : messages.editor.exportPdfAction}
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={isExportingPsd}
+                  onClick={() => void handleExportCurrentPagePsd()}
+                  type="button"
+                >
+                  {isExportingPsd
+                    ? messages.editor.exportingPsdAction
+                    : messages.editor.exportPsdAction}
                 </button>
               </div>
             </div>

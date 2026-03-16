@@ -348,6 +348,12 @@ export const ptBRMessages: AppMessages = {
     exportJpegAction: "Exportar JPG",
     exportingJpegAction: "Exportando JPG...",
     exportJpegErrorFallback: "O editor nao conseguiu exportar a pagina atual como JPG agora.",
+    exportPdfAction: "Exportar PDF",
+    exportingPdfAction: "Exportando PDF...",
+    exportPdfErrorFallback: "O editor nao conseguiu exportar a pagina atual como PDF agora.",
+    exportPsdAction: "Exportar PSD",
+    exportingPsdAction: "Exportando PSD...",
+    exportPsdErrorFallback: "O editor nao conseguiu exportar a pagina atual como PSD agora.",
     overlayRegionCount: "{count} regioes salvas",
     canvasEmptyState: "Ainda nao ha regioes de revisao. Crie uma para ancorar o fluxo do editor.",
     dimensionsFallbackNotice:
