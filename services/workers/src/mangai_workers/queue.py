@@ -109,6 +109,7 @@ def _execute_job(settings: WorkerSettings, state: dict[str, Any], job: dict[str,
 
     if job_type == "generate_translation":
         _apply_generate_translation_result(
+            settings=settings,
             state=state,
             job=job,
             result=result,
@@ -257,6 +258,7 @@ def _apply_run_ocr_result(
         asset_path=source_asset_path,
         source_language=source_language,
         regions=candidate_regions,
+        settings=settings,
     )
 
     replaced_dialogues = [
@@ -349,6 +351,7 @@ def _apply_run_ocr_result(
 
 
 def _apply_generate_translation_result(
+    settings: WorkerSettings,
     state: dict[str, Any],
     job: dict[str, Any],
     result: dict[str, Any],
@@ -379,8 +382,10 @@ def _apply_generate_translation_result(
         raise WorkerExecutionError("Could not find any dialogue candidates for automatic translation.")
 
     translated_outputs = translate_dialogues(
+        source_language=str(payload.get("source_language") or "ja-JP"),
         target_language=target_language,
         dialogues=translation_candidates,
+        settings=settings,
     )
 
     timestamp = _utcnow_iso()

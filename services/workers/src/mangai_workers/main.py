@@ -33,7 +33,8 @@ def main() -> None:
 
     print(
         f"{settings.app_name} running "
-        f"(env={settings.environment}, data_dir={settings.data_dir}, poll={settings.poll_interval_seconds}s)"
+        f"(env={settings.environment}, data_dir={settings.data_dir}, poll={settings.poll_interval_seconds}s, "
+        f"ocr={settings.ocr_provider}, translation={settings.translation_provider})"
     )
     run_worker_loop(settings)
 
