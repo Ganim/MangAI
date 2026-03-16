@@ -59,6 +59,10 @@ def seed_state(data_dir, *, job_status: str = "queued") -> str:
         ],
         "regions": [],
         "mask_revisions": [],
+        "dialogues": [],
+        "translations": [],
+        "assignments": [],
+        "placements": [],
         "jobs": [
             {
                 "id": job_id,
@@ -191,6 +195,10 @@ def seed_cleanup_state(data_dir) -> tuple[str, str]:
                 "updated_at": timestamp,
             }
         ],
+        "dialogues": [],
+        "translations": [],
+        "assignments": [],
+        "placements": [],
         "jobs": [
             {
                 "id": job_id,
@@ -218,6 +226,389 @@ def seed_cleanup_state(data_dir) -> tuple[str, str]:
     asset_path = data_dir / "assets" / f"{project_id}/{asset_id}.png"
     asset_path.parent.mkdir(parents=True, exist_ok=True)
     asset_path.write_bytes(b"cleanup-worker-page" * 32)
+    (data_dir / "state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
+    return page_id, project_id
+
+
+def seed_ocr_state(data_dir) -> tuple[str, str]:
+    project_id = "11111111-1111-4111-8111-111111111111"
+    page_id = "22222222-2222-4222-8222-222222222222"
+    asset_id = "33333333-3333-4333-8333-333333333333"
+    region_ids = [
+        "55555555-5555-4555-8555-555555555555",
+        "66666666-6666-4666-8666-666666666666",
+    ]
+    job_id = "77777777-7777-4777-8777-777777777777"
+    timestamp = "2026-03-15T00:00:00Z"
+
+    state = {
+        "projects": [
+            {
+                "id": project_id,
+                "schema_version": 1,
+                "name": "OCR Worker Test",
+                "status": "draft",
+                "source_language": "ja-JP",
+                "target_language": "pt-BR",
+                "target_text_direction": "ltr",
+                "page_count": 1,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        ],
+        "pages": [
+            {
+                "id": page_id,
+                "project_id": project_id,
+                "index": 1,
+                "file_name": "001.png",
+                "mime_type": "image/png",
+                "size_bytes": 2048,
+                "width": 1600,
+                "height": 2400,
+                "status": "analyzed",
+                "original_asset_path": f"/api/v1/projects/{project_id}/pages/{page_id}/original",
+                "active_cleaned_asset_path": None,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        ],
+        "assets": [
+            {
+                "id": asset_id,
+                "project_id": project_id,
+                "page_id": page_id,
+                "kind": "original",
+                "file_name": "001.png",
+                "storage_key": f"{project_id}/{asset_id}.png",
+                "mime_type": "image/png",
+                "size_bytes": 2048,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        ],
+        "regions": [
+            {
+                "id": region_ids[0],
+                "page_id": page_id,
+                "type": "speech_balloon",
+                "origin": "detected",
+                "state": "approved",
+                "confidence": 0.91,
+                "bounding_box": {"x": 180, "y": 140, "width": 360, "height": 210},
+                "shape": {
+                    "type": "polygon",
+                    "points": [
+                        {"x": 180, "y": 140},
+                        {"x": 540, "y": 140},
+                        {"x": 540, "y": 350},
+                        {"x": 180, "y": 350},
+                    ],
+                },
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            },
+            {
+                "id": region_ids[1],
+                "page_id": page_id,
+                "type": "speech_balloon",
+                "origin": "detected",
+                "state": "approved",
+                "confidence": 0.87,
+                "bounding_box": {"x": 640, "y": 320, "width": 340, "height": 220},
+                "shape": {
+                    "type": "polygon",
+                    "points": [
+                        {"x": 640, "y": 320},
+                        {"x": 980, "y": 320},
+                        {"x": 980, "y": 540},
+                        {"x": 640, "y": 540},
+                    ],
+                },
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            },
+        ],
+        "mask_revisions": [],
+        "dialogues": [],
+        "translations": [],
+        "assignments": [],
+        "placements": [],
+        "jobs": [
+            {
+                "id": job_id,
+                "project_id": project_id,
+                "page_id": page_id,
+                "type": "run_ocr",
+                "status": "queued",
+                "payload": {
+                    "job_id": job_id,
+                    "page_id": page_id,
+                    "asset_id": asset_id,
+                    "region_ids": region_ids,
+                    "source_language": "ja-JP",
+                },
+                "result": None,
+                "error_code": None,
+                "error_message": None,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        ],
+    }
+
+    data_dir.mkdir(parents=True, exist_ok=True)
+    asset_path = data_dir / "assets" / f"{project_id}/{asset_id}.png"
+    asset_path.parent.mkdir(parents=True, exist_ok=True)
+    asset_path.write_bytes(b"ocr-worker-page" * 32)
+    (data_dir / "state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
+    return page_id, project_id
+
+
+def seed_translation_state(data_dir) -> tuple[str, str]:
+    project_id = "11111111-1111-4111-8111-111111111111"
+    page_id = "22222222-2222-4222-8222-222222222222"
+    dialogue_ids = [
+        "55555555-5555-4555-8555-555555555555",
+        "66666666-6666-4666-8666-666666666666",
+    ]
+    job_id = "77777777-7777-4777-8777-777777777777"
+    timestamp = "2026-03-15T00:00:00Z"
+
+    state = {
+        "projects": [
+            {
+                "id": project_id,
+                "schema_version": 1,
+                "name": "Translation Worker Test",
+                "status": "draft",
+                "source_language": "ja-JP",
+                "target_language": "pt-BR",
+                "target_text_direction": "ltr",
+                "page_count": 1,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        ],
+        "pages": [
+            {
+                "id": page_id,
+                "project_id": project_id,
+                "index": 1,
+                "file_name": "001.png",
+                "mime_type": "image/png",
+                "size_bytes": 2048,
+                "width": 1600,
+                "height": 2400,
+                "status": "text_ready",
+                "original_asset_path": f"/api/v1/projects/{project_id}/pages/{page_id}/original",
+                "active_cleaned_asset_path": None,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        ],
+        "assets": [],
+        "regions": [],
+        "mask_revisions": [],
+        "dialogues": [
+            {
+                "id": dialogue_ids[0],
+                "page_id": page_id,
+                "source": "ocr",
+                "source_language": "ja-JP",
+                "content": "テキスト 1",
+                "reading_order": 1,
+                "status": "draft",
+                "source_region_id": None,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            },
+            {
+                "id": dialogue_ids[1],
+                "page_id": page_id,
+                "source": "ocr",
+                "source_language": "ja-JP",
+                "content": "テキスト 2",
+                "reading_order": 2,
+                "status": "draft",
+                "source_region_id": None,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            },
+        ],
+        "translations": [],
+        "assignments": [],
+        "placements": [],
+        "jobs": [
+            {
+                "id": job_id,
+                "project_id": project_id,
+                "page_id": page_id,
+                "type": "generate_translation",
+                "status": "queued",
+                "payload": {
+                    "job_id": job_id,
+                    "project_id": project_id,
+                    "dialogue_ids": dialogue_ids,
+                    "source_language": "ja-JP",
+                    "target_language": "pt-BR",
+                },
+                "result": None,
+                "error_code": None,
+                "error_message": None,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        ],
+    }
+
+    data_dir.mkdir(parents=True, exist_ok=True)
+    (data_dir / "state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
+    return page_id, project_id
+
+
+def seed_matching_state(data_dir) -> tuple[str, str]:
+    project_id = "11111111-1111-4111-8111-111111111111"
+    page_id = "22222222-2222-4222-8222-222222222222"
+    region_ids = [
+        "33333333-3333-4333-8333-333333333333",
+        "44444444-4444-4444-8444-444444444444",
+    ]
+    dialogue_ids = [
+        "55555555-5555-4555-8555-555555555555",
+        "66666666-6666-4666-8666-666666666666",
+    ]
+    job_id = "77777777-7777-4777-8777-777777777777"
+    timestamp = "2026-03-15T00:00:00Z"
+
+    state = {
+        "projects": [
+            {
+                "id": project_id,
+                "schema_version": 1,
+                "name": "Matching Worker Test",
+                "status": "draft",
+                "source_language": "ja-JP",
+                "target_language": "pt-BR",
+                "target_text_direction": "ltr",
+                "page_count": 1,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        ],
+        "pages": [
+            {
+                "id": page_id,
+                "project_id": project_id,
+                "index": 1,
+                "file_name": "001.png",
+                "mime_type": "image/png",
+                "size_bytes": 2048,
+                "width": 1600,
+                "height": 2400,
+                "status": "text_ready",
+                "original_asset_path": f"/api/v1/projects/{project_id}/pages/{page_id}/original",
+                "active_cleaned_asset_path": None,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        ],
+        "assets": [],
+        "regions": [
+            {
+                "id": region_ids[0],
+                "page_id": page_id,
+                "type": "speech_balloon",
+                "origin": "detected",
+                "state": "approved",
+                "confidence": 0.93,
+                "bounding_box": {"x": 160, "y": 130, "width": 360, "height": 210},
+                "shape": {
+                    "type": "polygon",
+                    "points": [
+                        {"x": 160, "y": 130},
+                        {"x": 520, "y": 130},
+                        {"x": 520, "y": 340},
+                        {"x": 160, "y": 340},
+                    ],
+                },
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            },
+            {
+                "id": region_ids[1],
+                "page_id": page_id,
+                "type": "speech_balloon",
+                "origin": "detected",
+                "state": "approved",
+                "confidence": 0.89,
+                "bounding_box": {"x": 610, "y": 310, "width": 350, "height": 230},
+                "shape": {
+                    "type": "polygon",
+                    "points": [
+                        {"x": 610, "y": 310},
+                        {"x": 960, "y": 310},
+                        {"x": 960, "y": 540},
+                        {"x": 610, "y": 540},
+                    ],
+                },
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            },
+        ],
+        "mask_revisions": [],
+        "dialogues": [
+            {
+                "id": dialogue_ids[0],
+                "page_id": page_id,
+                "source": "ocr",
+                "source_language": "ja-JP",
+                "content": "テキスト 1",
+                "reading_order": 1,
+                "status": "draft",
+                "source_region_id": region_ids[0],
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            },
+            {
+                "id": dialogue_ids[1],
+                "page_id": page_id,
+                "source": "manual",
+                "source_language": "ja-JP",
+                "content": "テキスト 2",
+                "reading_order": 2,
+                "status": "draft",
+                "source_region_id": None,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            },
+        ],
+        "translations": [],
+        "assignments": [],
+        "placements": [],
+        "jobs": [
+            {
+                "id": job_id,
+                "project_id": project_id,
+                "page_id": page_id,
+                "type": "match_dialogue",
+                "status": "queued",
+                "payload": {
+                    "job_id": job_id,
+                    "page_id": page_id,
+                    "dialogue_ids": dialogue_ids,
+                    "region_ids": region_ids,
+                },
+                "result": None,
+                "error_code": None,
+                "error_message": None,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        ],
+    }
+
+    data_dir.mkdir(parents=True, exist_ok=True)
     (data_dir / "state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
     return page_id, project_id
 
@@ -283,3 +674,73 @@ def test_process_next_job_generates_cleaned_asset_preview(tmp_path) -> None:
     assert svg_markup.startswith("<svg")
     assert "data:image/png;base64," in svg_markup
     assert "<polygon" in svg_markup
+
+
+def test_process_next_job_runs_ocr_and_persists_preview_dialogues(tmp_path) -> None:
+    data_dir = tmp_path / "worker-data"
+    page_id, _project_id = seed_ocr_state(data_dir)
+    settings = WorkerSettings(data_dir=data_dir, poll_interval_seconds=0.01)
+
+    processed_job = process_next_job(settings)
+
+    assert processed_job is not None
+    assert processed_job["status"] == "succeeded"
+    assert processed_job["type"] == "run_ocr"
+    assert processed_job["result"]["page_id"] == page_id
+    assert len(processed_job["result"]["dialogue_ids"]) == 2
+
+    state = json.loads((data_dir / "state.json").read_text(encoding="utf-8"))
+    page = state["pages"][0]
+    assert page["status"] == "text_ready"
+    assert len(state["dialogues"]) == 2
+    assert all(dialogue["source"] == "ocr" for dialogue in state["dialogues"])
+    preview_asset = next(asset for asset in state["assets"] if asset["kind"] == "ocr_preview")
+    preview_path = data_dir / "assets" / preview_asset["storage_key"]
+    assert preview_path.exists()
+    preview_payload = json.loads(preview_path.read_text(encoding="utf-8"))
+    assert preview_payload["dialogues_created"] == 2
+    assert preview_payload["source_language"] == "ja-JP"
+
+
+def test_process_next_job_generates_translation_drafts(tmp_path) -> None:
+    data_dir = tmp_path / "worker-data"
+    page_id, _project_id = seed_translation_state(data_dir)
+    settings = WorkerSettings(data_dir=data_dir, poll_interval_seconds=0.01)
+
+    processed_job = process_next_job(settings)
+
+    assert processed_job is not None
+    assert processed_job["status"] == "succeeded"
+    assert processed_job["type"] == "generate_translation"
+    assert len(processed_job["result"]["translation_ids"]) == 2
+
+    state = json.loads((data_dir / "state.json").read_text(encoding="utf-8"))
+    page = state["pages"][0]
+    assert page["id"] == page_id
+    assert page["status"] == "text_ready"
+    assert len(state["translations"]) == 2
+    assert all(translation["provider"] == "worker_fallback" for translation in state["translations"])
+    assert all(translation["target_language"] == "pt-BR" for translation in state["translations"])
+
+
+def test_process_next_job_matches_dialogues_and_creates_placements(tmp_path) -> None:
+    data_dir = tmp_path / "worker-data"
+    page_id, _project_id = seed_matching_state(data_dir)
+    settings = WorkerSettings(data_dir=data_dir, poll_interval_seconds=0.01)
+
+    processed_job = process_next_job(settings)
+
+    assert processed_job is not None
+    assert processed_job["status"] == "succeeded"
+    assert processed_job["type"] == "match_dialogue"
+    assert processed_job["result"]["page_id"] == page_id
+    assert len(processed_job["result"]["assignment_ids"]) == 2
+    assert len(processed_job["result"]["placement_ids"]) == 2
+
+    state = json.loads((data_dir / "state.json").read_text(encoding="utf-8"))
+    page = state["pages"][0]
+    assert page["status"] == "typeset_ready"
+    assert len(state["assignments"]) == 2
+    assert len(state["placements"]) == 2
+    assert all(assignment["origin"] == "automatic" for assignment in state["assignments"])
+    assert all(placement["layout_metrics"]["mode"] == "automatic" for placement in state["placements"])

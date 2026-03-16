@@ -42,8 +42,10 @@ class CreatePageJobRequest(APIModel):
     @field_validator("type")
     @classmethod
     def validate_supported_type(cls, value: JobType) -> JobType:
-        if value not in {"detect_regions", "generate_cleanup"}:
-            raise ValueError("Only detect_regions and generate_cleanup jobs are currently supported.")
+        if value not in {"detect_regions", "generate_cleanup", "run_ocr", "generate_translation", "match_dialogue"}:
+            raise ValueError(
+                "Only detect_regions, generate_cleanup, run_ocr, generate_translation, and match_dialogue jobs are currently supported."
+            )
         return value
 
 

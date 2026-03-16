@@ -281,7 +281,7 @@ export const ptBRMessages: AppMessages = {
     tallerAction: "Mais alta",
     jobsTitle: "Fila de automacao",
     jobsCopy:
-      "Este primeiro painel de jobs deixa a orquestracao visivel. Ja da para enfileirar deteccao de regioes e inspecionar o historico da pagina antes de ligar workers assincronos.",
+      "Esta trilha de automacao agora cobre deteccao de regioes, preview de limpeza, extracao OCR, traducao automatica e a primeira associacao de falas com historico visivel por pagina.",
     jobsLoading: "Carregando jobs da pagina...",
     jobsEmpty: "Nenhum job foi enfileirado para esta pagina ainda.",
     jobLoadErrorFallback: "O editor nao conseguiu carregar o historico de jobs da pagina.",
@@ -289,10 +289,18 @@ export const ptBRMessages: AppMessages = {
     textLoadErrorFallback: "O editor nao conseguiu carregar o fluxo de dialogos salvo desta pagina.",
     textSaveErrorFallback: "O editor nao conseguiu salvar o fluxo de dialogo selecionado agora.",
     approvedMasksSummary: "{count} mascaras de limpeza ativas e aprovadas prontas",
+    ocrCandidatesSummary: "{count} regioes prontas para OCR disponiveis",
+    unassignedDialoguesSummary: "{count} dialogos ainda precisam de associacao automatica",
     queueDetectionAction: "Enfileirar deteccao de regioes",
     queuingDetectionAction: "Enfileirando deteccao...",
     queueCleanupAction: "Enfileirar preview de limpeza",
     queuingCleanupAction: "Enfileirando limpeza...",
+    queueOcrAction: "Enfileirar extracao OCR",
+    queuingOcrAction: "Enfileirando OCR...",
+    queueTranslationAction: "Enfileirar traducao automatica",
+    queuingTranslationAction: "Enfileirando traducao...",
+    queueMatchingAction: "Enfileirar associacao automatica",
+    queuingMatchingAction: "Enfileirando associacao...",
     jobTypeLabels: {
       detect_regions: "Deteccao de regioes",
       generate_cleanup: "Geracao de limpeza",
@@ -321,7 +329,7 @@ export const ptBRMessages: AppMessages = {
     resetRegionAction: "Voltar para rascunho",
     textSectionTitle: "Fluxo de dialogo",
     textSectionCopy:
-      "Dialogo manual, traducao, associacao e primeiro placement agora vivem juntos em um unico loop de revisao.",
+      "Edicao manual agora vive ao lado do OCR, da traducao automatica e da primeira associacao para manter todo o loop humano de revisao no mesmo lugar.",
     textLoading: "Carregando fluxo de dialogos da pagina...",
     dialoguesEmpty:
       "Ainda nao existe nenhum dialogo salvo para esta pagina. Inicie um novo pelo formulario abaixo.",

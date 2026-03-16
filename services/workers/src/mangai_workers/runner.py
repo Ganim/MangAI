@@ -8,6 +8,12 @@ from mangai_workers.models import (
     CleanupJobResult,
     DetectRegionsJobPayload,
     DetectRegionsJobResult,
+    MatchingJobPayload,
+    MatchingJobResult,
+    OcrJobPayload,
+    OcrJobResult,
+    TranslationJobPayload,
+    TranslationJobResult,
 )
 
 
@@ -38,6 +44,30 @@ def run_generate_cleanup_job(payload: CleanupJobPayload) -> CleanupJobResult:
     )
 
 
+def run_ocr_job(payload: OcrJobPayload) -> OcrJobResult:
+    preview_asset_id = uuid5(NAMESPACE_URL, f"{payload.asset_id}:ocr-preview")
+    return OcrJobResult(
+        page_id=payload.page_id,
+        dialogue_ids=(),
+        preview_asset_id=preview_asset_id,
+    )
+
+
+def run_generate_translation_job(payload: TranslationJobPayload) -> TranslationJobResult:
+    return TranslationJobResult(
+        project_id=payload.project_id,
+        translation_ids=(),
+    )
+
+
+def run_match_dialogue_job(payload: MatchingJobPayload) -> MatchingJobResult:
+    return MatchingJobResult(
+        page_id=payload.page_id,
+        assignment_ids=(),
+        placement_ids=(),
+    )
+
+
 def run_job(
     job_type: str,
     payload: dict[str, str | list[str]],
@@ -58,7 +88,25 @@ def _handle_generate_cleanup(payload: dict[str, str | list[str]]) -> dict[str, s
     return run_generate_cleanup_job(parsed_payload).to_dict()
 
 
+def _handle_run_ocr(payload: dict[str, str | list[str]]) -> dict[str, str | list[str]]:
+    parsed_payload = OcrJobPayload.from_dict(payload)
+    return run_ocr_job(parsed_payload).to_dict()
+
+
+def _handle_generate_translation(payload: dict[str, str | list[str]]) -> dict[str, str | list[str]]:
+    parsed_payload = TranslationJobPayload.from_dict(payload)
+    return run_generate_translation_job(parsed_payload).to_dict()
+
+
+def _handle_match_dialogue(payload: dict[str, str | list[str]]) -> dict[str, str | list[str]]:
+    parsed_payload = MatchingJobPayload.from_dict(payload)
+    return run_match_dialogue_job(parsed_payload).to_dict()
+
+
 JOB_HANDLERS: dict[str, Callable[[dict[str, str] | dict[str, str | list[str]]], dict[str, str | int | list[str]]]] = {
     "detect_regions": _handle_detect_regions,
     "generate_cleanup": _handle_generate_cleanup,
+    "run_ocr": _handle_run_ocr,
+    "generate_translation": _handle_generate_translation,
+    "match_dialogue": _handle_match_dialogue,
 }

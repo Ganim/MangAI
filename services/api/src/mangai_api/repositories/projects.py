@@ -115,7 +115,7 @@ class LocalProjectStore:
     def enqueue_page_job(self, project_id: UUID, page_id: UUID, job_type: str) -> JobRecord:
         with self._lock:
             state = self._load_state_unlocked()
-            self._require_project(state, project_id)
+            project = self._require_project(state, project_id)
             self._require_page(state, project_id, page_id)
             original_asset = self._require_original_asset(state, project_id, page_id)
             job_id = uuid4()
@@ -147,9 +147,81 @@ class LocalProjectStore:
                         str(mask_revision.id) for mask_revision in approved_mask_revisions
                     ],
                 }
+            elif job_type == "run_ocr":
+                candidate_regions = self._get_ocr_candidate_regions_for_page(state, page_id)
+                if len(candidate_regions) == 0:
+                    raise JobValidationError(
+                        "At least one OCR candidate region is required before OCR can run."
+                    )
+                payload = {
+                    "job_id": str(job_id),
+                    "page_id": str(page_id),
+                    "asset_id": str(original_asset.id),
+                    "region_ids": [str(region.id) for region in candidate_regions],
+                    "source_language": project.source_language,
+                }
+            elif job_type == "generate_translation":
+                locked_translation_dialogue_ids = {
+                    translation.dialogue_id
+                    for translation in state.translations
+                    if translation.target_language == project.target_language
+                    and translation.edited_by_user
+                    and translation.content.strip() != ""
+                }
+                candidate_dialogues = [
+                    dialogue
+                    for dialogue in self._get_page_dialogues(state, page_id)
+                    if dialogue.id not in locked_translation_dialogue_ids
+                ]
+                if len(candidate_dialogues) == 0:
+                    raise JobValidationError(
+                        "At least one page dialogue without a locked user translation is required before automatic translation can run."
+                    )
+                payload = {
+                    "job_id": str(job_id),
+                    "project_id": str(project_id),
+                    "dialogue_ids": [str(dialogue.id) for dialogue in candidate_dialogues],
+                    "source_language": project.source_language,
+                    "target_language": project.target_language,
+                }
+            elif job_type == "match_dialogue":
+                assigned_dialogue_ids = {
+                    assignment.dialogue_id
+                    for assignment in state.assignments
+                    if assignment.page_id == page_id and assignment.approved
+                }
+                occupied_region_ids = {
+                    assignment.region_id
+                    for assignment in state.assignments
+                    if assignment.page_id == page_id and assignment.approved
+                }
+                candidate_dialogues = [
+                    dialogue
+                    for dialogue in self._get_page_dialogues(state, page_id)
+                    if dialogue.id not in assigned_dialogue_ids
+                ]
+                candidate_regions = [
+                    region
+                    for region in self._get_ocr_candidate_regions_for_page(state, page_id)
+                    if region.id not in occupied_region_ids
+                ]
+                if len(candidate_dialogues) == 0:
+                    raise JobValidationError(
+                        "At least one page dialogue without an approved assignment is required before automatic matching can run."
+                    )
+                if len(candidate_regions) == 0:
+                    raise JobValidationError(
+                        "At least one candidate region is required before automatic matching can run."
+                    )
+                payload = {
+                    "job_id": str(job_id),
+                    "page_id": str(page_id),
+                    "dialogue_ids": [str(dialogue.id) for dialogue in candidate_dialogues],
+                    "region_ids": [str(region.id) for region in candidate_regions],
+                }
             else:
                 raise JobValidationError(
-                    "Only detect_regions and generate_cleanup jobs are currently supported."
+                    "Only detect_regions, generate_cleanup, run_ocr, generate_translation, and match_dialogue jobs are currently supported."
                 )
 
             job = JobRecord(
@@ -1017,6 +1089,39 @@ class LocalProjectStore:
             candidate
             for candidate in state.mask_revisions
             if candidate.region_id in page_region_ids and candidate.is_active and candidate.approved
+        )
+
+    def _get_page_dialogues(
+        self,
+        state: StoredProjectState,
+        page_id: UUID,
+    ) -> list[DialogueRecord]:
+        return sorted(
+            [candidate for candidate in state.dialogues if candidate.page_id == page_id],
+            key=lambda candidate: (candidate.reading_order, candidate.created_at),
+        )
+
+    def _get_ocr_candidate_regions_for_page(
+        self,
+        state: StoredProjectState,
+        page_id: UUID,
+    ) -> tuple[RegionRecord, ...]:
+        supported_region_types = {"speech_balloon", "narration_box", "free_text", "unknown"}
+        return tuple(
+            sorted(
+                [
+                    candidate
+                    for candidate in state.regions
+                    if candidate.page_id == page_id
+                    and candidate.state != "rejected"
+                    and candidate.type in supported_region_types
+                ],
+                key=lambda candidate: (
+                    candidate.bounding_box.y,
+                    candidate.bounding_box.x,
+                    candidate.created_at,
+                ),
+            )
         )
 
     def _replace_page_after_mask_change(

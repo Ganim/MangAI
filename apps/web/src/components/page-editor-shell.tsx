@@ -28,6 +28,11 @@ import {
   updatePageRegion,
 } from "../features/projects/api.ts";
 import {
+  countAvailableMatchingRegions,
+  countOcrCandidateRegions,
+  countUnassignedDialogues,
+} from "../features/projects/automation.ts";
+import {
   hasPendingPageJobs,
 } from "../features/projects/jobs.ts";
 import {
@@ -133,6 +138,9 @@ export function PageEditorShell({
   const [isJobsLoading, setIsJobsLoading] = useState(false);
   const [isQueueingDetection, setIsQueueingDetection] = useState(false);
   const [isQueueingCleanup, setIsQueueingCleanup] = useState(false);
+  const [isQueueingOcr, setIsQueueingOcr] = useState(false);
+  const [isQueueingTranslation, setIsQueueingTranslation] = useState(false);
+  const [isQueueingMatching, setIsQueueingMatching] = useState(false);
   const [isCreatingMaskRevision, setIsCreatingMaskRevision] = useState(false);
   const [isSavingDialogue, setIsSavingDialogue] = useState(false);
   const [isExportingJpeg, setIsExportingJpeg] = useState(false);
@@ -499,6 +507,9 @@ export function PageEditorShell({
       ? null
       : getActiveMaskRevisionForRegion(maskRevisions, selectedRegion.id);
   const approvedActiveMaskRevisionCount = countApprovedActiveMaskRevisions(maskRevisions);
+  const ocrCandidateRegionCount = countOcrCandidateRegions(regions);
+  const availableMatchingRegionCount = countAvailableMatchingRegions(regions, assignments);
+  const unassignedDialogueCount = countUnassignedDialogues(dialogues, assignments);
   const textPreviewEntries = buildTextPreviewEntries({
     dialogues,
     translations,
@@ -673,6 +684,66 @@ export function PageEditorShell({
       setJobActionError(getErrorMessage(error, messages.editor.jobCreateErrorFallback));
     } finally {
       setIsQueueingCleanup(false);
+    }
+  }
+
+  async function handleQueueOcr() {
+    if (currentPage === null) {
+      return;
+    }
+
+    setIsQueueingOcr(true);
+    setJobActionError(null);
+
+    try {
+      const response = await createPageJob(projectId, currentPage.id, {
+        type: "run_ocr",
+      });
+      setJobs((currentJobs) => [response.job, ...currentJobs]);
+    } catch (error) {
+      setJobActionError(getErrorMessage(error, messages.editor.jobCreateErrorFallback));
+    } finally {
+      setIsQueueingOcr(false);
+    }
+  }
+
+  async function handleQueueAutomaticTranslation() {
+    if (currentPage === null) {
+      return;
+    }
+
+    setIsQueueingTranslation(true);
+    setJobActionError(null);
+
+    try {
+      const response = await createPageJob(projectId, currentPage.id, {
+        type: "generate_translation",
+      });
+      setJobs((currentJobs) => [response.job, ...currentJobs]);
+    } catch (error) {
+      setJobActionError(getErrorMessage(error, messages.editor.jobCreateErrorFallback));
+    } finally {
+      setIsQueueingTranslation(false);
+    }
+  }
+
+  async function handleQueueDialogueMatching() {
+    if (currentPage === null) {
+      return;
+    }
+
+    setIsQueueingMatching(true);
+    setJobActionError(null);
+
+    try {
+      const response = await createPageJob(projectId, currentPage.id, {
+        type: "match_dialogue",
+      });
+      setJobs((currentJobs) => [response.job, ...currentJobs]);
+    } catch (error) {
+      setJobActionError(getErrorMessage(error, messages.editor.jobCreateErrorFallback));
+    } finally {
+      setIsQueueingMatching(false);
     }
   }
 
@@ -1247,6 +1318,18 @@ export function PageEditorShell({
                 String(approvedActiveMaskRevisionCount),
               )}
             </p>
+            <p className="card-description">
+              {messages.editor.ocrCandidatesSummary.replace(
+                "{count}",
+                String(ocrCandidateRegionCount),
+              )}
+            </p>
+            <p className="card-description">
+              {messages.editor.unassignedDialoguesSummary.replace(
+                "{count}",
+                String(unassignedDialogueCount),
+              )}
+            </p>
 
             <div className="editor-selection-actions">
               <button
@@ -1268,6 +1351,43 @@ export function PageEditorShell({
                 {isQueueingCleanup
                   ? messages.editor.queuingCleanupAction
                   : messages.editor.queueCleanupAction}
+              </button>
+            </div>
+
+            <div className="editor-selection-actions">
+              <button
+                className="secondary-button"
+                disabled={isQueueingOcr || ocrCandidateRegionCount === 0}
+                onClick={() => void handleQueueOcr()}
+                type="button"
+              >
+                {isQueueingOcr
+                  ? messages.editor.queuingOcrAction
+                  : messages.editor.queueOcrAction}
+              </button>
+              <button
+                className="ghost-button"
+                disabled={isQueueingTranslation || dialogues.length === 0}
+                onClick={() => void handleQueueAutomaticTranslation()}
+                type="button"
+              >
+                {isQueueingTranslation
+                  ? messages.editor.queuingTranslationAction
+                  : messages.editor.queueTranslationAction}
+              </button>
+              <button
+                className="ghost-button"
+                disabled={
+                  isQueueingMatching
+                  || unassignedDialogueCount === 0
+                  || availableMatchingRegionCount === 0
+                }
+                onClick={() => void handleQueueDialogueMatching()}
+                type="button"
+              >
+                {isQueueingMatching
+                  ? messages.editor.queuingMatchingAction
+                  : messages.editor.queueMatchingAction}
               </button>
             </div>
 

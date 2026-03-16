@@ -31,9 +31,15 @@ import {
   parseCreateProjectRequest,
   parseDetectRegionsJobPayload,
   parseListProjectsResponse,
+  parseMatchingJobPayload,
+  parseMatchingJobResult,
+  parseOcrJobPayload,
+  parseOcrJobResult,
   parseProject,
   parseRegisterProjectPagesRequest,
   parseRegisterProjectPagesResponse,
+  parseTranslationJobPayload,
+  parseTranslationJobResult,
   parseTranslationResponse,
   parseUpdateMaskRevisionRequest,
   parseUpdatePageRegionRequest,
@@ -684,5 +690,57 @@ const detectPayload = parseDetectRegionsJobPayload({
 });
 
 assert.equal(detectPayload.page_id, UUID_2);
+
+const ocrPayload = parseOcrJobPayload({
+  job_id: UUID,
+  page_id: UUID_2,
+  asset_id: UUID_3,
+  region_ids: [UUID],
+  source_language: "ja-JP",
+});
+
+assert.equal(ocrPayload.region_ids[0], UUID);
+
+const ocrResult = parseOcrJobResult({
+  page_id: UUID_2,
+  dialogue_ids: [UUID],
+  preview_asset_id: UUID_3,
+});
+
+assert.equal(ocrResult.preview_asset_id, UUID_3);
+
+const translationPayload = parseTranslationJobPayload({
+  job_id: UUID,
+  project_id: UUID_2,
+  dialogue_ids: [UUID_3],
+  source_language: "ja-JP",
+  target_language: "pt-BR",
+});
+
+assert.equal(translationPayload.target_language, "pt-BR");
+
+const translationResult = parseTranslationJobResult({
+  project_id: UUID_2,
+  translation_ids: [UUID_3],
+});
+
+assert.equal(translationResult.translation_ids[0], UUID_3);
+
+const matchingPayload = parseMatchingJobPayload({
+  job_id: UUID,
+  page_id: UUID_2,
+  dialogue_ids: [UUID_3],
+  region_ids: [UUID],
+});
+
+assert.equal(matchingPayload.region_ids[0], UUID);
+
+const matchingResult = parseMatchingJobResult({
+  page_id: UUID_2,
+  assignment_ids: [UUID],
+  placement_ids: [UUID_3],
+});
+
+assert.equal(matchingResult.placement_ids[0], UUID_3);
 
 console.log("SHARED_CONTRACT_TESTS_OK");

@@ -212,10 +212,18 @@ export type AppMessages = {
     textLoadErrorFallback: string;
     textSaveErrorFallback: string;
     approvedMasksSummary: string;
+    ocrCandidatesSummary: string;
+    unassignedDialoguesSummary: string;
     queueDetectionAction: string;
     queuingDetectionAction: string;
     queueCleanupAction: string;
     queuingCleanupAction: string;
+    queueOcrAction: string;
+    queuingOcrAction: string;
+    queueTranslationAction: string;
+    queuingTranslationAction: string;
+    queueMatchingAction: string;
+    queuingMatchingAction: string;
     jobTypeLabels: JobTypeLabels;
     jobStatusLabels: JobStatusLabels;
     kicker: string;
@@ -539,7 +547,7 @@ export const enUSMessages: AppMessages = {
     tallerAction: "Taller",
     jobsTitle: "Automation queue",
     jobsCopy:
-      "This first jobs panel keeps orchestration visible. You can already queue region detection and inspect the page-level history before async workers are wired in.",
+      "This automation rail now covers region detection, cleanup previews, OCR extraction, automatic translation, and first-pass dialogue matching with visible page-level history.",
     jobsLoading: "Loading page jobs...",
     jobsEmpty: "No jobs have been queued for this page yet.",
     jobLoadErrorFallback: "The editor could not load the page job history.",
@@ -547,10 +555,18 @@ export const enUSMessages: AppMessages = {
     textLoadErrorFallback: "The editor could not load the saved dialogue workflow for this page.",
     textSaveErrorFallback: "The editor could not save the selected dialogue workflow right now.",
     approvedMasksSummary: "{count} approved active cleanup masks ready",
+    ocrCandidatesSummary: "{count} OCR-ready regions available",
+    unassignedDialoguesSummary: "{count} dialogues still need automatic matching",
     queueDetectionAction: "Queue region detection",
     queuingDetectionAction: "Queuing detection...",
     queueCleanupAction: "Queue cleanup preview",
     queuingCleanupAction: "Queuing cleanup...",
+    queueOcrAction: "Queue OCR extraction",
+    queuingOcrAction: "Queuing OCR...",
+    queueTranslationAction: "Queue automatic translation",
+    queuingTranslationAction: "Queuing translation...",
+    queueMatchingAction: "Queue dialogue matching",
+    queuingMatchingAction: "Queuing matching...",
     jobTypeLabels: {
       detect_regions: "Region detection",
       generate_cleanup: "Cleanup generation",
@@ -579,7 +595,7 @@ export const enUSMessages: AppMessages = {
     resetRegionAction: "Reset to draft",
     textSectionTitle: "Dialogue workflow",
     textSectionCopy:
-      "Manual dialogue, translation, assignment, and first-pass placement now live together in one review loop.",
+      "Manual edits now live beside OCR, automatic translation, and first-pass matching so the human review loop stays in one place.",
     textLoading: "Loading page dialogue workflow...",
     dialoguesEmpty: "No dialogue has been saved for this page yet. Start a new one from the form below.",
     dialogueOrderLabel: "Line {order}",

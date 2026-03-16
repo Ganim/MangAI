@@ -588,6 +588,10 @@ export function parseOcrJobResult(value: unknown, path: Array<string | number> =
       (item, itemPath) => readUuid(item, itemPath),
       { minLength: 1 },
     ),
+    preview_asset_id: readUuid(
+      objectValue.preview_asset_id,
+      atPath(path, "preview_asset_id"),
+    ),
   };
 }
 
@@ -653,6 +657,12 @@ export function parseMatchingJobResult(value: unknown, path: Array<string | numb
     assignment_ids: readArray(
       objectValue.assignment_ids,
       atPath(path, "assignment_ids"),
+      (item, itemPath) => readUuid(item, itemPath),
+      { minLength: 1 },
+    ),
+    placement_ids: readArray(
+      objectValue.placement_ids,
+      atPath(path, "placement_ids"),
       (item, itemPath) => readUuid(item, itemPath),
       { minLength: 1 },
     ),

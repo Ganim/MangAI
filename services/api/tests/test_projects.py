@@ -369,6 +369,40 @@ def test_page_jobs_can_be_queued_and_listed(client: TestClient) -> None:
     assert jobs[0]["id"] == job["id"]
 
 
+def test_run_ocr_job_requires_candidate_regions(client: TestClient) -> None:
+    project_id = create_project(client)
+    page_payload = upload_single_page(client, project_id)
+    page_id = page_payload["id"]
+
+    response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/jobs",
+        json={"type": "run_ocr"},
+    )
+
+    assert response.status_code == 422
+    payload = response.json()
+    assert payload["error_code"] == "INVALID_JOB_REQUEST"
+
+
+def test_run_ocr_job_can_be_queued_with_candidate_regions(client: TestClient) -> None:
+    project_id = create_project(client)
+    page_payload = upload_single_page(client, project_id)
+    page_id = page_payload["id"]
+    region = create_region(client, project_id, page_id)
+
+    response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/jobs",
+        json={"type": "run_ocr"},
+    )
+
+    assert response.status_code == 201
+    job = response.json()["job"]
+    assert job["type"] == "run_ocr"
+    assert job["payload"]["page_id"] == page_id
+    assert job["payload"]["region_ids"] == [region["id"]]
+    assert job["payload"]["source_language"] == "ja-JP"
+
+
 def test_generate_cleanup_job_requires_approved_active_mask_revision(client: TestClient) -> None:
     project_id = create_project(client)
     page_payload = upload_single_page(client, project_id)
@@ -542,6 +576,66 @@ def test_manual_text_flow_persists_dialogues_translations_assignments_and_placem
     assert detail_page["status"] == "typeset_ready"
 
 
+def test_generate_translation_job_can_be_queued_for_existing_dialogues(client: TestClient) -> None:
+    project_id = create_project(client)
+    page_payload = upload_single_page(client, project_id)
+    page_id = page_payload["id"]
+
+    dialogue_response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/dialogues",
+        json={
+            "page_id": page_id,
+            "content": "Original line",
+            "source_language": "ja-JP",
+            "reading_order": 1,
+        },
+    )
+    assert dialogue_response.status_code == 201
+    dialogue = dialogue_response.json()["dialogue"]
+
+    response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/jobs",
+        json={"type": "generate_translation"},
+    )
+
+    assert response.status_code == 201
+    job = response.json()["job"]
+    assert job["type"] == "generate_translation"
+    assert job["payload"]["project_id"] == project_id
+    assert job["payload"]["dialogue_ids"] == [dialogue["id"]]
+    assert job["payload"]["target_language"] == "pt-BR"
+
+
+def test_match_dialogue_job_can_be_queued_for_unassigned_dialogues(client: TestClient) -> None:
+    project_id = create_project(client)
+    page_payload = upload_single_page(client, project_id)
+    page_id = page_payload["id"]
+    region = create_region(client, project_id, page_id)
+
+    dialogue_response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/dialogues",
+        json={
+            "page_id": page_id,
+            "content": "Original line",
+            "source_language": "ja-JP",
+            "reading_order": 1,
+        },
+    )
+    assert dialogue_response.status_code == 201
+    dialogue = dialogue_response.json()["dialogue"]
+
+    response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/jobs",
+        json={"type": "match_dialogue"},
+    )
+
+    assert response.status_code == 201
+    job = response.json()["job"]
+    assert job["type"] == "match_dialogue"
+    assert job["payload"]["dialogue_ids"] == [dialogue["id"]]
+    assert job["payload"]["region_ids"] == [region["id"]]
+
+
 def test_page_jobs_reject_unsupported_job_type(client: TestClient) -> None:
     project_id = create_project(client)
     page_payload = upload_single_page(client, project_id)
@@ -549,7 +643,7 @@ def test_page_jobs_reject_unsupported_job_type(client: TestClient) -> None:
 
     response = client.post(
         f"/api/v1/projects/{project_id}/pages/{page_id}/jobs",
-        json={"type": "generate_translation"},
+        json={"type": "generate_typesetting"},
     )
 
     assert response.status_code == 422

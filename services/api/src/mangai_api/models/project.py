@@ -134,7 +134,7 @@ class StoredProjectAsset(APIModel):
     id: UUID
     project_id: UUID
     page_id: UUID
-    kind: Literal["original", "overlay", "cleaned", "cleanup_variant"]
+    kind: Literal["original", "overlay", "cleaned", "cleanup_variant", "ocr_preview"]
     file_name: str
     storage_key: str
     mime_type: str
