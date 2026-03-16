@@ -17,7 +17,12 @@ class Settings(BaseSettings):
     default_ui_locale: str = Field(default="en-US")
     data_dir: Path = Field(default=SERVICE_ROOT / ".data")
     cors_allowed_origins: tuple[str, ...] = Field(
-        default=("http://127.0.0.1:3000", "http://localhost:3000"),
+        default=(
+            "http://127.0.0.1:3000",
+            "http://localhost:3000",
+            "http://127.0.0.1:3001",
+            "http://localhost:3001",
+        ),
     )
 
     model_config = SettingsConfigDict(
