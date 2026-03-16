@@ -20,10 +20,14 @@ class WorkerSettings:
     cache_dir: Path = DEFAULT_WORKER_CACHE_DIR
     poll_interval_seconds: float = 2.0
     stalled_job_timeout_seconds: float = 30.0
+    detection_provider: str = "ocr"
     ocr_provider: str = "fallback"
     translation_provider: str = "fallback"
     strict_provider_selection: bool = False
     http_timeout_seconds: float = 30.0
+    comic_text_detector_model_path: Path | None = (
+        DEFAULT_WORKER_CACHE_DIR / "comic-text-detector" / "comictextdetector.pt.onnx"
+    )
     azure_vision_read_url: str | None = None
     azure_vision_api_key: str | None = None
     azure_vision_poll_interval_seconds: float = 1.0
@@ -49,11 +53,16 @@ def get_settings() -> WorkerSettings:
         stalled_job_timeout_seconds=float(
             environ.get("MANGAI_WORKER_STALLED_JOB_TIMEOUT_SECONDS", "30.0")
         ),
+        detection_provider=environ.get("MANGAI_DETECTION_PROVIDER", "ocr").strip().lower(),
         ocr_provider=environ.get("MANGAI_OCR_PROVIDER", "fallback").strip().lower(),
         translation_provider=environ.get("MANGAI_TRANSLATION_PROVIDER", "fallback").strip().lower(),
         strict_provider_selection=environ.get("MANGAI_STRICT_PROVIDER_SELECTION", "false").strip().lower()
         in {"1", "true", "yes", "on"},
         http_timeout_seconds=float(environ.get("MANGAI_HTTP_TIMEOUT_SECONDS", "30.0")),
+        comic_text_detector_model_path=_read_optional_path_env(
+            "MANGAI_COMIC_TEXT_DETECTOR_MODEL_PATH",
+            DEFAULT_WORKER_CACHE_DIR / "comic-text-detector" / "comictextdetector.pt.onnx",
+        ),
         azure_vision_read_url=_read_optional_env("MANGAI_AZURE_VISION_READ_URL"),
         azure_vision_api_key=_read_optional_env("MANGAI_AZURE_VISION_API_KEY"),
         azure_vision_poll_interval_seconds=float(
@@ -113,3 +122,10 @@ def _read_optional_env(name: str) -> str | None:
         return None
     stripped = value.strip()
     return stripped or None
+
+
+def _read_optional_path_env(name: str, default: Path | None = None) -> Path | None:
+    value = _read_optional_env(name)
+    if value is None:
+        return default
+    return Path(value).expanduser()

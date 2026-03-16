@@ -7,6 +7,8 @@ def test_worker_settings_read_environment(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("MANGAI_WORKER_POLL_INTERVAL_SECONDS", "5.5")
     monkeypatch.setenv("MANGAI_WORKER_STALLED_JOB_TIMEOUT_SECONDS", "12.5")
     monkeypatch.setenv("MANGAI_WORKERS_APP_NAME", "MangAI Worker Test")
+    monkeypatch.setenv("MANGAI_DETECTION_PROVIDER", "comic_text_detector")
+    monkeypatch.setenv("MANGAI_COMIC_TEXT_DETECTOR_MODEL_PATH", str(tmp_path / "comictextdetector.pt.onnx"))
     monkeypatch.setenv("MANGAI_OCR_PROVIDER", "paddleocr")
     monkeypatch.setenv("MANGAI_TRANSLATION_PROVIDER", "deepl")
     monkeypatch.setenv("MANGAI_STRICT_PROVIDER_SELECTION", "true")
@@ -28,6 +30,8 @@ def test_worker_settings_read_environment(monkeypatch, tmp_path) -> None:
     assert settings.cache_dir == tmp_path / "worker-cache"
     assert settings.poll_interval_seconds == 5.5
     assert settings.stalled_job_timeout_seconds == 12.5
+    assert settings.detection_provider == "comic_text_detector"
+    assert settings.comic_text_detector_model_path == tmp_path / "comictextdetector.pt.onnx"
     assert settings.ocr_provider == "paddleocr"
     assert settings.translation_provider == "deepl"
     assert settings.strict_provider_selection is True
@@ -61,6 +65,7 @@ def test_worker_settings_load_local_env_file(monkeypatch, tmp_path) -> None:
     assert settings.translation_provider == "azure_translator"
     assert settings.azure_translator_api_key == "test-key"
     assert settings.azure_translator_region == "brazilsouth"
+    assert settings.detection_provider == "ocr"
     assert settings.cache_dir.name == ".cache"
 
     clear_settings_cache()

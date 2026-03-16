@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "manga-ocr>=0.1.14",
     "paddleocr>=3.4.0",
+    "torchvision>=0.25.0",
 ]
 
 [project.scripts]

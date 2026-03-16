@@ -1,5 +1,7 @@
 from mangai_workers.config import WorkerSettings
+from mangai_workers.comic_text_detector import ComicTextBlock
 from mangai_workers.detection import (
+    build_detected_regions_from_comic_text_blocks,
     build_detected_regions_from_recognized_lines,
     detect_regions_from_asset,
 )
@@ -71,3 +73,79 @@ def test_build_detected_regions_classifies_horizontal_cluster_as_narration_box()
     assert len(candidates) == 1
     assert candidates[0].type == "narration_box"
     assert candidates[0].bounding_box["width"] > candidates[0].bounding_box["height"]
+
+
+def test_build_detected_regions_from_comic_text_blocks_preserves_panel_detector_boxes() -> None:
+    candidates = build_detected_regions_from_comic_text_blocks(
+        text_blocks=[
+            ComicTextBlock(
+                x=680,
+                y=70,
+                width=60,
+                height=140,
+                language="ja",
+                vertical=True,
+            ),
+            ComicTextBlock(
+                x=505,
+                y=620,
+                width=560,
+                height=42,
+                language="unknown",
+                vertical=False,
+            ),
+        ],
+        page_width=1130,
+        page_height=1600,
+    )
+
+    assert len(candidates) == 2
+    assert candidates[0].type == "speech_balloon"
+    assert candidates[1].type == "narration_box"
+    assert candidates[0].bounding_box["x"] < 680
+    assert candidates[1].bounding_box["width"] > 560
+
+
+def test_detect_regions_prefers_comic_text_detector_provider(monkeypatch, tmp_path) -> None:
+    asset_path = tmp_path / "page-a.bin"
+    asset_path.write_bytes(b"asset-a" * 32)
+
+    monkeypatch.setattr(
+        "mangai_workers.detection.extract_comic_text_detector_blocks",
+        lambda **_kwargs: [
+            ComicTextBlock(
+                x=100,
+                y=120,
+                width=80,
+                height=180,
+                language="ja",
+                vertical=True,
+            ),
+            ComicTextBlock(
+                x=320,
+                y=240,
+                width=220,
+                height=44,
+                language="unknown",
+                vertical=False,
+            ),
+        ],
+    )
+    monkeypatch.setattr(
+        "mangai_workers.detection.extract_paddle_recognized_lines",
+        lambda **_kwargs: [],
+    )
+
+    candidates = detect_regions_from_asset(
+        asset_path=asset_path,
+        page_width=1000,
+        page_height=1400,
+        settings=WorkerSettings(
+            cache_dir=tmp_path / "cache",
+            detection_provider="comic_text_detector",
+        ),
+    )
+
+    assert len(candidates) == 2
+    assert candidates[0].type == "speech_balloon"
+    assert candidates[1].type == "narration_box"

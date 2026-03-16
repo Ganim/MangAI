@@ -7,6 +7,10 @@ from pathlib import Path
 from statistics import median
 from typing import TYPE_CHECKING
 
+from mangai_workers.comic_text_detector import (
+    ComicTextBlock,
+    extract_comic_text_detector_blocks,
+)
 from mangai_workers.ocr import OcrProviderError, RecognizedLine, extract_paddle_recognized_lines
 from mangai_workers.runner import WorkerExecutionError
 
@@ -48,6 +52,22 @@ def detect_regions_from_asset(
         raise WorkerExecutionError(f"Source asset '{asset_path}' is empty.")
 
     if settings is not None:
+        if settings.detection_provider == "comic_text_detector":
+            try:
+                detected_blocks = extract_comic_text_detector_blocks(
+                    asset_path=asset_path,
+                    settings=settings,
+                )
+                candidates = build_detected_regions_from_comic_text_blocks(
+                    text_blocks=detected_blocks,
+                    page_width=page_width,
+                    page_height=page_height,
+                )
+                if len(candidates) > 0:
+                    return candidates
+            except Exception:  # noqa: BLE001 - detection should degrade gracefully
+                pass
+
         try:
             recognized_lines = extract_paddle_recognized_lines(
                 asset_path=asset_path,
@@ -68,6 +88,48 @@ def detect_regions_from_asset(
         asset_bytes=asset_bytes,
         page_width=page_width,
         page_height=page_height,
+    )
+
+
+def build_detected_regions_from_comic_text_blocks(
+    *,
+    text_blocks: list[ComicTextBlock],
+    page_width: int,
+    page_height: int,
+) -> list[DetectedRegionCandidate]:
+    candidates: list[DetectedRegionCandidate] = []
+    for block in text_blocks:
+        if block.width < 10 or block.height < 10:
+            continue
+
+        padding_x = min(18.0, max(6.0, block.width * 0.08))
+        padding_y = min(18.0, max(6.0, block.height * 0.08))
+        bounding_box = _clamp_bounding_box(
+            x=block.x - padding_x,
+            y=block.y - padding_y,
+            width=block.width + (padding_x * 2.0),
+            height=block.height + (padding_y * 2.0),
+            page_width=page_width,
+            page_height=page_height,
+        )
+        region_type = _classify_comic_text_block(block, bounding_box)
+        confidence = 0.94 if block.language != "unknown" else 0.84
+        candidates.append(
+            DetectedRegionCandidate(
+                type=region_type,
+                confidence=confidence,
+                bounding_box=bounding_box,
+            )
+        )
+
+    deduplicated = _deduplicate_candidates(candidates)
+    return sorted(
+        deduplicated,
+        key=lambda candidate: (
+            candidate.bounding_box["y"],
+            candidate.bounding_box["x"],
+            candidate.type,
+        ),
     )
 
 
@@ -384,6 +446,19 @@ def _classify_cluster(
         return "speech_balloon"
     if len(cluster) <= 2 and width < 180 and height < 110:
         return "free_text"
+    return "speech_balloon"
+
+
+def _classify_comic_text_block(
+    block: ComicTextBlock,
+    bounding_box: dict[str, float],
+) -> str:
+    width = bounding_box["width"]
+    height = bounding_box["height"]
+    if not block.vertical and width >= height * 1.1:
+        return "narration_box"
+    if width <= height * 0.72:
+        return "speech_balloon"
     return "speech_balloon"
 
 
