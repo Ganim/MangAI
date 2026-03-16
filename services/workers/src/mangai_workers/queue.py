@@ -8,6 +8,7 @@ from typing import Any
 from uuid import uuid4
 
 from mangai_workers.config import WorkerSettings
+from mangai_workers.detection import detect_regions_from_asset
 from mangai_workers.runner import WorkerExecutionError, run_job
 
 
@@ -100,12 +101,22 @@ def _apply_detect_regions_result(
     asset_id = str(payload["asset_id"])
 
     page = _find_by_id(state.get("pages", []), page_id, "page")
-    _find_by_id(state.get("assets", []), asset_id, "asset")
+    asset = _find_by_id(state.get("assets", []), asset_id, "asset")
 
     width = int(page.get("width") or 1000)
     height = int(page.get("height") or 1400)
     timestamp = _utcnow_iso()
-    detected_regions = _build_detected_regions(page_id=page_id, width=width, height=height, timestamp=timestamp)
+    source_asset_path = settings.data_dir / "assets" / str(asset["storage_key"])
+    detected_candidates = detect_regions_from_asset(
+        asset_path=source_asset_path,
+        page_width=width,
+        page_height=height,
+    )
+    detected_regions = _build_detected_regions(
+        page_id=page_id,
+        detected_candidates=detected_candidates,
+        timestamp=timestamp,
+    )
 
     preserved_regions = [
         region
@@ -137,34 +148,25 @@ def _apply_detect_regions_result(
 def _build_detected_regions(
     *,
     page_id: str,
-    width: int,
-    height: int,
+    detected_candidates: list[Any],
     timestamp: str,
 ) -> list[dict[str, Any]]:
-    candidate_boxes = (
-        {
-            "type": "speech_balloon",
-            "confidence": 0.94,
-            "bounding_box": _bounding_box(width * 0.12, height * 0.1, width * 0.34, height * 0.17),
-        },
-        {
-            "type": "speech_balloon",
-            "confidence": 0.88,
-            "bounding_box": _bounding_box(width * 0.56, height * 0.46, width * 0.26, height * 0.15),
-        },
-    )
-
     regions: list[dict[str, Any]] = []
-    for candidate in candidate_boxes:
-        bounding_box = candidate["bounding_box"]
+    for candidate in detected_candidates:
+        bounding_box = _bounding_box(
+            candidate.bounding_box["x"],
+            candidate.bounding_box["y"],
+            candidate.bounding_box["width"],
+            candidate.bounding_box["height"],
+        )
         regions.append(
             {
                 "id": str(uuid4()),
                 "page_id": page_id,
-                "type": candidate["type"],
+                "type": candidate.type,
                 "origin": "detected",
                 "state": "draft",
-                "confidence": candidate["confidence"],
+                "confidence": candidate.confidence,
                 "bounding_box": bounding_box,
                 "shape": _polygon_shape(bounding_box),
                 "created_at": timestamp,
@@ -190,6 +192,15 @@ def _build_overlay_asset(
         "page_id": page_id,
         "region_ids": [region["id"] for region in regions],
         "regions_created": len(regions),
+        "regions": [
+            {
+                "id": region["id"],
+                "type": region["type"],
+                "confidence": region["confidence"],
+                "bounding_box": region["bounding_box"],
+            }
+            for region in regions
+        ],
     }
     serialized = json.dumps(payload, indent=2).encode("utf-8")
     asset_path.write_bytes(serialized)

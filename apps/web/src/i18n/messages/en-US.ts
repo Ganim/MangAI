@@ -171,9 +171,20 @@ export type AppMessages = {
     regionStateLabel: string;
     regionOriginLabel: string;
     regionBoundsLabel: string;
+    regionConfidenceLabel: string;
+    regionConfidenceUnknown: string;
     regionTypeLabels: RegionTypeLabels;
     regionStateLabels: RegionStateLabels;
     regionOriginLabels: RegionOriginLabels;
+    adjustBoundsLabel: string;
+    moveLeftAction: string;
+    moveUpAction: string;
+    moveDownAction: string;
+    moveRightAction: string;
+    narrowerAction: string;
+    widerAction: string;
+    shorterAction: string;
+    tallerAction: string;
     jobsTitle: string;
     jobsCopy: string;
     jobsLoading: string;
@@ -417,6 +428,8 @@ export const enUSMessages: AppMessages = {
     regionStateLabel: "State",
     regionOriginLabel: "Origin",
     regionBoundsLabel: "Bounds",
+    regionConfidenceLabel: "Confidence",
+    regionConfidenceUnknown: "Manual",
     regionTypeLabels: {
       speech_balloon: "Speech balloon",
       narration_box: "Narration box",
@@ -436,6 +449,15 @@ export const enUSMessages: AppMessages = {
       user_split: "User split",
       user_merged: "User merged",
     },
+    adjustBoundsLabel: "Bounding box controls",
+    moveLeftAction: "Move left",
+    moveUpAction: "Move up",
+    moveDownAction: "Move down",
+    moveRightAction: "Move right",
+    narrowerAction: "Narrower",
+    widerAction: "Wider",
+    shorterAction: "Shorter",
+    tallerAction: "Taller",
     jobsTitle: "Automation queue",
     jobsCopy:
       "This first jobs panel keeps orchestration visible. You can already queue region detection and inspect the page-level history before async workers are wired in.",

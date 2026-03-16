@@ -79,6 +79,9 @@ def seed_state(data_dir, *, job_status: str = "queued") -> str:
     }
 
     data_dir.mkdir(parents=True, exist_ok=True)
+    asset_path = data_dir / "assets" / f"{project_id}/{asset_id}.png"
+    asset_path.parent.mkdir(parents=True, exist_ok=True)
+    asset_path.write_bytes(b"worker-test-page" * 32)
     (data_dir / "state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
     return page_id
 
@@ -93,16 +96,19 @@ def test_process_next_job_generates_detected_regions_and_overlay(tmp_path) -> No
     assert processed_job is not None
     assert processed_job["status"] == "succeeded"
     assert processed_job["result"]["page_id"] == page_id
-    assert processed_job["result"]["regions_created"] == 2
+    assert processed_job["result"]["regions_created"] in {2, 3}
 
     state = json.loads((data_dir / "state.json").read_text(encoding="utf-8"))
     assert state["pages"][0]["status"] == "analyzed"
-    assert len(state["regions"]) == 2
+    assert len(state["regions"]) in {2, 3}
     assert all(region["origin"] == "detected" for region in state["regions"])
     assert all(region["confidence"] is not None for region in state["regions"])
     overlay_asset = next(asset for asset in state["assets"] if asset["kind"] == "overlay")
     overlay_path = data_dir / "assets" / overlay_asset["storage_key"]
     assert overlay_path.exists()
+    overlay_payload = json.loads(overlay_path.read_text(encoding="utf-8"))
+    assert overlay_payload["regions_created"] in {2, 3}
+    assert len(overlay_payload["regions"]) == overlay_payload["regions_created"]
 
 
 def test_process_next_job_returns_none_without_queued_jobs(tmp_path) -> None:

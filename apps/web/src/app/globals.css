@@ -625,6 +625,17 @@ button:hover {
   flex-wrap: wrap;
 }
 
+.editor-selection-adjustments {
+  display: grid;
+  gap: 10px;
+}
+
+.editor-adjustment-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .editor-job-card {
   display: grid;
   gap: 8px;
@@ -1079,6 +1090,10 @@ button:hover {
 
   .editor-selection-actions {
     flex-direction: column;
+  }
+
+  .editor-adjustment-group {
+    grid-template-columns: 1fr;
   }
 
   .editor-page-stage {

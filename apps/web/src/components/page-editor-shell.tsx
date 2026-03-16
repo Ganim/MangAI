@@ -22,8 +22,11 @@ import {
   buildDefaultRegionInput,
   formatRegionBounds,
   formatRegionIndexLabel,
+  getBoundingBoxAdjustmentStep,
   getPageCanvasSize,
   getRegionOverlayStyle,
+  moveBoundingBox,
+  resizeBoundingBox,
 } from "../features/projects/regions.ts";
 import {
   buildProjectPageEditorHref,
@@ -255,6 +258,9 @@ export function PageEditorShell({
   const currentCanvasSize = currentPage
     ? getPageCanvasSize({ width: currentPage.width, height: currentPage.height })
     : null;
+  const regionAdjustmentStep = currentPage
+    ? getBoundingBoxAdjustmentStep({ width: currentPage.width, height: currentPage.height })
+    : 24;
 
   async function handleCreateRegion() {
     if (currentPage === null) {
@@ -294,6 +300,30 @@ export function PageEditorShell({
     try {
       const response = await updatePageRegion(projectId, currentPage.id, selectedRegion.id, {
         state: nextState,
+      });
+      setRegions((currentRegions) =>
+        currentRegions.map((region) =>
+          region.id === response.region.id ? response.region : region,
+        ),
+      );
+    } catch (error) {
+      setRegionActionError(getErrorMessage(error, messages.editor.regionUpdateErrorFallback));
+    } finally {
+      setUpdatingRegionId(null);
+    }
+  }
+
+  async function handleUpdateRegionBoundingBox(nextBoundingBox: PageRegion["bounding_box"]) {
+    if (currentPage === null || selectedRegion === null) {
+      return;
+    }
+
+    setUpdatingRegionId(selectedRegion.id);
+    setRegionActionError(null);
+
+    try {
+      const response = await updatePageRegion(projectId, currentPage.id, selectedRegion.id, {
+        bounding_box: nextBoundingBox,
       });
       setRegions((currentRegions) =>
         currentRegions.map((region) =>
@@ -432,6 +462,14 @@ export function PageEditorShell({
                   <span className="status-item-label">{messages.editor.regionBoundsLabel}</span>
                   <strong>{formatRegionBounds(selectedRegion)}</strong>
                 </div>
+                <div className="editor-selection-meta">
+                  <span className="status-item-label">{messages.editor.regionConfidenceLabel}</span>
+                  <strong>
+                    {selectedRegion.confidence === null
+                      ? messages.editor.regionConfidenceUnknown
+                      : `${Math.round(selectedRegion.confidence * 100)}%`}
+                  </strong>
+                </div>
 
                 <div className="editor-selection-actions">
                   <button
@@ -458,6 +496,150 @@ export function PageEditorShell({
                   >
                     {messages.editor.resetRegionAction}
                   </button>
+                </div>
+
+                <div className="editor-selection-adjustments">
+                  <span className="status-item-label">{messages.editor.adjustBoundsLabel}</span>
+                  <div className="editor-adjustment-group">
+                    <button
+                      className="ghost-button"
+                      disabled={updatingRegionId === selectedRegion.id}
+                      onClick={() =>
+                        void handleUpdateRegionBoundingBox(
+                          moveBoundingBox(
+                            selectedRegion.bounding_box,
+                            currentPage,
+                            -regionAdjustmentStep,
+                            0,
+                          ),
+                        )
+                      }
+                      type="button"
+                    >
+                      {messages.editor.moveLeftAction}
+                    </button>
+                    <button
+                      className="ghost-button"
+                      disabled={updatingRegionId === selectedRegion.id}
+                      onClick={() =>
+                        void handleUpdateRegionBoundingBox(
+                          moveBoundingBox(
+                            selectedRegion.bounding_box,
+                            currentPage,
+                            0,
+                            -regionAdjustmentStep,
+                          ),
+                        )
+                      }
+                      type="button"
+                    >
+                      {messages.editor.moveUpAction}
+                    </button>
+                    <button
+                      className="ghost-button"
+                      disabled={updatingRegionId === selectedRegion.id}
+                      onClick={() =>
+                        void handleUpdateRegionBoundingBox(
+                          moveBoundingBox(
+                            selectedRegion.bounding_box,
+                            currentPage,
+                            0,
+                            regionAdjustmentStep,
+                          ),
+                        )
+                      }
+                      type="button"
+                    >
+                      {messages.editor.moveDownAction}
+                    </button>
+                    <button
+                      className="ghost-button"
+                      disabled={updatingRegionId === selectedRegion.id}
+                      onClick={() =>
+                        void handleUpdateRegionBoundingBox(
+                          moveBoundingBox(
+                            selectedRegion.bounding_box,
+                            currentPage,
+                            regionAdjustmentStep,
+                            0,
+                          ),
+                        )
+                      }
+                      type="button"
+                    >
+                      {messages.editor.moveRightAction}
+                    </button>
+                  </div>
+                  <div className="editor-adjustment-group">
+                    <button
+                      className="ghost-button"
+                      disabled={updatingRegionId === selectedRegion.id}
+                      onClick={() =>
+                        void handleUpdateRegionBoundingBox(
+                          resizeBoundingBox(
+                            selectedRegion.bounding_box,
+                            currentPage,
+                            -regionAdjustmentStep,
+                            0,
+                          ),
+                        )
+                      }
+                      type="button"
+                    >
+                      {messages.editor.narrowerAction}
+                    </button>
+                    <button
+                      className="ghost-button"
+                      disabled={updatingRegionId === selectedRegion.id}
+                      onClick={() =>
+                        void handleUpdateRegionBoundingBox(
+                          resizeBoundingBox(
+                            selectedRegion.bounding_box,
+                            currentPage,
+                            regionAdjustmentStep,
+                            0,
+                          ),
+                        )
+                      }
+                      type="button"
+                    >
+                      {messages.editor.widerAction}
+                    </button>
+                    <button
+                      className="ghost-button"
+                      disabled={updatingRegionId === selectedRegion.id}
+                      onClick={() =>
+                        void handleUpdateRegionBoundingBox(
+                          resizeBoundingBox(
+                            selectedRegion.bounding_box,
+                            currentPage,
+                            0,
+                            -regionAdjustmentStep,
+                          ),
+                        )
+                      }
+                      type="button"
+                    >
+                      {messages.editor.shorterAction}
+                    </button>
+                    <button
+                      className="ghost-button"
+                      disabled={updatingRegionId === selectedRegion.id}
+                      onClick={() =>
+                        void handleUpdateRegionBoundingBox(
+                          resizeBoundingBox(
+                            selectedRegion.bounding_box,
+                            currentPage,
+                            0,
+                            regionAdjustmentStep,
+                          ),
+                        )
+                      }
+                      type="button"
+                    >
+                      {messages.editor.tallerAction}
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
