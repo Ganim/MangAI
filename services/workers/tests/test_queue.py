@@ -1,6 +1,8 @@
 import json
+from pathlib import Path
 
 from mangai_workers.config import WorkerSettings
+import mangai_workers.queue as worker_queue
 from mangai_workers.queue import has_pending_jobs, process_next_job
 
 
@@ -647,6 +649,22 @@ def test_process_next_job_returns_none_without_queued_jobs(tmp_path) -> None:
     assert process_next_job(settings) is None
 
 
+def test_process_next_job_recovers_stalled_running_job(tmp_path) -> None:
+    data_dir = tmp_path / "worker-data"
+    page_id = seed_state(data_dir, job_status="running")
+    settings = WorkerSettings(
+        data_dir=data_dir,
+        poll_interval_seconds=0.01,
+        stalled_job_timeout_seconds=0,
+    )
+
+    processed_job = process_next_job(settings)
+
+    assert processed_job is not None
+    assert processed_job["status"] == "succeeded"
+    assert processed_job["result"]["page_id"] == page_id
+
+
 def test_process_next_job_generates_cleaned_asset_preview(tmp_path) -> None:
     data_dir = tmp_path / "worker-data"
     page_id, project_id = seed_cleanup_state(data_dir)
@@ -744,3 +762,23 @@ def test_process_next_job_matches_dialogues_and_creates_placements(tmp_path) -> 
     assert len(state["placements"]) == 2
     assert all(assignment["origin"] == "automatic" for assignment in state["assignments"])
     assert all(placement["layout_metrics"]["mode"] == "automatic" for placement in state["placements"])
+
+
+def test_save_state_retries_replace_when_file_is_temporarily_locked(tmp_path, monkeypatch) -> None:
+    state_path = tmp_path / "state.json"
+    replace_calls = {"count": 0}
+    original_replace = Path.replace
+
+    def flaky_replace(self: Path, target: Path):
+        replace_calls["count"] += 1
+        if replace_calls["count"] == 1:
+            raise PermissionError("locked")
+        return original_replace(self, target)
+
+    monkeypatch.setattr(worker_queue, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(Path, "replace", flaky_replace)
+
+    worker_queue._save_state(state_path, {"jobs": []})
+
+    assert replace_calls["count"] == 2
+    assert json.loads(state_path.read_text(encoding="utf-8")) == {"jobs": []}

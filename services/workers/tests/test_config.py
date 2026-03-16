@@ -1,9 +1,10 @@
-from mangai_workers.config import clear_settings_cache, get_settings
+from mangai_workers.config import DEFAULT_SHARED_DATA_DIR, clear_settings_cache, get_settings
 
 
 def test_worker_settings_read_environment(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("MANGAI_DATA_DIR", str(tmp_path / "worker-data"))
     monkeypatch.setenv("MANGAI_WORKER_POLL_INTERVAL_SECONDS", "5.5")
+    monkeypatch.setenv("MANGAI_WORKER_STALLED_JOB_TIMEOUT_SECONDS", "12.5")
     monkeypatch.setenv("MANGAI_WORKERS_APP_NAME", "MangAI Worker Test")
     monkeypatch.setenv("MANGAI_OCR_PROVIDER", "paddleocr")
     monkeypatch.setenv("MANGAI_TRANSLATION_PROVIDER", "deepl")
@@ -24,6 +25,7 @@ def test_worker_settings_read_environment(monkeypatch, tmp_path) -> None:
     assert settings.app_name == "MangAI Worker Test"
     assert settings.data_dir == tmp_path / "worker-data"
     assert settings.poll_interval_seconds == 5.5
+    assert settings.stalled_job_timeout_seconds == 12.5
     assert settings.ocr_provider == "paddleocr"
     assert settings.translation_provider == "deepl"
     assert settings.strict_provider_selection is True
@@ -57,5 +59,17 @@ def test_worker_settings_load_local_env_file(monkeypatch, tmp_path) -> None:
     assert settings.translation_provider == "azure_translator"
     assert settings.azure_translator_api_key == "test-key"
     assert settings.azure_translator_region == "brazilsouth"
+
+    clear_settings_cache()
+
+
+def test_worker_settings_default_to_shared_api_data_dir(monkeypatch) -> None:
+    monkeypatch.delenv("MANGAI_DATA_DIR", raising=False)
+    monkeypatch.delenv("MANGAI_ENV_FILE", raising=False)
+    clear_settings_cache()
+
+    settings = get_settings()
+
+    assert settings.data_dir == DEFAULT_SHARED_DATA_DIR
 
     clear_settings_cache()

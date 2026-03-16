@@ -369,6 +369,29 @@ def test_page_jobs_can_be_queued_and_listed(client: TestClient) -> None:
     assert jobs[0]["id"] == job["id"]
 
 
+def test_page_jobs_reuse_pending_job_of_same_type(client: TestClient) -> None:
+    project_id = create_project(client)
+    page_payload = upload_single_page(client, project_id)
+    page_id = page_payload["id"]
+
+    first_response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/jobs",
+        json={"type": "detect_regions"},
+    )
+    second_response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/jobs",
+        json={"type": "detect_regions"},
+    )
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 201
+    assert second_response.json()["job"]["id"] == first_response.json()["job"]["id"]
+
+    list_response = client.get(f"/api/v1/projects/{project_id}/pages/{page_id}/jobs")
+    assert list_response.status_code == 200
+    assert len(list_response.json()["jobs"]) == 1
+
+
 def test_run_ocr_job_requires_candidate_regions(client: TestClient) -> None:
     project_id = create_project(client)
     page_payload = upload_single_page(client, project_id)

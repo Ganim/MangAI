@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
+from time import sleep
 from uuid import UUID, uuid4
 
 from mangai_api.constants import (
@@ -64,6 +65,9 @@ def _utcnow() -> datetime:
 
 
 SYSTEM_ACTOR_ID = UUID("00000000-0000-4000-8000-000000000000")
+PENDING_JOB_STATUSES = {"queued", "running"}
+STATE_REPLACE_ATTEMPTS = 8
+STATE_REPLACE_DELAY_SECONDS = 0.05
 
 
 @dataclass(frozen=True)
@@ -117,6 +121,18 @@ class LocalProjectStore:
             state = self._load_state_unlocked()
             project = self._require_project(state, project_id)
             self._require_page(state, project_id, page_id)
+            existing_pending_job = next(
+                (
+                    candidate
+                    for candidate in state.jobs
+                    if candidate.page_id == page_id
+                    and candidate.type == job_type
+                    and candidate.status in PENDING_JOB_STATUSES
+                ),
+                None,
+            )
+            if existing_pending_job is not None:
+                return existing_pending_job.model_copy(deep=True)
             original_asset = self._require_original_asset(state, project_id, page_id)
             job_id = uuid4()
             now = _utcnow()
@@ -1216,7 +1232,24 @@ class LocalProjectStore:
     def _save_state_unlocked(self, state: StoredProjectState) -> None:
         temp_file = self._state_file.with_suffix(".tmp")
         temp_file.write_text(state.model_dump_json(indent=2), encoding="utf-8")
-        temp_file.replace(self._state_file)
+        self._replace_state_file_with_retry(temp_file, self._state_file)
+
+    def _replace_state_file_with_retry(
+        self,
+        source_path: Path,
+        target_path: Path,
+        *,
+        attempts: int = STATE_REPLACE_ATTEMPTS,
+        delay_seconds: float = STATE_REPLACE_DELAY_SECONDS,
+    ) -> None:
+        for attempt in range(attempts):
+            try:
+                source_path.replace(target_path)
+                return
+            except PermissionError:
+                if attempt == attempts - 1:
+                    raise
+                sleep(delay_seconds)
 
     def _polygon_shape_from_bounding_box(self, bounding_box: BoundingBox) -> PolygonShape:
         x = bounding_box.x

@@ -15,8 +15,9 @@ from mangai_workers.runner import WorkerExecutionError, run_job
 from mangai_workers.translation import TranslationCandidate, translate_dialogues
 
 
-POLLABLE_JOB_STATUSES = {"queued"}
 PENDING_JOB_STATUSES = {"queued", "running"}
+STATE_REPLACE_ATTEMPTS = 8
+STATE_REPLACE_DELAY_SECONDS = 0.05
 
 
 def process_next_job(settings: WorkerSettings) -> dict[str, Any] | None:
@@ -26,7 +27,19 @@ def process_next_job(settings: WorkerSettings) -> dict[str, Any] | None:
 
     state = _load_state(state_path)
     jobs = state.setdefault("jobs", [])
-    job = next((candidate for candidate in jobs if candidate.get("status") in POLLABLE_JOB_STATUSES), None)
+    current_timestamp = datetime.now(UTC)
+    job = next(
+        (
+            candidate
+            for candidate in jobs
+            if _is_job_pollable(
+                candidate,
+                current_timestamp=current_timestamp,
+                stalled_after_seconds=settings.stalled_job_timeout_seconds,
+            )
+        ),
+        None,
+    )
     if job is None:
         return None
 
@@ -927,8 +940,50 @@ def _save_state(state_path: Path, state: dict[str, Any]) -> None:
     state_path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = state_path.with_suffix(".tmp")
     temp_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
-    temp_path.replace(state_path)
+    _replace_file_with_retry(temp_path, state_path)
+
+
+def _replace_file_with_retry(
+    source_path: Path,
+    target_path: Path,
+    *,
+    attempts: int = STATE_REPLACE_ATTEMPTS,
+    delay_seconds: float = STATE_REPLACE_DELAY_SECONDS,
+) -> None:
+    for attempt in range(attempts):
+        try:
+            source_path.replace(target_path)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            sleep(delay_seconds)
 
 
 def _utcnow_iso() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _is_job_pollable(
+    job: dict[str, Any],
+    *,
+    current_timestamp: datetime,
+    stalled_after_seconds: float,
+) -> bool:
+    status = str(job.get("status") or "")
+    if status == "queued":
+        return True
+    if status != "running":
+        return False
+
+    updated_at = job.get("updated_at")
+    if not isinstance(updated_at, str):
+        return False
+
+    try:
+        normalized_updated_at = updated_at.replace("Z", "+00:00")
+        updated_at_timestamp = datetime.fromisoformat(normalized_updated_at)
+    except ValueError:
+        return False
+
+    return (current_timestamp - updated_at_timestamp).total_seconds() >= stalled_after_seconds
