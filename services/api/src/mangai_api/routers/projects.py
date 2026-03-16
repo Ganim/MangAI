@@ -7,6 +7,12 @@ from fastapi.responses import FileResponse
 
 from mangai_api.domain_errors import UploadValidationError
 from mangai_api.models.job import CreatePageJobRequest, JobResponse, ListJobsResponse
+from mangai_api.models.mask import (
+    CreateMaskRevisionRequest,
+    ListMaskRevisionsResponse,
+    MaskRevisionResponse,
+    UpdateMaskRevisionRequest,
+)
 from mangai_api.models.project import (
     CreateProjectRequest,
     CreateProjectResponse,
@@ -79,6 +85,23 @@ def list_page_regions(
 ) -> ListRegionsResponse:
     return ListRegionsResponse(
         regions=tuple(store.list_page_regions(project_id=project_id, page_id=page_id))
+    )
+
+
+@router.get(
+    "/{project_id}/pages/{page_id}/mask-revisions",
+    response_model=ListMaskRevisionsResponse,
+    summary="List page mask revisions",
+)
+def list_page_mask_revisions(
+    project_id: UUID,
+    page_id: UUID,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> ListMaskRevisionsResponse:
+    return ListMaskRevisionsResponse(
+        mask_revisions=tuple(
+            store.list_page_mask_revisions(project_id=project_id, page_id=page_id)
+        )
     )
 
 
@@ -157,6 +180,26 @@ def create_page_region(
 
 
 @router.post(
+    "/{project_id}/pages/{page_id}/mask-revisions",
+    response_model=MaskRevisionResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create page mask revision",
+)
+def create_page_mask_revision(
+    project_id: UUID,
+    page_id: UUID,
+    payload: CreateMaskRevisionRequest,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> MaskRevisionResponse:
+    mask_revision = store.create_mask_revision(
+        project_id=project_id,
+        page_id=page_id,
+        payload=payload,
+    )
+    return MaskRevisionResponse(mask_revision=mask_revision)
+
+
+@router.post(
     "/{project_id}/pages/{page_id}/jobs",
     response_model=JobResponse,
     status_code=status.HTTP_201_CREATED,
@@ -193,6 +236,27 @@ def update_page_region(
     return RegionResponse(region=region)
 
 
+@router.patch(
+    "/{project_id}/pages/{page_id}/mask-revisions/{mask_revision_id}",
+    response_model=MaskRevisionResponse,
+    summary="Update page mask revision",
+)
+def update_page_mask_revision(
+    project_id: UUID,
+    page_id: UUID,
+    mask_revision_id: UUID,
+    payload: UpdateMaskRevisionRequest,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> MaskRevisionResponse:
+    mask_revision = store.update_mask_revision(
+        project_id=project_id,
+        page_id=page_id,
+        mask_revision_id=mask_revision_id,
+        payload=payload,
+    )
+    return MaskRevisionResponse(mask_revision=mask_revision)
+
+
 @router.get(
     "/{project_id}/pages/{page_id}/original",
     summary="Get original uploaded page asset",
@@ -203,4 +267,17 @@ def get_original_page_asset(
     store: LocalProjectStore = Depends(get_project_store),
 ) -> FileResponse:
     asset_path, mime_type = store.get_original_asset_file(project_id=project_id, page_id=page_id)
+    return FileResponse(asset_path, media_type=mime_type)
+
+
+@router.get(
+    "/{project_id}/assets/{asset_id}",
+    summary="Get a stored project asset",
+)
+def get_project_asset(
+    project_id: UUID,
+    asset_id: UUID,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> FileResponse:
+    asset_path, mime_type = store.get_project_asset_file(project_id=project_id, asset_id=asset_id)
     return FileResponse(asset_path, media_type=mime_type)

@@ -14,6 +14,7 @@ from mangai_api.i18n import (
 )
 from mangai_api.models.common import APIModel
 from mangai_api.models.job import JobRecord
+from mangai_api.models.mask import MaskRevisionRecord
 from mangai_api.models.region import RegionRecord
 
 
@@ -93,6 +94,7 @@ class ProjectPage(APIModel):
     height: int | None = Field(default=None, ge=1)
     status: PageStatus
     original_asset_path: str = Field(min_length=1)
+    active_cleaned_asset_path: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -126,7 +128,7 @@ class StoredProjectAsset(APIModel):
     id: UUID
     project_id: UUID
     page_id: UUID
-    kind: Literal["original", "overlay"]
+    kind: Literal["original", "overlay", "cleaned", "cleanup_variant"]
     file_name: str
     storage_key: str
     mime_type: str
@@ -140,6 +142,7 @@ class StoredProjectState(APIModel):
     pages: tuple[ProjectPage, ...] = ()
     assets: tuple[StoredProjectAsset, ...] = ()
     regions: tuple[RegionRecord, ...] = ()
+    mask_revisions: tuple[MaskRevisionRecord, ...] = ()
     jobs: tuple[JobRecord, ...] = ()
 
 
@@ -158,6 +161,7 @@ class RegisterUploadedProjectPage(APIModel):
     height: int | None = Field(default=None, ge=1)
     status: PageStatus
     original_asset_path: str = Field(min_length=1)
+    active_cleaned_asset_path: str | None = None
     created_at: datetime
     updated_at: datetime
 

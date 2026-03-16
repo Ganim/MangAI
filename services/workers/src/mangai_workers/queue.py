@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -86,6 +87,15 @@ def _execute_job(settings: WorkerSettings, state: dict[str, Any], job: dict[str,
         )
         return result
 
+    if job_type == "generate_cleanup":
+        _apply_generate_cleanup_result(
+            settings=settings,
+            state=state,
+            job=job,
+            result=result,
+        )
+        return result
+
     raise WorkerExecutionError(f"Unsupported job type '{job_type}'.")
 
 
@@ -143,6 +153,49 @@ def _apply_detect_regions_result(
     ]
     state["assets"] = [*preserved_assets, overlay_asset]
     result["regions_created"] = len(detected_regions)
+
+
+def _apply_generate_cleanup_result(
+    settings: WorkerSettings,
+    state: dict[str, Any],
+    job: dict[str, Any],
+    result: dict[str, Any],
+) -> None:
+    project_id = str(job["project_id"])
+    page_id = str(job["page_id"])
+    payload = _require_dict(job.get("payload"), "job payload")
+    source_asset_id = str(payload["source_asset_id"])
+    mask_revision_ids = _require_string_list(payload.get("mask_revision_ids"), "mask_revision_ids")
+
+    page = _find_by_id(state.get("pages", []), page_id, "page")
+    source_asset = _find_by_id(state.get("assets", []), source_asset_id, "asset")
+    approved_masks = _get_mask_revisions(state, page_id, mask_revision_ids)
+    if len(approved_masks) == 0:
+        raise WorkerExecutionError("Cleanup jobs require at least one approved active mask revision.")
+
+    cleaned_asset = _build_cleaned_asset(
+        project_id=project_id,
+        page_id=page_id,
+        cleaned_asset_id=str(result["cleaned_asset_id"]),
+        source_asset=source_asset,
+        approved_masks=approved_masks,
+        settings=settings,
+        page_width=int(page.get("width") or 1000),
+        page_height=int(page.get("height") or 1400),
+    )
+
+    timestamp = _utcnow_iso()
+    page["status"] = "cleaned"
+    page["active_cleaned_asset_path"] = f"/api/v1/projects/{project_id}/assets/{cleaned_asset['id']}"
+    page["updated_at"] = timestamp
+
+    preserved_assets = [
+        asset
+        for asset in state.get("assets", [])
+        if asset.get("id") != cleaned_asset["id"]
+    ]
+    state["assets"] = [*preserved_assets, cleaned_asset]
+    result["variant_asset_ids"] = []
 
 
 def _build_detected_regions(
@@ -218,6 +271,77 @@ def _build_overlay_asset(
     }
 
 
+def _build_cleaned_asset(
+    *,
+    project_id: str,
+    page_id: str,
+    cleaned_asset_id: str,
+    source_asset: dict[str, Any],
+    approved_masks: list[dict[str, Any]],
+    settings: WorkerSettings,
+    page_width: int,
+    page_height: int,
+) -> dict[str, Any]:
+    storage_key = str(Path(project_id) / f"{cleaned_asset_id}.svg")
+    asset_path = settings.data_dir / "assets" / storage_key
+    asset_path.parent.mkdir(parents=True, exist_ok=True)
+
+    source_asset_path = settings.data_dir / "assets" / str(source_asset["storage_key"])
+    if not source_asset_path.exists():
+        raise WorkerExecutionError(f"Could not find source asset '{source_asset['id']}'.")
+
+    source_bytes = source_asset_path.read_bytes()
+    svg_markup = _render_cleanup_svg(
+        source_bytes=source_bytes,
+        source_mime_type=str(source_asset["mime_type"]),
+        approved_masks=approved_masks,
+        page_width=page_width,
+        page_height=page_height,
+    )
+    serialized = svg_markup.encode("utf-8")
+    asset_path.write_bytes(serialized)
+    timestamp = _utcnow_iso()
+    return {
+        "id": cleaned_asset_id,
+        "project_id": project_id,
+        "page_id": page_id,
+        "kind": "cleaned",
+        "file_name": f"{page_id}-cleaned.svg",
+        "storage_key": storage_key,
+        "mime_type": "image/svg+xml",
+        "size_bytes": len(serialized),
+        "created_at": timestamp,
+        "updated_at": timestamp,
+    }
+
+
+def _render_cleanup_svg(
+    *,
+    source_bytes: bytes,
+    source_mime_type: str,
+    approved_masks: list[dict[str, Any]],
+    page_width: int,
+    page_height: int,
+) -> str:
+    encoded_source = base64.b64encode(source_bytes).decode("ascii")
+    polygons_markup = "\n".join(
+        f'<polygon fill="#f8f7f1" points="{_serialize_polygon_points(mask["shape"]["points"])}" />'
+        for mask in approved_masks
+    )
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{page_width}" height="{page_height}" '
+        f'viewBox="0 0 {page_width} {page_height}">'
+        f'<image href="data:{source_mime_type};base64,{encoded_source}" '
+        f'width="{page_width}" height="{page_height}" preserveAspectRatio="none" />'
+        f'<g opacity="1">{polygons_markup}</g>'
+        "</svg>"
+    )
+
+
+def _serialize_polygon_points(points: list[dict[str, Any]]) -> str:
+    return " ".join(f'{point["x"]},{point["y"]}' for point in points)
+
+
 def _bounding_box(x: float, y: float, width: float, height: float) -> dict[str, float]:
     return {
         "x": round(max(x, 0), 2),
@@ -250,9 +374,43 @@ def _find_by_id(items: list[dict[str, Any]], identifier: str, label: str) -> dic
     return item
 
 
+def _get_mask_revisions(
+    state: dict[str, Any],
+    page_id: str,
+    mask_revision_ids: list[str],
+) -> list[dict[str, Any]]:
+    page_region_ids = {
+        str(region.get("id"))
+        for region in state.get("regions", [])
+        if str(region.get("page_id")) == page_id
+    }
+    mask_revision_lookup = {
+        str(mask_revision.get("id")): mask_revision
+        for mask_revision in state.get("mask_revisions", [])
+        if str(mask_revision.get("region_id")) in page_region_ids
+    }
+    matched_mask_revisions = []
+    for mask_revision_id in mask_revision_ids:
+        mask_revision = mask_revision_lookup.get(mask_revision_id)
+        if mask_revision is None:
+            raise WorkerExecutionError(f"Could not find mask revision '{mask_revision_id}'.")
+        if not mask_revision.get("is_active") or not mask_revision.get("approved"):
+            raise WorkerExecutionError(
+                f"Mask revision '{mask_revision_id}' is not approved and active."
+            )
+        matched_mask_revisions.append(mask_revision)
+    return matched_mask_revisions
+
+
 def _require_dict(value: Any, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise WorkerExecutionError(f"Expected {label} to be an object.")
+    return value
+
+
+def _require_string_list(value: Any, label: str) -> list[str]:
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise WorkerExecutionError(f"Expected {label} to be an array of strings.")
     return value
 
 

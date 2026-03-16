@@ -18,6 +18,13 @@ class RegionNotFoundError(Exception):
         self.region_id = region_id
 
 
+class MaskRevisionNotFoundError(Exception):
+    def __init__(self, page_id: str, mask_revision_id: str) -> None:
+        super().__init__(f"Mask revision '{mask_revision_id}' was not found in page '{page_id}'.")
+        self.page_id = page_id
+        self.mask_revision_id = mask_revision_id
+
+
 class JobValidationError(ValueError):
     pass
 

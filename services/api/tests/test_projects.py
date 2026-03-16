@@ -34,6 +34,23 @@ def upload_single_page(client: TestClient, project_id: str) -> dict:
     return response.json()["pages"][0]
 
 
+def create_region(client: TestClient, project_id: str, page_id: str) -> dict:
+    response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/regions",
+        json={
+            "type": "speech_balloon",
+            "bounding_box": {
+                "x": 24,
+                "y": 18,
+                "width": 120,
+                "height": 80,
+            },
+        },
+    )
+    assert response.status_code == 201
+    return response.json()["region"]
+
+
 def test_create_project_normalizes_languages_and_defaults_direction(client: TestClient) -> None:
     response = client.post(
         "/api/v1/projects",
@@ -228,6 +245,7 @@ def test_upload_project_pages_infers_png_dimensions(client: TestClient) -> None:
     detail_page = detail_response.json()["pages"][0]
     assert detail_page["width"] == 1
     assert detail_page["height"] == 1
+    assert detail_page["active_cleaned_asset_path"] is None
 
 
 def test_upload_project_pages_rejects_unsupported_type(client: TestClient) -> None:
@@ -250,21 +268,7 @@ def test_page_regions_can_be_created_listed_and_updated(client: TestClient) -> N
     page_payload = upload_single_page(client, project_id)
     page_id = page_payload["id"]
 
-    create_response = client.post(
-        f"/api/v1/projects/{project_id}/pages/{page_id}/regions",
-        json={
-            "type": "speech_balloon",
-            "bounding_box": {
-                "x": 24,
-                "y": 18,
-                "width": 120,
-                "height": 80,
-            },
-        },
-    )
-
-    assert create_response.status_code == 201
-    created_region = create_response.json()["region"]
+    created_region = create_region(client, project_id, page_id)
     assert created_region["origin"] == "user_created"
     assert created_region["state"] == "draft"
 
@@ -294,6 +298,51 @@ def test_page_regions_can_be_created_listed_and_updated(client: TestClient) -> N
     assert updated_region["shape"]["points"][1]["x"] == 162
 
 
+def test_page_mask_revisions_can_be_created_listed_and_updated(client: TestClient) -> None:
+    project_id = create_project(client)
+    page_payload = upload_single_page(client, project_id)
+    page_id = page_payload["id"]
+    region = create_region(client, project_id, page_id)
+
+    create_response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/mask-revisions",
+        json={
+            "region_id": region["id"],
+            "shape": region["shape"],
+        },
+    )
+
+    assert create_response.status_code == 201
+    created_mask_revision = create_response.json()["mask_revision"]
+    assert created_mask_revision["region_id"] == region["id"]
+    assert created_mask_revision["version"] == 1
+    assert created_mask_revision["is_active"] is True
+    assert created_mask_revision["approved"] is False
+
+    list_response = client.get(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/mask-revisions"
+    )
+    assert list_response.status_code == 200
+    listed_mask_revisions = list_response.json()["mask_revisions"]
+    assert len(listed_mask_revisions) == 1
+    assert listed_mask_revisions[0]["id"] == created_mask_revision["id"]
+
+    update_response = client.patch(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/mask-revisions/{created_mask_revision['id']}",
+        json={"approved": True},
+    )
+    assert update_response.status_code == 200
+    updated_mask_revision = update_response.json()["mask_revision"]
+    assert updated_mask_revision["approved"] is True
+    assert updated_mask_revision["shape"]["points"][1]["x"] == region["shape"]["points"][1]["x"]
+
+    detail_response = client.get(f"/api/v1/projects/{project_id}")
+    assert detail_response.status_code == 200
+    detail_page = detail_response.json()["pages"][0]
+    assert detail_page["status"] == "cleanup_ready"
+    assert detail_page["active_cleaned_asset_path"] is None
+
+
 def test_page_jobs_can_be_queued_and_listed(client: TestClient) -> None:
     project_id = create_project(client)
     page_payload = upload_single_page(client, project_id)
@@ -318,6 +367,69 @@ def test_page_jobs_can_be_queued_and_listed(client: TestClient) -> None:
     jobs = list_response.json()["jobs"]
     assert len(jobs) == 1
     assert jobs[0]["id"] == job["id"]
+
+
+def test_generate_cleanup_job_requires_approved_active_mask_revision(client: TestClient) -> None:
+    project_id = create_project(client)
+    page_payload = upload_single_page(client, project_id)
+    page_id = page_payload["id"]
+    region = create_region(client, project_id, page_id)
+
+    mask_response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/mask-revisions",
+        json={
+            "region_id": region["id"],
+            "shape": region["shape"],
+        },
+    )
+    assert mask_response.status_code == 201
+
+    cleanup_response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/jobs",
+        json={"type": "generate_cleanup"},
+    )
+
+    assert cleanup_response.status_code == 422
+    payload = cleanup_response.json()
+    assert payload["error_code"] == "INVALID_JOB_REQUEST"
+
+
+def test_generate_cleanup_job_can_be_queued_with_approved_active_mask_revision(
+    client: TestClient,
+) -> None:
+    project_id = create_project(client)
+    page_payload = upload_single_page(client, project_id)
+    page_id = page_payload["id"]
+    region = create_region(client, project_id, page_id)
+
+    mask_response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/mask-revisions",
+        json={
+            "region_id": region["id"],
+            "shape": region["shape"],
+        },
+    )
+    assert mask_response.status_code == 201
+    mask_revision = mask_response.json()["mask_revision"]
+
+    approve_response = client.patch(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/mask-revisions/{mask_revision['id']}",
+        json={"approved": True},
+    )
+    assert approve_response.status_code == 200
+
+    cleanup_response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/jobs",
+        json={"type": "generate_cleanup"},
+    )
+
+    assert cleanup_response.status_code == 201
+    job = cleanup_response.json()["job"]
+    assert job["type"] == "generate_cleanup"
+    assert job["payload"]["page_id"] == page_id
+    assert job["payload"]["source_asset_id"]
+    assert job["payload"]["region_ids"] == [region["id"]]
+    assert job["payload"]["mask_revision_ids"] == [mask_revision["id"]]
 
 
 def test_page_jobs_reject_unsupported_job_type(client: TestClient) -> None:

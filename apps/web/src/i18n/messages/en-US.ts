@@ -153,6 +153,9 @@ export type AppMessages = {
     regionLoadErrorFallback: string;
     regionCreateErrorFallback: string;
     regionUpdateErrorFallback: string;
+    maskLoadErrorFallback: string;
+    maskCreateErrorFallback: string;
+    maskUpdateErrorFallback: string;
     loadingEditor: string;
     pageNotFound: string;
     pageNavigatorTitle: string;
@@ -173,6 +176,21 @@ export type AppMessages = {
     regionBoundsLabel: string;
     regionConfidenceLabel: string;
     regionConfidenceUnknown: string;
+    maskSectionTitle: string;
+    maskSectionCopy: string;
+    masksLoading: string;
+    masksEmptyForRegion: string;
+    maskVersionLabel: string;
+    maskVersionValue: string;
+    maskApprovalLabel: string;
+    maskApprovedValue: string;
+    maskPendingValue: string;
+    maskPointsLabel: string;
+    createMaskFromRegionAction: string;
+    refreshMaskFromRegionAction: string;
+    creatingMaskAction: string;
+    approveMaskAction: string;
+    approvingMaskAction: string;
     regionTypeLabels: RegionTypeLabels;
     regionStateLabels: RegionStateLabels;
     regionOriginLabels: RegionOriginLabels;
@@ -191,8 +209,11 @@ export type AppMessages = {
     jobsEmpty: string;
     jobLoadErrorFallback: string;
     jobCreateErrorFallback: string;
+    approvedMasksSummary: string;
     queueDetectionAction: string;
     queuingDetectionAction: string;
+    queueCleanupAction: string;
+    queuingCleanupAction: string;
     jobTypeLabels: JobTypeLabels;
     jobStatusLabels: JobStatusLabels;
     kicker: string;
@@ -207,6 +228,11 @@ export type AppMessages = {
     overlayRegionCount: string;
     canvasEmptyState: string;
     dimensionsFallbackNotice: string;
+    cleanupPreviewTitle: string;
+    cleanupPreviewCopy: string;
+    cleanupPreviewEmpty: string;
+    originalPreviewLabel: string;
+    cleanedPreviewLabel: string;
   };
 };
 
@@ -407,6 +433,9 @@ export const enUSMessages: AppMessages = {
     regionLoadErrorFallback: "The editor could not load the saved review regions for this page.",
     regionCreateErrorFallback: "The editor could not create a new review region right now.",
     regionUpdateErrorFallback: "The editor could not update the selected region right now.",
+    maskLoadErrorFallback: "The editor could not load the saved cleanup masks for this page.",
+    maskCreateErrorFallback: "The editor could not create a cleanup mask right now.",
+    maskUpdateErrorFallback: "The editor could not update the selected cleanup mask right now.",
     loadingEditor: "Loading editor shell...",
     pageNotFound: "This page could not be found in the selected project.",
     pageNavigatorTitle: "Page navigator",
@@ -430,6 +459,22 @@ export const enUSMessages: AppMessages = {
     regionBoundsLabel: "Bounds",
     regionConfidenceLabel: "Confidence",
     regionConfidenceUnknown: "Manual",
+    maskSectionTitle: "Cleanup mask",
+    maskSectionCopy:
+      "Each active mask revision becomes the cleanup source of truth for this region. Create a new version from the reviewed region and approve it before queuing cleanup.",
+    masksLoading: "Loading cleanup masks...",
+    masksEmptyForRegion: "No cleanup mask exists for this region yet.",
+    maskVersionLabel: "Active version",
+    maskVersionValue: "Mask v{version}",
+    maskApprovalLabel: "Approval",
+    maskApprovedValue: "Approved",
+    maskPendingValue: "Pending review",
+    maskPointsLabel: "Polygon points",
+    createMaskFromRegionAction: "Create mask from region",
+    refreshMaskFromRegionAction: "Create new mask version",
+    creatingMaskAction: "Creating mask...",
+    approveMaskAction: "Approve cleanup mask",
+    approvingMaskAction: "Approving mask...",
     regionTypeLabels: {
       speech_balloon: "Speech balloon",
       narration_box: "Narration box",
@@ -464,9 +509,12 @@ export const enUSMessages: AppMessages = {
     jobsLoading: "Loading page jobs...",
     jobsEmpty: "No jobs have been queued for this page yet.",
     jobLoadErrorFallback: "The editor could not load the page job history.",
-    jobCreateErrorFallback: "The editor could not queue region detection right now.",
+    jobCreateErrorFallback: "The editor could not queue the selected automation right now.",
+    approvedMasksSummary: "{count} approved active cleanup masks ready",
     queueDetectionAction: "Queue region detection",
     queuingDetectionAction: "Queuing detection...",
+    queueCleanupAction: "Queue cleanup preview",
+    queuingCleanupAction: "Queuing cleanup...",
     jobTypeLabels: {
       detect_regions: "Region detection",
       generate_cleanup: "Cleanup generation",
@@ -497,5 +545,12 @@ export const enUSMessages: AppMessages = {
     canvasEmptyState: "No review regions yet. Create one to anchor the editor workflow.",
     dimensionsFallbackNotice:
       "This page does not have stored dimensions yet, so the editor is using a fallback canvas proportion until a real image size is available.",
+    cleanupPreviewTitle: "Cleanup compare",
+    cleanupPreviewCopy:
+      "Once cleanup runs, the editor keeps the original page for review and shows the generated cleaned preview beside it.",
+    cleanupPreviewEmpty:
+      "No cleaned preview exists yet. Approve at least one active mask and queue cleanup to generate the first comparison.",
+    originalPreviewLabel: "Original",
+    cleanedPreviewLabel: "Cleanup preview",
   },
 };

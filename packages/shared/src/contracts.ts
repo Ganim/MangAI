@@ -29,7 +29,14 @@ import {
   readNullable,
   readUuid,
 } from "./validate.ts";
-import { parseBoundingBox, parseJob, parseRegion, parseTextStyle } from "./entities.ts";
+import {
+  parseBoundingBox,
+  parseJob,
+  parseMaskRevision,
+  parsePolygonShape,
+  parseRegion,
+  parseTextStyle,
+} from "./entities.ts";
 
 export function parseCreateProjectRequest(value: unknown, path: Array<string | number> = []) {
   const objectValue = readObject<Record<string, unknown>>(value, path);
@@ -173,6 +180,12 @@ export function parseRegisteredProjectPage(value: unknown, path: Array<string | 
       objectValue.original_asset_path,
       atPath(path, "original_asset_path"),
     ),
+    active_cleaned_asset_path:
+      readNullable(
+        objectValue.active_cleaned_asset_path,
+        (input, inputPath) => readString(input, inputPath),
+        atPath(path, "active_cleaned_asset_path"),
+      ) ?? null,
     created_at: readTimestamp(objectValue.created_at, atPath(path, "created_at")),
     updated_at: readTimestamp(objectValue.updated_at, atPath(path, "updated_at")),
   };
@@ -244,6 +257,66 @@ export function parsePageRegionResponse(value: unknown, path: Array<string | num
   const objectValue = readObject<Record<string, unknown>>(value, path);
   return {
     region: parseRegion(objectValue.region, atPath(path, "region")),
+  };
+}
+
+export function parseCreateMaskRevisionRequest(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    region_id: readUuid(objectValue.region_id, atPath(path, "region_id")),
+    shape: parsePolygonShape(objectValue.shape, atPath(path, "shape")),
+  };
+}
+
+export function parseUpdateMaskRevisionRequest(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  const parsedValue = {
+    approved: readOptional(
+      objectValue.approved,
+      (input, inputPath) => readBoolean(input, inputPath),
+      atPath(path, "approved"),
+    ),
+    is_active: readOptional(
+      objectValue.is_active,
+      (input, inputPath) => readBoolean(input, inputPath),
+      atPath(path, "is_active"),
+    ),
+    shape: readOptional(
+      objectValue.shape,
+      (input, inputPath) => parsePolygonShape(input, inputPath),
+      atPath(path, "shape"),
+    ),
+  };
+
+  if (
+    parsedValue.approved === undefined &&
+    parsedValue.is_active === undefined &&
+    parsedValue.shape === undefined
+  ) {
+    throw new ValidationError("At least one mask revision field must be updated", path);
+  }
+
+  return parsedValue;
+}
+
+export function parseListPageMaskRevisionsResponse(
+  value: unknown,
+  path: Array<string | number> = [],
+) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    mask_revisions: readArray(
+      objectValue.mask_revisions,
+      atPath(path, "mask_revisions"),
+      (item, itemPath) => parseMaskRevision(item, itemPath),
+    ),
+  };
+}
+
+export function parseMaskRevisionResponse(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    mask_revision: parseMaskRevision(objectValue.mask_revision, atPath(path, "mask_revision")),
   };
 }
 

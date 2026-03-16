@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+  parseCreateMaskRevisionRequest,
   parseCreatePageJobRequest,
   SUPPORTED_SOURCE_LANGUAGE_CODES,
   SUPPORTED_TARGET_LANGUAGE_CODES,
@@ -12,8 +13,10 @@ import {
   normalizeProjectTargetLanguage,
   parseCreatePageRegionRequest,
   parseCreateProjectResponse,
+  parseListPageMaskRevisionsResponse,
   parseListPageJobsResponse,
   parseListPageRegionsResponse,
+  parseMaskRevisionResponse,
   parsePageRegionResponse,
   parsePageJobResponse,
   parseProjectDetailResponse,
@@ -24,6 +27,7 @@ import {
   parseProject,
   parseRegisterProjectPagesRequest,
   parseRegisterProjectPagesResponse,
+  parseUpdateMaskRevisionRequest,
   parseUpdatePageRegionRequest,
 } from "../src/index.ts";
 
@@ -150,6 +154,7 @@ const parsedRegisterPagesResponse = parseRegisterProjectPagesResponse({
       height: null,
       status: "uploaded",
       original_asset_path: `/api/v1/projects/${UUID}/pages/${UUID_3}/original`,
+      active_cleaned_asset_path: null,
       created_at: "2026-03-15T00:00:00Z",
       updated_at: "2026-03-15T00:00:00Z",
     },
@@ -184,6 +189,7 @@ const parsedProjectDetail = parseProjectDetailResponse({
       height: null,
       status: "uploaded",
       original_asset_path: `/api/v1/projects/${UUID}/pages/${UUID_3}/original`,
+      active_cleaned_asset_path: null,
       created_at: "2026-03-15T00:00:00Z",
       updated_at: "2026-03-15T00:00:00Z",
     },
@@ -217,6 +223,7 @@ const parsedAnalyzedPage = parseProjectDetailResponse({
       height: 2400,
       status: "analyzed",
       original_asset_path: `/api/v1/projects/${UUID}/pages/${UUID_3}/original`,
+      active_cleaned_asset_path: `/api/v1/projects/${UUID}/assets/${UUID_2}`,
       created_at: "2026-03-15T00:00:00Z",
       updated_at: "2026-03-15T00:00:00Z",
     },
@@ -224,6 +231,7 @@ const parsedAnalyzedPage = parseProjectDetailResponse({
 });
 
 assert.equal(parsedAnalyzedPage.pages[0]?.status, "analyzed");
+assert.equal(parsedAnalyzedPage.pages[0]?.active_cleaned_asset_path, `/api/v1/projects/${UUID}/assets/${UUID_2}`);
 
 const parsedCreateRegionRequest = parseCreatePageRegionRequest({
   type: "speech_balloon",
@@ -306,6 +314,78 @@ const parsedRegionResponse = parsePageRegionResponse({
 });
 
 assert.equal(parsedRegionResponse.region.state, "approved");
+
+const parsedCreateMaskRevision = parseCreateMaskRevisionRequest({
+  region_id: UUID_3,
+  shape: {
+    type: "polygon",
+    points: [
+      { x: 10, y: 20 },
+      { x: 110, y: 20 },
+      { x: 110, y: 80 },
+      { x: 10, y: 80 },
+    ],
+  },
+});
+
+assert.equal(parsedCreateMaskRevision.region_id, UUID_3);
+
+const parsedUpdateMaskRevision = parseUpdateMaskRevisionRequest({
+  approved: true,
+});
+
+assert.equal(parsedUpdateMaskRevision.approved, true);
+assert.throws(() => parseUpdateMaskRevisionRequest({}), ValidationError);
+
+const parsedMaskRevisionsResponse = parseListPageMaskRevisionsResponse({
+  mask_revisions: [
+    {
+      id: UUID,
+      region_id: UUID_3,
+      version: 1,
+      is_active: true,
+      approved: true,
+      shape: {
+        type: "polygon",
+        points: [
+          { x: 10, y: 20 },
+          { x: 110, y: 20 },
+          { x: 110, y: 80 },
+          { x: 10, y: 80 },
+        ],
+      },
+      created_by: UUID_2,
+      created_at: "2026-03-15T00:00:00Z",
+      updated_at: "2026-03-15T00:00:00Z",
+    },
+  ],
+});
+
+assert.equal(parsedMaskRevisionsResponse.mask_revisions[0]?.approved, true);
+
+const parsedMaskRevisionResponse = parseMaskRevisionResponse({
+  mask_revision: {
+    id: UUID,
+    region_id: UUID_3,
+    version: 2,
+    is_active: true,
+    approved: false,
+    shape: {
+      type: "polygon",
+      points: [
+        { x: 12, y: 22 },
+        { x: 112, y: 22 },
+        { x: 112, y: 82 },
+        { x: 12, y: 82 },
+      ],
+    },
+    created_by: UUID_2,
+    created_at: "2026-03-15T00:00:00Z",
+    updated_at: "2026-03-15T00:00:00Z",
+  },
+});
+
+assert.equal(parsedMaskRevisionResponse.mask_revision.version, 2);
 
 const parsedCreateJobRequest = parseCreatePageJobRequest({
   type: "detect_regions",

@@ -38,6 +38,7 @@ def seed_state(data_dir, *, job_status: str = "queued") -> str:
                 "height": 2400,
                 "status": "uploaded",
                 "original_asset_path": f"/api/v1/projects/{project_id}/pages/{page_id}/original",
+                "active_cleaned_asset_path": None,
                 "created_at": timestamp,
                 "updated_at": timestamp,
             }
@@ -57,6 +58,7 @@ def seed_state(data_dir, *, job_status: str = "queued") -> str:
             }
         ],
         "regions": [],
+        "mask_revisions": [],
         "jobs": [
             {
                 "id": job_id,
@@ -84,6 +86,140 @@ def seed_state(data_dir, *, job_status: str = "queued") -> str:
     asset_path.write_bytes(b"worker-test-page" * 32)
     (data_dir / "state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
     return page_id
+
+
+def seed_cleanup_state(data_dir) -> tuple[str, str]:
+    project_id = "11111111-1111-4111-8111-111111111111"
+    page_id = "22222222-2222-4222-8222-222222222222"
+    asset_id = "33333333-3333-4333-8333-333333333333"
+    region_id = "55555555-5555-4555-8555-555555555555"
+    mask_revision_id = "66666666-6666-4666-8666-666666666666"
+    job_id = "77777777-7777-4777-8777-777777777777"
+    timestamp = "2026-03-15T00:00:00Z"
+
+    state = {
+        "projects": [
+            {
+                "id": project_id,
+                "schema_version": 1,
+                "name": "Cleanup Worker Test",
+                "status": "draft",
+                "source_language": "ja-JP",
+                "target_language": "pt-BR",
+                "target_text_direction": "ltr",
+                "page_count": 1,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        ],
+        "pages": [
+            {
+                "id": page_id,
+                "project_id": project_id,
+                "index": 1,
+                "file_name": "001.png",
+                "mime_type": "image/png",
+                "size_bytes": 2048,
+                "width": 1600,
+                "height": 2400,
+                "status": "cleanup_ready",
+                "original_asset_path": f"/api/v1/projects/{project_id}/pages/{page_id}/original",
+                "active_cleaned_asset_path": None,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        ],
+        "assets": [
+            {
+                "id": asset_id,
+                "project_id": project_id,
+                "page_id": page_id,
+                "kind": "original",
+                "file_name": "001.png",
+                "storage_key": f"{project_id}/{asset_id}.png",
+                "mime_type": "image/png",
+                "size_bytes": 2048,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        ],
+        "regions": [
+            {
+                "id": region_id,
+                "page_id": page_id,
+                "type": "speech_balloon",
+                "origin": "user_created",
+                "state": "approved",
+                "confidence": None,
+                "bounding_box": {
+                    "x": 200,
+                    "y": 180,
+                    "width": 420,
+                    "height": 260,
+                },
+                "shape": {
+                    "type": "polygon",
+                    "points": [
+                        {"x": 200, "y": 180},
+                        {"x": 620, "y": 180},
+                        {"x": 620, "y": 440},
+                        {"x": 200, "y": 440},
+                    ],
+                },
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        ],
+        "mask_revisions": [
+            {
+                "id": mask_revision_id,
+                "region_id": region_id,
+                "version": 1,
+                "is_active": True,
+                "approved": True,
+                "shape": {
+                    "type": "polygon",
+                    "points": [
+                        {"x": 210, "y": 190},
+                        {"x": 610, "y": 190},
+                        {"x": 610, "y": 430},
+                        {"x": 210, "y": 430},
+                    ],
+                },
+                "created_by": "00000000-0000-4000-8000-000000000000",
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        ],
+        "jobs": [
+            {
+                "id": job_id,
+                "project_id": project_id,
+                "page_id": page_id,
+                "type": "generate_cleanup",
+                "status": "queued",
+                "payload": {
+                    "job_id": job_id,
+                    "page_id": page_id,
+                    "source_asset_id": asset_id,
+                    "region_ids": [region_id],
+                    "mask_revision_ids": [mask_revision_id],
+                },
+                "result": None,
+                "error_code": None,
+                "error_message": None,
+                "created_at": timestamp,
+                "updated_at": timestamp,
+            }
+        ],
+    }
+
+    data_dir.mkdir(parents=True, exist_ok=True)
+    asset_path = data_dir / "assets" / f"{project_id}/{asset_id}.png"
+    asset_path.parent.mkdir(parents=True, exist_ok=True)
+    asset_path.write_bytes(b"cleanup-worker-page" * 32)
+    (data_dir / "state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
+    return page_id, project_id
 
 
 def test_process_next_job_generates_detected_regions_and_overlay(tmp_path) -> None:
@@ -118,3 +254,32 @@ def test_process_next_job_returns_none_without_queued_jobs(tmp_path) -> None:
 
     assert has_pending_jobs(settings) is False
     assert process_next_job(settings) is None
+
+
+def test_process_next_job_generates_cleaned_asset_preview(tmp_path) -> None:
+    data_dir = tmp_path / "worker-data"
+    page_id, project_id = seed_cleanup_state(data_dir)
+    settings = WorkerSettings(data_dir=data_dir, poll_interval_seconds=0.01)
+
+    processed_job = process_next_job(settings)
+
+    assert processed_job is not None
+    assert processed_job["status"] == "succeeded"
+    assert processed_job["type"] == "generate_cleanup"
+    assert processed_job["result"]["page_id"] == page_id
+    assert processed_job["result"]["variant_asset_ids"] == []
+
+    state = json.loads((data_dir / "state.json").read_text(encoding="utf-8"))
+    page = state["pages"][0]
+    assert page["status"] == "cleaned"
+    assert page["active_cleaned_asset_path"].startswith(
+        f"/api/v1/projects/{project_id}/assets/"
+    )
+
+    cleaned_asset = next(asset for asset in state["assets"] if asset["kind"] == "cleaned")
+    cleaned_asset_path = data_dir / "assets" / cleaned_asset["storage_key"]
+    assert cleaned_asset_path.exists()
+    svg_markup = cleaned_asset_path.read_text(encoding="utf-8")
+    assert svg_markup.startswith("<svg")
+    assert "data:image/png;base64," in svg_markup
+    assert "<polygon" in svg_markup

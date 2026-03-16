@@ -619,6 +619,10 @@ button:hover {
   background: var(--panel-strong);
 }
 
+.editor-mask-panel {
+  background: rgba(255, 250, 242, 0.82);
+}
+
 .editor-selection-actions {
   display: flex;
   gap: 10px;
@@ -674,6 +678,28 @@ button:hover {
 .editor-job-state-pill-canceled {
   background: rgba(113, 42, 42, 0.14);
   color: #7a2d2d;
+}
+
+.editor-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.editor-compare-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(78, 49, 25, 0.1);
+  background: var(--panel-strong);
+}
+
+.editor-compare-image {
+  width: 100%;
+  border-radius: 18px;
+  border: 1px solid rgba(78, 49, 25, 0.08);
+  background: rgba(255, 252, 247, 0.94);
 }
 
 .editor-region-overlay {
@@ -1093,6 +1119,10 @@ button:hover {
   }
 
   .editor-adjustment-group {
+    grid-template-columns: 1fr;
+  }
+
+  .editor-compare-grid {
     grid-template-columns: 1fr;
   }
 

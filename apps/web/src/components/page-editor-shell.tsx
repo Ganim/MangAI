@@ -7,17 +7,26 @@ import type { AppMessages } from "../i18n/index.ts";
 import type { SupportedUiLocale } from "../i18n/config.ts";
 import {
   ApiClientError,
+  createMaskRevision,
   createPageJob,
   createPageRegion,
   getPageJobs,
+  getPageMaskRevisions,
   getPageRegions,
   getProjectDetail,
   resolveApiAssetUrl,
+  updateMaskRevision,
   updatePageRegion,
 } from "../features/projects/api.ts";
 import {
   hasPendingPageJobs,
 } from "../features/projects/jobs.ts";
+import {
+  buildMaskRevisionInputFromRegion,
+  countApprovedActiveMaskRevisions,
+  getActiveMaskRevisionForRegion,
+  hasApprovedActiveMaskRevisions,
+} from "../features/projects/masks.ts";
 import {
   buildDefaultRegionInput,
   formatRegionBounds,
@@ -47,6 +56,8 @@ type PageRegionsResponse = Awaited<ReturnType<typeof getPageRegions>>;
 type PageRegion = PageRegionsResponse["regions"][number];
 type PageJobsResponse = Awaited<ReturnType<typeof getPageJobs>>;
 type PageJob = PageJobsResponse["jobs"][number];
+type PageMaskRevisionsResponse = Awaited<ReturnType<typeof getPageMaskRevisions>>;
+type PageMaskRevision = PageMaskRevisionsResponse["mask_revisions"][number];
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiClientError) {
@@ -77,17 +88,24 @@ export function PageEditorShell({
   const [projectDetail, setProjectDetail] = useState<ProjectDetail | null>(null);
   const [regions, setRegions] = useState<PageRegion[]>([]);
   const [jobs, setJobs] = useState<PageJob[]>([]);
+  const [maskRevisions, setMaskRevisions] = useState<PageMaskRevision[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRegionsLoading, setIsRegionsLoading] = useState(false);
+  const [isMaskRevisionsLoading, setIsMaskRevisionsLoading] = useState(false);
   const [isCreatingRegion, setIsCreatingRegion] = useState(false);
   const [isJobsLoading, setIsJobsLoading] = useState(false);
   const [isQueueingDetection, setIsQueueingDetection] = useState(false);
+  const [isQueueingCleanup, setIsQueueingCleanup] = useState(false);
+  const [isCreatingMaskRevision, setIsCreatingMaskRevision] = useState(false);
   const [updatingRegionId, setUpdatingRegionId] = useState<string | null>(null);
+  const [updatingMaskRevisionId, setUpdatingMaskRevisionId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [regionLoadError, setRegionLoadError] = useState<string | null>(null);
   const [regionActionError, setRegionActionError] = useState<string | null>(null);
   const [jobLoadError, setJobLoadError] = useState<string | null>(null);
   const [jobActionError, setJobActionError] = useState<string | null>(null);
+  const [maskLoadError, setMaskLoadError] = useState<string | null>(null);
+  const [maskActionError, setMaskActionError] = useState<string | null>(null);
   const [selectedRegionId, setSelectedRegionId] = useState<string | null>(null);
   const [showRegions, setShowRegions] = useState(true);
 
@@ -124,10 +142,17 @@ export function PageEditorShell({
   const pages = projectDetail?.pages ?? [];
   const currentPage = pages.find((candidate) => candidate.id === pageId) ?? null;
 
+  async function refreshProjectDetailState() {
+    const response = await getProjectDetail(projectId);
+    setProjectDetail(response);
+    return response;
+  }
+
   useEffect(() => {
     if (currentPage === null) {
       setRegions([]);
       setJobs([]);
+      setMaskRevisions([]);
       setSelectedRegionId(null);
       return;
     }
@@ -204,6 +229,42 @@ export function PageEditorShell({
   }, [currentPage, messages.editor.jobLoadErrorFallback, projectId]);
 
   useEffect(() => {
+    if (currentPage === null) {
+      setMaskRevisions([]);
+      return;
+    }
+
+    const nextPage = currentPage;
+    let canceled = false;
+
+    async function loadMaskRevisions() {
+      setIsMaskRevisionsLoading(true);
+      setMaskLoadError(null);
+      try {
+        const response = await getPageMaskRevisions(projectId, nextPage.id);
+        if (canceled) {
+          return;
+        }
+        setMaskRevisions(response.mask_revisions);
+      } catch (error) {
+        if (canceled) {
+          return;
+        }
+        setMaskLoadError(getErrorMessage(error, messages.editor.maskLoadErrorFallback));
+      } finally {
+        if (!canceled) {
+          setIsMaskRevisionsLoading(false);
+        }
+      }
+    }
+
+    void loadMaskRevisions();
+    return () => {
+      canceled = true;
+    };
+  }, [currentPage, messages.editor.maskLoadErrorFallback, projectId]);
+
+  useEffect(() => {
     if (currentPage === null || !hasPendingPageJobs(jobs)) {
       return;
     }
@@ -213,15 +274,19 @@ export function PageEditorShell({
 
     async function pollPageAutomationState() {
       try {
-        const [jobsResponse, regionsResponse] = await Promise.all([
+        const [projectResponse, jobsResponse, regionsResponse, maskRevisionsResponse] = await Promise.all([
+          getProjectDetail(projectId),
           getPageJobs(projectId, nextPage.id),
           getPageRegions(projectId, nextPage.id),
+          getPageMaskRevisions(projectId, nextPage.id),
         ]);
         if (canceled) {
           return;
         }
+        setProjectDetail(projectResponse);
         setJobs(jobsResponse.jobs);
         setRegions(regionsResponse.regions);
+        setMaskRevisions(maskRevisionsResponse.mask_revisions);
         setSelectedRegionId((currentSelectedRegionId) =>
           regionsResponse.regions.some((region) => region.id === currentSelectedRegionId)
             ? currentSelectedRegionId
@@ -229,6 +294,7 @@ export function PageEditorShell({
         );
         setJobLoadError(null);
         setRegionLoadError(null);
+        setMaskLoadError(null);
       } catch (error) {
         if (canceled) {
           return;
@@ -250,6 +316,7 @@ export function PageEditorShell({
     currentPage,
     jobs,
     messages.editor.jobLoadErrorFallback,
+    messages.editor.maskLoadErrorFallback,
     projectId,
   ]);
 
@@ -261,6 +328,11 @@ export function PageEditorShell({
   const regionAdjustmentStep = currentPage
     ? getBoundingBoxAdjustmentStep({ width: currentPage.width, height: currentPage.height })
     : 24;
+  const selectedRegionMaskRevision =
+    selectedRegion === null
+      ? null
+      : getActiveMaskRevisionForRegion(maskRevisions, selectedRegion.id);
+  const approvedActiveMaskRevisionCount = countApprovedActiveMaskRevisions(maskRevisions);
 
   async function handleCreateRegion() {
     if (currentPage === null) {
@@ -357,6 +429,81 @@ export function PageEditorShell({
     }
   }
 
+  async function handleCreateMaskRevisionFromRegion() {
+    if (currentPage === null || selectedRegion === null) {
+      return;
+    }
+
+    setIsCreatingMaskRevision(true);
+    setMaskActionError(null);
+
+    try {
+      const response = await createMaskRevision(
+        projectId,
+        currentPage.id,
+        buildMaskRevisionInputFromRegion(selectedRegion),
+      );
+      setMaskRevisions((currentMaskRevisions) => {
+        const nextMaskRevisions = currentMaskRevisions.filter(
+          (maskRevision) =>
+            !(maskRevision.region_id === response.mask_revision.region_id && maskRevision.is_active),
+        );
+        return [...nextMaskRevisions, response.mask_revision];
+      });
+      await refreshProjectDetailState();
+    } catch (error) {
+      setMaskActionError(getErrorMessage(error, messages.editor.maskCreateErrorFallback));
+    } finally {
+      setIsCreatingMaskRevision(false);
+    }
+  }
+
+  async function handleApproveMaskRevision(maskRevisionId: string) {
+    if (currentPage === null) {
+      return;
+    }
+
+    setUpdatingMaskRevisionId(maskRevisionId);
+    setMaskActionError(null);
+
+    try {
+      const response = await updateMaskRevision(projectId, currentPage.id, maskRevisionId, {
+        approved: true,
+      });
+      setMaskRevisions((currentMaskRevisions) =>
+        currentMaskRevisions.map((maskRevision) =>
+          maskRevision.id === response.mask_revision.id ? response.mask_revision : maskRevision,
+        ),
+      );
+      await refreshProjectDetailState();
+    } catch (error) {
+      setMaskActionError(getErrorMessage(error, messages.editor.maskUpdateErrorFallback));
+    } finally {
+      setUpdatingMaskRevisionId(null);
+    }
+  }
+
+  async function handleQueueCleanup() {
+    if (currentPage === null) {
+      return;
+    }
+
+    setIsQueueingCleanup(true);
+    setJobActionError(null);
+
+    try {
+      const response = await createPageJob(projectId, currentPage.id, {
+        type: "generate_cleanup",
+      });
+      setJobs((currentJobs) => [response.job, ...currentJobs]);
+      await refreshProjectDetailState();
+    } catch (error) {
+      setJobActionError(getErrorMessage(error, messages.editor.jobCreateErrorFallback));
+    } finally {
+      setIsQueueingCleanup(false);
+    }
+  }
+
   return (
     <main className="page-shell editor-page-shell">
       <WorkspaceHeader
@@ -405,6 +552,8 @@ export function PageEditorShell({
 
             {regionLoadError ? <p className="notice notice-error">{regionLoadError}</p> : null}
             {regionActionError ? <p className="notice notice-error">{regionActionError}</p> : null}
+            {maskLoadError ? <p className="notice notice-error">{maskLoadError}</p> : null}
+            {maskActionError ? <p className="notice notice-error">{maskActionError}</p> : null}
 
             {isRegionsLoading ? (
               <p className="empty-state">{messages.editor.regionsLoading}</p>
@@ -641,6 +790,78 @@ export function PageEditorShell({
                     </button>
                   </div>
                 </div>
+
+                <div className="section-head section-head-compact">
+                  <h3 className="section-title">{messages.editor.maskSectionTitle}</h3>
+                  <p className="section-copy">{messages.editor.maskSectionCopy}</p>
+                </div>
+
+                {isMaskRevisionsLoading ? (
+                  <p className="empty-state">{messages.editor.masksLoading}</p>
+                ) : selectedRegionMaskRevision ? (
+                  <div className="editor-selection-panel editor-mask-panel">
+                    <div className="editor-selection-meta">
+                      <span className="status-item-label">{messages.editor.maskVersionLabel}</span>
+                      <strong>
+                        {messages.editor.maskVersionValue.replace(
+                          "{version}",
+                          String(selectedRegionMaskRevision.version),
+                        )}
+                      </strong>
+                    </div>
+                    <div className="editor-selection-meta">
+                      <span className="status-item-label">{messages.editor.maskApprovalLabel}</span>
+                      <strong>
+                        {selectedRegionMaskRevision.approved
+                          ? messages.editor.maskApprovedValue
+                          : messages.editor.maskPendingValue}
+                      </strong>
+                    </div>
+                    <div className="editor-selection-meta">
+                      <span className="status-item-label">{messages.editor.maskPointsLabel}</span>
+                      <strong>{selectedRegionMaskRevision.shape.points.length}</strong>
+                    </div>
+                    <div className="editor-selection-actions">
+                      <button
+                        className="ghost-button"
+                        disabled={isCreatingMaskRevision}
+                        onClick={() => void handleCreateMaskRevisionFromRegion()}
+                        type="button"
+                      >
+                        {isCreatingMaskRevision
+                          ? messages.editor.creatingMaskAction
+                          : messages.editor.refreshMaskFromRegionAction}
+                      </button>
+                      <button
+                        className="secondary-button"
+                        disabled={
+                          updatingMaskRevisionId === selectedRegionMaskRevision.id
+                          || selectedRegionMaskRevision.approved
+                        }
+                        onClick={() => void handleApproveMaskRevision(selectedRegionMaskRevision.id)}
+                        type="button"
+                      >
+                        {updatingMaskRevisionId === selectedRegionMaskRevision.id
+                          ? messages.editor.approvingMaskAction
+                          : messages.editor.approveMaskAction}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="editor-selection-panel editor-mask-panel">
+                    <p className="empty-state">{messages.editor.masksEmptyForRegion}</p>
+                    <button
+                      className="primary-button"
+                      disabled={isCreatingMaskRevision}
+                      onClick={() => void handleCreateMaskRevisionFromRegion()}
+                      type="button"
+                    >
+                      {isCreatingMaskRevision
+                        ? messages.editor.creatingMaskAction
+                        : messages.editor.createMaskFromRegionAction}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="empty-state">{messages.editor.selectionEmpty}</p>
@@ -654,16 +875,35 @@ export function PageEditorShell({
             {jobLoadError ? <p className="notice notice-error">{jobLoadError}</p> : null}
             {jobActionError ? <p className="notice notice-error">{jobActionError}</p> : null}
 
-            <button
-              className="primary-button"
-              disabled={isQueueingDetection}
-              onClick={() => void handleQueueRegionDetection()}
-              type="button"
-            >
-              {isQueueingDetection
-                ? messages.editor.queuingDetectionAction
-                : messages.editor.queueDetectionAction}
-            </button>
+            <p className="card-description">
+              {messages.editor.approvedMasksSummary.replace(
+                "{count}",
+                String(approvedActiveMaskRevisionCount),
+              )}
+            </p>
+
+            <div className="editor-selection-actions">
+              <button
+                className="primary-button"
+                disabled={isQueueingDetection}
+                onClick={() => void handleQueueRegionDetection()}
+                type="button"
+              >
+                {isQueueingDetection
+                  ? messages.editor.queuingDetectionAction
+                  : messages.editor.queueDetectionAction}
+              </button>
+              <button
+                className="secondary-button"
+                disabled={isQueueingCleanup || !hasApprovedActiveMaskRevisions(maskRevisions)}
+                onClick={() => void handleQueueCleanup()}
+                type="button"
+              >
+                {isQueueingCleanup
+                  ? messages.editor.queuingCleanupAction
+                  : messages.editor.queueCleanupAction}
+              </button>
+            </div>
 
             {isJobsLoading ? (
               <p className="empty-state">{messages.editor.jobsLoading}</p>
@@ -768,6 +1008,34 @@ export function PageEditorShell({
                   : null}
               </div>
             </div>
+
+            <div className="section-head section-head-compact">
+              <h2 className="section-title">{messages.editor.cleanupPreviewTitle}</h2>
+              <p className="section-copy">{messages.editor.cleanupPreviewCopy}</p>
+            </div>
+
+            {currentPage.active_cleaned_asset_path ? (
+              <div className="editor-compare-grid">
+                <article className="editor-compare-card">
+                  <span className="card-step">{messages.editor.originalPreviewLabel}</span>
+                  <img
+                    alt={`${currentPage.file_name} original`}
+                    className="editor-compare-image"
+                    src={resolveApiAssetUrl(currentPage.original_asset_path)}
+                  />
+                </article>
+                <article className="editor-compare-card">
+                  <span className="card-step">{messages.editor.cleanedPreviewLabel}</span>
+                  <img
+                    alt={`${currentPage.file_name} cleaned`}
+                    className="editor-compare-image"
+                    src={resolveApiAssetUrl(currentPage.active_cleaned_asset_path)}
+                  />
+                </article>
+              </div>
+            ) : (
+              <p className="empty-state">{messages.editor.cleanupPreviewEmpty}</p>
+            )}
           </section>
         </section>
       ) : (

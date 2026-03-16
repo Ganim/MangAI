@@ -15,6 +15,7 @@ from mangai_api.constants import (
 )
 from mangai_api.domain_errors import (
     JobValidationError,
+    MaskRevisionNotFoundError,
     ProjectNotFoundError,
     ProjectPageNotFoundError,
     RegionNotFoundError,
@@ -32,6 +33,11 @@ from mangai_api.models.project import (
     StoredProjectState,
 )
 from mangai_api.models.job import JobRecord
+from mangai_api.models.mask import (
+    CreateMaskRevisionRequest,
+    MaskRevisionRecord,
+    UpdateMaskRevisionRequest,
+)
 from mangai_api.models.region import (
     BoundingBox,
     CreateRegionRequest,
@@ -44,6 +50,9 @@ from mangai_api.models.region import (
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+SYSTEM_ACTOR_ID = UUID("00000000-0000-4000-8000-000000000000")
 
 
 @dataclass(frozen=True)
@@ -101,20 +110,44 @@ class LocalProjectStore:
             job_id = uuid4()
             now = _utcnow()
 
-            if job_type != "detect_regions":
-                raise JobValidationError("Only detect_regions jobs are currently supported.")
+            if job_type == "detect_regions":
+                payload = {
+                    "job_id": str(job_id),
+                    "page_id": str(page_id),
+                    "asset_id": str(original_asset.id),
+                }
+            elif job_type == "generate_cleanup":
+                approved_mask_revisions = self._get_approved_active_mask_revisions_for_page(
+                    state,
+                    page_id,
+                )
+                if len(approved_mask_revisions) == 0:
+                    raise JobValidationError(
+                        "At least one approved active mask revision is required before cleanup."
+                    )
+                payload = {
+                    "job_id": str(job_id),
+                    "page_id": str(page_id),
+                    "source_asset_id": str(original_asset.id),
+                    "region_ids": [
+                        str(mask_revision.region_id) for mask_revision in approved_mask_revisions
+                    ],
+                    "mask_revision_ids": [
+                        str(mask_revision.id) for mask_revision in approved_mask_revisions
+                    ],
+                }
+            else:
+                raise JobValidationError(
+                    "Only detect_regions and generate_cleanup jobs are currently supported."
+                )
 
             job = JobRecord(
                 id=job_id,
                 project_id=project_id,
                 page_id=page_id,
-                type="detect_regions",
+                type=job_type,
                 status="queued",
-                payload={
-                    "job_id": str(job_id),
-                    "page_id": str(page_id),
-                    "asset_id": str(original_asset.id),
-                },
+                payload=payload,
                 result=None,
                 error_code=None,
                 error_message=None,
@@ -136,6 +169,133 @@ class LocalProjectStore:
                 key=lambda region: region.created_at,
             )
         ]
+
+    def list_page_mask_revisions(
+        self,
+        project_id: UUID,
+        page_id: UUID,
+    ) -> list[MaskRevisionRecord]:
+        state = self._load_state()
+        self._require_project(state, project_id)
+        self._require_page(state, project_id, page_id)
+        page_region_ids = {
+            region.id for region in state.regions if region.page_id == page_id
+        }
+        return [
+            mask_revision.model_copy(deep=True)
+            for mask_revision in sorted(
+                [
+                    candidate
+                    for candidate in state.mask_revisions
+                    if candidate.region_id in page_region_ids
+                ],
+                key=lambda candidate: (candidate.created_at, candidate.version),
+            )
+        ]
+
+    def create_mask_revision(
+        self,
+        project_id: UUID,
+        page_id: UUID,
+        payload: CreateMaskRevisionRequest,
+    ) -> MaskRevisionRecord:
+        with self._lock:
+            state = self._load_state_unlocked()
+            self._require_project(state, project_id)
+            page = self._require_page(state, project_id, page_id)
+            region = self._require_region(state, page_id, payload.region_id)
+            current_versions = [
+                candidate.version
+                for candidate in state.mask_revisions
+                if candidate.region_id == region.id
+            ]
+            now = _utcnow()
+            mask_revision = MaskRevisionRecord(
+                id=uuid4(),
+                region_id=region.id,
+                version=(max(current_versions) + 1) if current_versions else 1,
+                is_active=True,
+                approved=False,
+                shape=payload.shape,
+                created_by=SYSTEM_ACTOR_ID,
+                created_at=now,
+                updated_at=now,
+            )
+            next_mask_revisions = tuple(
+                candidate.model_copy(update={"is_active": False, "updated_at": now})
+                if candidate.region_id == region.id and candidate.is_active
+                else candidate
+                for candidate in state.mask_revisions
+            )
+            next_mask_revisions = (*next_mask_revisions, mask_revision)
+            next_pages = self._replace_page_after_mask_change(
+                state=state,
+                page=page,
+                next_mask_revisions=next_mask_revisions,
+            )
+            next_state = state.model_copy(
+                update={
+                    "pages": next_pages,
+                    "mask_revisions": next_mask_revisions,
+                }
+            )
+            self._save_state_unlocked(next_state)
+            return mask_revision.model_copy(deep=True)
+
+    def update_mask_revision(
+        self,
+        project_id: UUID,
+        page_id: UUID,
+        mask_revision_id: UUID,
+        payload: UpdateMaskRevisionRequest,
+    ) -> MaskRevisionRecord:
+        with self._lock:
+            state = self._load_state_unlocked()
+            self._require_project(state, project_id)
+            page = self._require_page(state, project_id, page_id)
+            mask_revision = self._require_mask_revision(state, page_id, mask_revision_id)
+            now = _utcnow()
+
+            updated_mask_revision = mask_revision.model_copy(
+                update={
+                    "approved": payload.approved if payload.approved is not None else mask_revision.approved,
+                    "is_active": payload.is_active if payload.is_active is not None else mask_revision.is_active,
+                    "shape": payload.shape or mask_revision.shape,
+                    "updated_at": now,
+                }
+            )
+
+            next_mask_revisions: list[MaskRevisionRecord] = []
+            for candidate in state.mask_revisions:
+                if candidate.id == mask_revision_id:
+                    next_mask_revisions.append(updated_mask_revision)
+                    continue
+
+                if (
+                    payload.is_active is True
+                    and candidate.region_id == mask_revision.region_id
+                    and candidate.is_active
+                ):
+                    next_mask_revisions.append(
+                        candidate.model_copy(update={"is_active": False, "updated_at": now})
+                    )
+                    continue
+
+                next_mask_revisions.append(candidate)
+
+            next_pages = self._replace_page_after_mask_change(
+                state=state,
+                page=page,
+                next_mask_revisions=tuple(next_mask_revisions),
+            )
+            next_state = state.model_copy(
+                update={
+                    "pages": next_pages,
+                    "mask_revisions": tuple(next_mask_revisions),
+                }
+            )
+            self._save_state_unlocked(next_state)
+            return updated_mask_revision.model_copy(deep=True)
 
     def create_page_region(
         self,
@@ -271,9 +431,19 @@ class LocalProjectStore:
         if asset is None:
             raise ProjectPageNotFoundError(str(project_id), str(page_id))
 
+        return self.get_project_asset_file(project_id=project_id, asset_id=asset.id)
+
+    def get_project_asset_file(
+        self,
+        project_id: UUID,
+        asset_id: UUID,
+    ) -> tuple[Path, str]:
+        state = self._load_state()
+        self._require_project(state, project_id)
+        asset = self._require_asset(state, project_id, asset_id)
         asset_path = self._assets_dir / asset.storage_key
         if not asset_path.exists():
-            raise ProjectPageNotFoundError(str(project_id), str(page_id))
+            raise ProjectPageNotFoundError(str(project_id), str(asset.page_id))
         return asset_path, asset.mime_type
 
     def _register_project_pages(
@@ -317,6 +487,7 @@ class LocalProjectStore:
                     height=page_height,
                     status="uploaded",
                     original_asset_path=self._build_original_asset_path(project_id, page_id),
+                    active_cleaned_asset_path=None,
                     created_at=now,
                     updated_at=now,
                 )
@@ -382,6 +553,9 @@ class LocalProjectStore:
     def _build_original_asset_path(self, project_id: UUID, page_id: UUID) -> str:
         return f"{self._api_prefix}/projects/{project_id}/pages/{page_id}/original"
 
+    def _build_project_asset_path(self, project_id: UUID, asset_id: UUID) -> str:
+        return f"{self._api_prefix}/projects/{project_id}/assets/{asset_id}"
+
     def _require_project(self, state: StoredProjectState, project_id: UUID) -> ProjectSummary:
         project = next((candidate for candidate in state.projects if candidate.id == project_id), None)
         if project is None:
@@ -443,6 +617,83 @@ class LocalProjectStore:
         if region is None:
             raise RegionNotFoundError(str(page_id), str(region_id))
         return region
+
+    def _require_mask_revision(
+        self,
+        state: StoredProjectState,
+        page_id: UUID,
+        mask_revision_id: UUID,
+    ) -> MaskRevisionRecord:
+        page_region_ids = {
+            region.id for region in state.regions if region.page_id == page_id
+        }
+        mask_revision = next(
+            (
+                candidate
+                for candidate in state.mask_revisions
+                if candidate.id == mask_revision_id and candidate.region_id in page_region_ids
+            ),
+            None,
+        )
+        if mask_revision is None:
+            raise MaskRevisionNotFoundError(str(page_id), str(mask_revision_id))
+        return mask_revision
+
+    def _require_asset(
+        self,
+        state: StoredProjectState,
+        project_id: UUID,
+        asset_id: UUID,
+    ) -> StoredProjectAsset:
+        asset = next(
+            (
+                candidate
+                for candidate in state.assets
+                if candidate.project_id == project_id and candidate.id == asset_id
+            ),
+            None,
+        )
+        if asset is None:
+            raise ProjectNotFoundError(str(project_id))
+        return asset
+
+    def _get_approved_active_mask_revisions_for_page(
+        self,
+        state: StoredProjectState,
+        page_id: UUID,
+    ) -> tuple[MaskRevisionRecord, ...]:
+        page_region_ids = {
+            region.id for region in state.regions if region.page_id == page_id
+        }
+        return tuple(
+            candidate
+            for candidate in state.mask_revisions
+            if candidate.region_id in page_region_ids and candidate.is_active and candidate.approved
+        )
+
+    def _replace_page_after_mask_change(
+        self,
+        *,
+        state: StoredProjectState,
+        page: ProjectPage,
+        next_mask_revisions: tuple[MaskRevisionRecord, ...],
+    ) -> tuple[ProjectPage, ...]:
+        next_state = state.model_copy(update={"mask_revisions": next_mask_revisions})
+        approved_active_mask_exists = len(
+            self._get_approved_active_mask_revisions_for_page(next_state, page.id)
+        ) > 0
+
+        next_page = page.model_copy(
+            update={
+                "status": "cleanup_ready" if approved_active_mask_exists else "analyzed",
+                "active_cleaned_asset_path": None,
+                "updated_at": _utcnow(),
+            }
+        )
+        return tuple(
+            next_page if candidate.id == page.id else candidate
+            for candidate in state.pages
+        )
 
     def _get_pages_for_project(
         self,

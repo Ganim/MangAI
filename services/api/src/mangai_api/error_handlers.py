@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 
 from mangai_api.domain_errors import (
     JobValidationError,
+    MaskRevisionNotFoundError,
     ProjectNotFoundError,
     ProjectPageNotFoundError,
     RegionNotFoundError,
@@ -51,6 +52,20 @@ def register_error_handlers(app) -> None:
     async def handle_region_not_found(_: Request, exc: RegionNotFoundError) -> JSONResponse:
         payload = ErrorResponse(
             error_code="REGION_NOT_FOUND",
+            message=str(exc),
+        )
+        return JSONResponse(
+            status_code=status.HTTP_404_NOT_FOUND,
+            content=payload.model_dump(),
+        )
+
+    @app.exception_handler(MaskRevisionNotFoundError)
+    async def handle_mask_revision_not_found(
+        _: Request,
+        exc: MaskRevisionNotFoundError,
+    ) -> JSONResponse:
+        payload = ErrorResponse(
+            error_code="MASK_REVISION_NOT_FOUND",
             message=str(exc),
         )
         return JSONResponse(

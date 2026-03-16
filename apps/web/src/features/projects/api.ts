@@ -1,15 +1,19 @@
 import {
+  parseCreateMaskRevisionRequest,
   parseCreatePageRegionRequest,
   parseCreatePageJobRequest,
   parseCreateProjectRequest,
   parseCreateProjectResponse,
   parseListPageJobsResponse,
+  parseListPageMaskRevisionsResponse,
   parseListProjectsResponse,
   parseListPageRegionsResponse,
+  parseMaskRevisionResponse,
   parsePageJobResponse,
   parsePageRegionResponse,
   parseProjectDetailResponse,
   parseRegisterProjectPagesResponse,
+  parseUpdateMaskRevisionRequest,
   parseUpdatePageRegionRequest,
 } from "@mangai/shared";
 
@@ -55,6 +59,27 @@ type UpdatePageRegionInput = {
     width: number;
     height: number;
   };
+};
+
+type PolygonPointInput = {
+  x: number;
+  y: number;
+};
+
+type PolygonShapeInput = {
+  type: "polygon";
+  points: PolygonPointInput[];
+};
+
+type CreateMaskRevisionInput = {
+  region_id: string;
+  shape: PolygonShapeInput;
+};
+
+type UpdateMaskRevisionInput = {
+  approved?: boolean;
+  is_active?: boolean;
+  shape?: PolygonShapeInput;
 };
 
 type CreatePageJobInput = {
@@ -133,6 +158,14 @@ export async function getPageJobs(projectId: string, pageId: string) {
   );
 }
 
+export async function getPageMaskRevisions(projectId: string, pageId: string) {
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/mask-revisions`,
+    { method: "GET" },
+    parseListPageMaskRevisionsResponse,
+  );
+}
+
 export async function createProject(input: CreateProjectInput) {
   const payload = parseCreateProjectRequest(input);
   return requestJson(
@@ -201,6 +234,39 @@ export async function updatePageRegion(
       body: JSON.stringify(payload),
     },
     parsePageRegionResponse,
+  );
+}
+
+export async function createMaskRevision(
+  projectId: string,
+  pageId: string,
+  input: CreateMaskRevisionInput,
+) {
+  const payload = parseCreateMaskRevisionRequest(input);
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/mask-revisions`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    parseMaskRevisionResponse,
+  );
+}
+
+export async function updateMaskRevision(
+  projectId: string,
+  pageId: string,
+  maskRevisionId: string,
+  input: UpdateMaskRevisionInput,
+) {
+  const payload = parseUpdateMaskRevisionRequest(input);
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/mask-revisions/${maskRevisionId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+    parseMaskRevisionResponse,
   );
 }
 
