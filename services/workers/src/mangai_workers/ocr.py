@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from time import monotonic, sleep
@@ -133,16 +134,23 @@ class PaddleOcrProvider:
         if not asset_path.exists():
             raise FileNotFoundError(f"Could not find OCR source asset '{asset_path}'.")
 
+        os.environ.setdefault("PADDLE_PDX_MODEL_SOURCE", "BOS")
+        os.environ.setdefault("PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK", "True")
         ocr_engine = PaddleOCR(
-            use_angle_cls=True,
             lang=_map_source_language_to_paddle(source_language),
-            show_log=False,
+            use_doc_orientation_classify=False,
+            use_doc_unwarping=False,
+            use_textline_orientation=False,
         )
         try:
-            raw_result = ocr_engine.ocr(str(asset_path), cls=True)
+            if hasattr(ocr_engine, "predict"):
+                raw_result = ocr_engine.predict(input=str(asset_path))
+                recognized_lines = _flatten_paddle_predict_output(raw_result)
+            else:
+                raw_result = ocr_engine.ocr(str(asset_path), cls=True)
+                recognized_lines = _flatten_paddle_legacy_output(raw_result)
         except Exception as exc:  # noqa: BLE001 - optional dependency runtime failures should be recoverable
             raise OcrProviderError("PaddleOCR could not process the current asset.") from exc
-        recognized_lines = _flatten_paddle_result(raw_result)
         if len(recognized_lines) == 0:
             return _build_fallback_lines(source_language=source_language, regions=regions)
         return _group_recognized_lines_to_regions(
@@ -305,7 +313,52 @@ def _find_best_region_for_line(
     )
 
 
-def _flatten_paddle_result(raw_result: object) -> list[RecognizedLine]:
+def _flatten_paddle_predict_output(raw_result: object) -> list[RecognizedLine]:
+    recognized_lines: list[RecognizedLine] = []
+    if not isinstance(raw_result, list):
+        return recognized_lines
+
+    for page_result in raw_result:
+        if hasattr(page_result, "res"):
+            page_payload = getattr(page_result, "res")
+        elif isinstance(page_result, dict):
+            page_payload = page_result.get("res", page_result)
+        else:
+            page_payload = None
+
+        if not isinstance(page_payload, dict):
+            continue
+
+        rec_texts = page_payload.get("rec_texts")
+        rec_scores = page_payload.get("rec_scores")
+        rec_polys = page_payload.get("rec_polys") or page_payload.get("dt_polys")
+        if not isinstance(rec_texts, list) or not isinstance(rec_polys, list):
+            continue
+
+        normalized_scores = (
+            list(rec_scores)
+            if isinstance(rec_scores, (list, tuple))
+            else [1.0] * len(rec_texts)
+        )
+        for index, text_value in enumerate(rec_texts):
+            text = str(text_value).strip()
+            if text == "":
+                continue
+            polygon = rec_polys[index] if index < len(rec_polys) else None
+            score = float(normalized_scores[index]) if index < len(normalized_scores) else 1.0
+            center_x, center_y = _get_polygon_center(polygon)
+            recognized_lines.append(
+                RecognizedLine(
+                    text=text,
+                    confidence=score,
+                    x=center_x,
+                    y=center_y,
+                )
+            )
+    return recognized_lines
+
+
+def _flatten_paddle_legacy_output(raw_result: object) -> list[RecognizedLine]:
     recognized_lines: list[RecognizedLine] = []
     if not isinstance(raw_result, list):
         return recognized_lines

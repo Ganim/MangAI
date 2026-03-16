@@ -1,4 +1,6 @@
 import json
+import sys
+import types
 
 import pytest
 
@@ -112,6 +114,49 @@ def test_azure_vision_provider_extracts_and_groups_lines(monkeypatch, tmp_path) 
     assert len(lines) == 1
     assert lines[0].region_id == "region-1"
     assert lines[0].text == "Detected line"
+
+
+def test_paddleocr_provider_parses_predict_output(monkeypatch, tmp_path) -> None:
+    asset_path = tmp_path / "page.png"
+    asset_path.write_bytes(b"fake-image")
+
+    class FakePaddleResult:
+        def __init__(self) -> None:
+            self.res = {
+                "rec_texts": ["Detected line"],
+                "rec_scores": [0.93],
+                "rec_polys": [[[10, 10], [110, 10], [110, 60], [10, 60]]],
+            }
+
+    class FakePaddleOCR:
+        def __init__(self, **kwargs) -> None:
+            self.kwargs = kwargs
+
+        def predict(self, input=None):  # noqa: A002 - mirrors library signature
+            return [FakePaddleResult()]
+
+    monkeypatch.setitem(sys.modules, "paddleocr", types.SimpleNamespace(PaddleOCR=FakePaddleOCR))
+
+    lines = extract_ocr_lines_from_asset(
+        asset_path=asset_path,
+        source_language="en-US",
+        regions=[
+            OcrCandidateRegion(
+                id="region-1",
+                type="speech_balloon",
+                confidence=0.82,
+                x=10,
+                y=10,
+                width=100,
+                height=60,
+            )
+        ],
+        settings=WorkerSettings(ocr_provider="paddleocr", strict_provider_selection=True),
+    )
+
+    assert len(lines) == 1
+    assert lines[0].text == "Detected line"
+    assert lines[0].confidence == 0.93
 
 
 def test_azure_translation_provider_builds_request_and_returns_outputs(monkeypatch) -> None:

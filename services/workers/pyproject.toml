@@ -3,7 +3,9 @@ name = "mangai-workers"
 version = "0.1.0"
 description = "MangAI worker service"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "paddleocr>=3.4.0",
+]
 
 [project.scripts]
 mangai-workers = "mangai_workers.main:main"
