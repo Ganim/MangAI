@@ -249,6 +249,10 @@ export type AppMessages = {
     updateDialogueAction: string;
     savingDialogueAction: string;
     newDialogueAction: string;
+    adjustTextBoxLabel: string;
+    exportJpegAction: string;
+    exportingJpegAction: string;
+    exportJpegErrorFallback: string;
     overlayRegionCount: string;
     canvasEmptyState: string;
     dimensionsFallbackNotice: string;
@@ -591,6 +595,10 @@ export const enUSMessages: AppMessages = {
     updateDialogueAction: "Update dialogue workflow",
     savingDialogueAction: "Saving dialogue workflow...",
     newDialogueAction: "Start new dialogue",
+    adjustTextBoxLabel: "Text box controls",
+    exportJpegAction: "Export JPG",
+    exportingJpegAction: "Exporting JPG...",
+    exportJpegErrorFallback: "The editor could not export the current page as JPG right now.",
     overlayRegionCount: "{count} saved regions",
     canvasEmptyState: "No review regions yet. Create one to anchor the editor workflow.",
     dimensionsFallbackNotice:

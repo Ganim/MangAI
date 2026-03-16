@@ -31,6 +31,11 @@ import {
   hasPendingPageJobs,
 } from "../features/projects/jobs.ts";
 import {
+  buildJpegExportFileName,
+  exportPageAsJpeg,
+  getPreferredExportAssetPath,
+} from "../features/projects/export.ts";
+import {
   buildMaskRevisionInputFromRegion,
   countApprovedActiveMaskRevisions,
   getActiveMaskRevisionForRegion,
@@ -126,8 +131,10 @@ export function PageEditorShell({
   const [isQueueingCleanup, setIsQueueingCleanup] = useState(false);
   const [isCreatingMaskRevision, setIsCreatingMaskRevision] = useState(false);
   const [isSavingDialogue, setIsSavingDialogue] = useState(false);
+  const [isExportingJpeg, setIsExportingJpeg] = useState(false);
   const [updatingRegionId, setUpdatingRegionId] = useState<string | null>(null);
   const [updatingMaskRevisionId, setUpdatingMaskRevisionId] = useState<string | null>(null);
+  const [updatingPlacementId, setUpdatingPlacementId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [regionLoadError, setRegionLoadError] = useState<string | null>(null);
   const [regionActionError, setRegionActionError] = useState<string | null>(null);
@@ -467,6 +474,14 @@ export function PageEditorShell({
     regions.find((candidate) => candidate.id === selectedRegionId) ?? null;
   const selectedDialogue =
     dialogues.find((candidate) => candidate.id === selectedDialogueId) ?? null;
+  const selectedDialogueAssignment =
+    selectedDialogue === null
+      ? null
+      : assignments.find((candidate) => candidate.dialogue_id === selectedDialogue.id) ?? null;
+  const selectedDialoguePlacement =
+    selectedDialogueAssignment === null
+      ? null
+      : placements.find((candidate) => candidate.assignment_id === selectedDialogueAssignment.id) ?? null;
   const currentCanvasSize = currentPage
     ? getPageCanvasSize({ width: currentPage.width, height: currentPage.height })
     : null;
@@ -745,6 +760,60 @@ export function PageEditorShell({
       setTextActionError(getErrorMessage(error, messages.editor.textSaveErrorFallback));
     } finally {
       setIsSavingDialogue(false);
+    }
+  }
+
+  async function handleUpdatePlacementBoundingBox(nextBoundingBox: PagePlacement["text_box"]) {
+    if (
+      currentPage === null
+      || selectedDialogueAssignment === null
+      || selectedDialoguePlacement === null
+    ) {
+      return;
+    }
+
+    setUpdatingPlacementId(selectedDialoguePlacement.id);
+    setTextActionError(null);
+
+    try {
+      const response = await upsertPagePlacement(projectId, currentPage.id, {
+        assignment_id: selectedDialogueAssignment.id,
+        text_box: nextBoundingBox,
+        style: selectedDialoguePlacement.style,
+      });
+      setPlacements((currentPlacements) =>
+        currentPlacements.map((placement) =>
+          placement.id === response.placement.id ? response.placement : placement,
+        ),
+      );
+      await refreshProjectDetailState();
+    } catch (error) {
+      setTextActionError(getErrorMessage(error, messages.editor.textSaveErrorFallback));
+    } finally {
+      setUpdatingPlacementId(null);
+    }
+  }
+
+  async function handleExportCurrentPageJpeg() {
+    if (currentPage === null) {
+      return;
+    }
+
+    setIsExportingJpeg(true);
+    setTextActionError(null);
+
+    try {
+      await exportPageAsJpeg({
+        imageSrc: resolveApiAssetUrl(getPreferredExportAssetPath(currentPage)),
+        fileName: buildJpegExportFileName(currentPage.file_name),
+        width: currentPage.width,
+        height: currentPage.height,
+        entries: textPreviewEntries,
+      });
+    } catch (error) {
+      setTextActionError(getErrorMessage(error, messages.editor.exportJpegErrorFallback));
+    } finally {
+      setIsExportingJpeg(false);
     }
   }
 
@@ -1277,6 +1346,151 @@ export function PageEditorShell({
                     )
                   : messages.editor.dialogueRegionMissingHint}
               </p>
+              {selectedDialoguePlacement ? (
+                <div className="editor-selection-adjustments">
+                  <span className="status-item-label">{messages.editor.adjustTextBoxLabel}</span>
+                  <div className="editor-adjustment-group">
+                    <button
+                      className="ghost-button"
+                      disabled={updatingPlacementId === selectedDialoguePlacement.id}
+                      onClick={() =>
+                        void handleUpdatePlacementBoundingBox(
+                          moveBoundingBox(
+                            selectedDialoguePlacement.text_box,
+                            currentPage,
+                            -regionAdjustmentStep,
+                            0,
+                          ),
+                        )
+                      }
+                      type="button"
+                    >
+                      {messages.editor.moveLeftAction}
+                    </button>
+                    <button
+                      className="ghost-button"
+                      disabled={updatingPlacementId === selectedDialoguePlacement.id}
+                      onClick={() =>
+                        void handleUpdatePlacementBoundingBox(
+                          moveBoundingBox(
+                            selectedDialoguePlacement.text_box,
+                            currentPage,
+                            0,
+                            -regionAdjustmentStep,
+                          ),
+                        )
+                      }
+                      type="button"
+                    >
+                      {messages.editor.moveUpAction}
+                    </button>
+                    <button
+                      className="ghost-button"
+                      disabled={updatingPlacementId === selectedDialoguePlacement.id}
+                      onClick={() =>
+                        void handleUpdatePlacementBoundingBox(
+                          moveBoundingBox(
+                            selectedDialoguePlacement.text_box,
+                            currentPage,
+                            0,
+                            regionAdjustmentStep,
+                          ),
+                        )
+                      }
+                      type="button"
+                    >
+                      {messages.editor.moveDownAction}
+                    </button>
+                    <button
+                      className="ghost-button"
+                      disabled={updatingPlacementId === selectedDialoguePlacement.id}
+                      onClick={() =>
+                        void handleUpdatePlacementBoundingBox(
+                          moveBoundingBox(
+                            selectedDialoguePlacement.text_box,
+                            currentPage,
+                            regionAdjustmentStep,
+                            0,
+                          ),
+                        )
+                      }
+                      type="button"
+                    >
+                      {messages.editor.moveRightAction}
+                    </button>
+                  </div>
+                  <div className="editor-adjustment-group">
+                    <button
+                      className="ghost-button"
+                      disabled={updatingPlacementId === selectedDialoguePlacement.id}
+                      onClick={() =>
+                        void handleUpdatePlacementBoundingBox(
+                          resizeBoundingBox(
+                            selectedDialoguePlacement.text_box,
+                            currentPage,
+                            -regionAdjustmentStep,
+                            0,
+                          ),
+                        )
+                      }
+                      type="button"
+                    >
+                      {messages.editor.narrowerAction}
+                    </button>
+                    <button
+                      className="ghost-button"
+                      disabled={updatingPlacementId === selectedDialoguePlacement.id}
+                      onClick={() =>
+                        void handleUpdatePlacementBoundingBox(
+                          resizeBoundingBox(
+                            selectedDialoguePlacement.text_box,
+                            currentPage,
+                            regionAdjustmentStep,
+                            0,
+                          ),
+                        )
+                      }
+                      type="button"
+                    >
+                      {messages.editor.widerAction}
+                    </button>
+                    <button
+                      className="ghost-button"
+                      disabled={updatingPlacementId === selectedDialoguePlacement.id}
+                      onClick={() =>
+                        void handleUpdatePlacementBoundingBox(
+                          resizeBoundingBox(
+                            selectedDialoguePlacement.text_box,
+                            currentPage,
+                            0,
+                            -regionAdjustmentStep,
+                          ),
+                        )
+                      }
+                      type="button"
+                    >
+                      {messages.editor.shorterAction}
+                    </button>
+                    <button
+                      className="ghost-button"
+                      disabled={updatingPlacementId === selectedDialoguePlacement.id}
+                      onClick={() =>
+                        void handleUpdatePlacementBoundingBox(
+                          resizeBoundingBox(
+                            selectedDialoguePlacement.text_box,
+                            currentPage,
+                            0,
+                            regionAdjustmentStep,
+                          ),
+                        )
+                      }
+                      type="button"
+                    >
+                      {messages.editor.tallerAction}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               <button
                 className="primary-button"
                 disabled={isSavingDialogue}
@@ -1318,6 +1532,16 @@ export function PageEditorShell({
                   {isCreatingRegion
                     ? messages.editor.creatingRegionAction
                     : messages.editor.addRegionAction}
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={isExportingJpeg}
+                  onClick={() => void handleExportCurrentPageJpeg()}
+                  type="button"
+                >
+                  {isExportingJpeg
+                    ? messages.editor.exportingJpegAction
+                    : messages.editor.exportJpegAction}
                 </button>
               </div>
             </div>

@@ -72,7 +72,7 @@
 
 ## Export
 
-- [ ] Define JPG renderer
+- [x] Define JPG renderer
 - [ ] Define PDF renderer
 - [ ] Define PSD renderer
 - [ ] Define export manifest format

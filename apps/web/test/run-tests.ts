@@ -1,3 +1,4 @@
+import "./export.test.ts";
 import "./i18n.test.ts";
 import "./jobs.test.ts";
 import "./masks.test.ts";

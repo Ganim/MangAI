@@ -344,6 +344,10 @@ export const ptBRMessages: AppMessages = {
     updateDialogueAction: "Atualizar fluxo de dialogo",
     savingDialogueAction: "Salvando fluxo de dialogo...",
     newDialogueAction: "Iniciar novo dialogo",
+    adjustTextBoxLabel: "Controles do text box",
+    exportJpegAction: "Exportar JPG",
+    exportingJpegAction: "Exportando JPG...",
+    exportJpegErrorFallback: "O editor nao conseguiu exportar a pagina atual como JPG agora.",
     overlayRegionCount: "{count} regioes salvas",
     canvasEmptyState: "Ainda nao ha regioes de revisao. Crie uma para ancorar o fluxo do editor.",
     dimensionsFallbackNotice:
