@@ -97,6 +97,8 @@ def build_ocr_provider(settings: WorkerSettings) -> OcrProvider:
             return FallbackOcrProvider()
         if provider_name == "paddleocr":
             return PaddleOcrProvider(settings)
+        if provider_name == "mangaocr":
+            return MangaOcrProvider(settings)
         if provider_name == "azure_vision":
             return AzureVisionOcrProvider(settings)
         raise OcrProviderError(f"Unsupported OCR provider '{provider_name}'.")
@@ -173,6 +175,63 @@ class PaddleOcrProvider:
         )
 
 
+class MangaOcrProvider:
+    def __init__(self, settings: WorkerSettings) -> None:
+        self._settings = settings
+
+    def extract(
+        self,
+        *,
+        asset_path: Path,
+        source_language: str,
+        regions: list[OcrCandidateRegion],
+    ) -> list[OcrLine]:
+        if not asset_path.exists():
+            raise FileNotFoundError(f"Could not find OCR source asset '{asset_path}'.")
+        if source_language.split("-", 1)[0].lower() != "ja":
+            raise OcrProviderError("MangaOCR currently supports only Japanese source text.")
+
+        _configure_local_model_caches(self._settings)
+        try:
+            from PIL import Image
+        except ImportError as exc:
+            raise OcrProviderError("Pillow is required to crop image regions for MangaOCR.") from exc
+
+        try:
+            ocr_engine = _get_cached_manga_ocr_engine(cache_dir=str(self._settings.cache_dir))
+        except Exception as exc:  # noqa: BLE001 - model bootstrap errors should be recoverable
+            raise OcrProviderError("MangaOCR could not initialize the current worker runtime.") from exc
+
+        ordered_regions = sorted(regions, key=lambda candidate: (candidate.y, candidate.x, candidate.id))
+        fallback_lines = _build_fallback_lines(source_language=source_language, regions=ordered_regions)
+        fallback_lookup = {line.region_id: line for line in fallback_lines}
+
+        with Image.open(asset_path) as image:
+            extracted_lines: list[OcrLine] = []
+            for region in ordered_regions:
+                crop_box = _to_crop_box(region, image.width, image.height)
+                if crop_box is None:
+                    extracted_lines.append(fallback_lookup[region.id])
+                    continue
+
+                crop = image.crop(crop_box)
+                recognized_text = str(ocr_engine(crop)).strip()
+                crop.close()
+                if recognized_text == "":
+                    extracted_lines.append(fallback_lookup[region.id])
+                    continue
+
+                extracted_lines.append(
+                    OcrLine(
+                        region_id=region.id,
+                        text=recognized_text,
+                        confidence=round(region.confidence if region.confidence is not None else 0.94, 2),
+                    )
+                )
+
+        return extracted_lines
+
+
 def _configure_local_model_caches(settings: WorkerSettings) -> None:
     cache_root = settings.cache_dir
     paddlex_cache_dir = cache_root / "paddlex"
@@ -216,6 +275,22 @@ def _get_cached_paddle_ocr_engine(
         use_doc_unwarping=False,
         use_textline_orientation=False,
     )
+
+
+@lru_cache(maxsize=4)
+def _get_cached_manga_ocr_engine(
+    *,
+    cache_dir: str,
+):
+    del cache_dir
+    try:
+        from manga_ocr import MangaOcr
+    except ImportError as exc:
+        raise OcrProviderError(
+            "MangaOCR is not installed in this worker environment."
+        ) from exc
+
+    return MangaOcr()
 
 
 class AzureVisionOcrProvider:
@@ -369,6 +444,20 @@ def _find_best_region_for_line(
             + (recognized_line.y - (region.y + region.height / 2)) ** 2
         ),
     )
+
+
+def _to_crop_box(
+    region: OcrCandidateRegion,
+    image_width: int,
+    image_height: int,
+) -> tuple[int, int, int, int] | None:
+    left = max(int(region.x), 0)
+    top = max(int(region.y), 0)
+    right = min(int(region.x + region.width), image_width)
+    bottom = min(int(region.y + region.height), image_height)
+    if right <= left or bottom <= top:
+        return None
+    return left, top, right, bottom
 
 
 def _flatten_paddle_predict_output(raw_result: object) -> list[RecognizedLine]:

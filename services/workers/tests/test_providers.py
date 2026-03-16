@@ -159,6 +159,79 @@ def test_paddleocr_provider_parses_predict_output(monkeypatch, tmp_path) -> None
     assert lines[0].confidence == 0.93
 
 
+def test_mangaocr_provider_extracts_text_from_region_crops(monkeypatch, tmp_path) -> None:
+    asset_path = tmp_path / "page.png"
+
+    try:
+        from PIL import Image
+    except ImportError as exc:  # pragma: no cover - test environment should include Pillow
+        raise AssertionError("Pillow is required for MangaOCR provider tests.") from exc
+
+    Image.new("RGB", (160, 120), color="white").save(asset_path)
+
+    class FakeMangaOcr:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def __call__(self, image) -> str:
+            self.calls += 1
+            return f"Recognized text {self.calls}"
+
+    monkeypatch.setitem(sys.modules, "manga_ocr", types.SimpleNamespace(MangaOcr=FakeMangaOcr))
+
+    lines = extract_ocr_lines_from_asset(
+        asset_path=asset_path,
+        source_language="ja-JP",
+        regions=[
+            OcrCandidateRegion(
+                id="region-1",
+                type="speech_balloon",
+                confidence=0.82,
+                x=10,
+                y=10,
+                width=60,
+                height=40,
+            ),
+            OcrCandidateRegion(
+                id="region-2",
+                type="speech_balloon",
+                confidence=0.91,
+                x=80,
+                y=30,
+                width=50,
+                height=50,
+            ),
+        ],
+        settings=WorkerSettings(ocr_provider="mangaocr", strict_provider_selection=True),
+    )
+
+    assert [line.region_id for line in lines] == ["region-1", "region-2"]
+    assert [line.text for line in lines] == ["Recognized text 1", "Recognized text 2"]
+
+
+def test_mangaocr_provider_rejects_non_japanese_source_language(tmp_path) -> None:
+    asset_path = tmp_path / "page.png"
+    asset_path.write_bytes(b"fake-image")
+
+    with pytest.raises(OcrProviderError):
+        extract_ocr_lines_from_asset(
+            asset_path=asset_path,
+            source_language="en-US",
+            regions=[
+                OcrCandidateRegion(
+                    id="region-1",
+                    type="speech_balloon",
+                    confidence=0.82,
+                    x=10,
+                    y=10,
+                    width=100,
+                    height=60,
+                )
+            ],
+            settings=WorkerSettings(ocr_provider="mangaocr", strict_provider_selection=True),
+        )
+
+
 def test_azure_translation_provider_builds_request_and_returns_outputs(monkeypatch) -> None:
     captured_urls: list[str] = []
 
