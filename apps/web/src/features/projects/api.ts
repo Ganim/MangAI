@@ -190,7 +190,7 @@ export async function listProjects() {
 }
 
 export function resolveApiAssetUrl(assetPath: string) {
-  return `${getPublicApiBaseUrl()}${assetPath}`;
+  return new URL(assetPath, `${getPublicApiBaseUrl()}/`).toString();
 }
 
 export async function getProjectDetail(projectId: string) {
