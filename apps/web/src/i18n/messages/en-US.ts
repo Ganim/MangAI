@@ -250,8 +250,8 @@ export type AppMessages = {
     jobStatusLabels: JobStatusLabels;
     kicker: string;
     canvasCopy: string;
-    showRegionsAction: string;
-    hideRegionsAction: string;
+    showContextAreasAction: string;
+    hideContextAreasAction: string;
     showTextAreasAction: string;
     hideTextAreasAction: string;
     addRegionAction: string;
@@ -636,8 +636,8 @@ export const enUSMessages: AppMessages = {
     kicker: "Page editor shell",
     canvasCopy:
       "The original uploaded page now carries real persisted review regions. This gives us a dependable base for cleanup masks, dialogue mapping, and later automation.",
-    showRegionsAction: "Show overlays",
-    hideRegionsAction: "Hide overlays",
+    showContextAreasAction: "Show context areas",
+    hideContextAreasAction: "Hide context areas",
     showTextAreasAction: "Show text areas",
     hideTextAreasAction: "Hide text areas",
     addRegionAction: "Add review region",

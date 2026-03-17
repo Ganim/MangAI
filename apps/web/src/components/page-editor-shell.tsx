@@ -208,7 +208,7 @@ export function PageEditorShell({
   const [selectedDialogueId, setSelectedDialogueId] = useState<string | null>(null);
   const [dialogueDraft, setDialogueDraft] = useState("");
   const [translationDraft, setTranslationDraft] = useState("");
-  const [showRegions, setShowRegions] = useState(true);
+  const [showContextAreas, setShowContextAreas] = useState(true);
   const [showTextAreas, setShowTextAreas] = useState(true);
   const [selectedRegionArea, setSelectedRegionArea] = useState<RegionAreaKind>("context_area");
   const [activeRegionTransform, setActiveRegionTransform] = useState<ActiveRegionTransform | null>(null);
@@ -727,7 +727,7 @@ export function PageEditorShell({
       );
       setRegions((currentRegions) => [...currentRegions, response.region]);
       handleSelectRegion(response.region.id, "context_area");
-      setShowRegions(true);
+      setShowContextAreas(true);
       setShowTextAreas(true);
     } catch (error) {
       setRegionActionError(getErrorMessage(error, messages.editor.regionCreateErrorFallback));
@@ -2096,12 +2096,12 @@ export function PageEditorShell({
               <div className="editor-toolbar-actions">
                 <button
                   className="secondary-button"
-                  onClick={() => setShowRegions((currentValue) => !currentValue)}
+                  onClick={() => setShowContextAreas((currentValue) => !currentValue)}
                   type="button"
                 >
-                  {showRegions
-                    ? messages.editor.hideRegionsAction
-                    : messages.editor.showRegionsAction}
+                  {showContextAreas
+                    ? messages.editor.hideContextAreasAction
+                    : messages.editor.showContextAreasAction}
                 </button>
                 <button
                   className="ghost-button"
@@ -2185,7 +2185,7 @@ export function PageEditorShell({
                   </div>
                 ) : null}
 
-                {showRegions
+                {showContextAreas
                   ? regions.map((region, index) => {
                       const isSelected = region.id === selectedRegionId;
                       const isActiveArea = isSelected && selectedRegionArea === "context_area";
@@ -2218,7 +2218,7 @@ export function PageEditorShell({
                     })
                   : null}
 
-                {showRegions && showTextAreas
+                {showTextAreas
                   ? regions.map((region, index) => {
                       const isSelected = region.id === selectedRegionId;
                       const isActiveArea = isSelected && selectedRegionArea === "text_area";
@@ -2251,7 +2251,9 @@ export function PageEditorShell({
                     })
                   : null}
 
-                {showRegions && selectedRegion !== null && selectedRegionAreaBoundingBox !== null ? (
+                {(selectedRegionArea === "context_area" ? showContextAreas : showTextAreas)
+                  && selectedRegion !== null
+                  && selectedRegionAreaBoundingBox !== null ? (
                   <div
                     className="editor-region-handle-layer"
                     style={getBoundingBoxOverlayStyle(selectedRegionAreaBoundingBox, currentPage)}

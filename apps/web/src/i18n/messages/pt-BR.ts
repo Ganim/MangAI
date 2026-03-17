@@ -342,8 +342,8 @@ export const ptBRMessages: AppMessages = {
     kicker: "Shell do editor de pagina",
     canvasCopy:
       "A pagina original enviada agora carrega regioes reais persistidas de revisao. Isso nos da uma base confiavel para mascaras de limpeza, mapeamento de falas e automacoes futuras.",
-    showRegionsAction: "Mostrar overlays",
-    hideRegionsAction: "Ocultar overlays",
+    showContextAreasAction: "Mostrar areas de contexto",
+    hideContextAreasAction: "Ocultar areas de contexto",
     showTextAreasAction: "Mostrar areas de texto",
     hideTextAreasAction: "Ocultar areas de texto",
     addRegionAction: "Adicionar regiao",
