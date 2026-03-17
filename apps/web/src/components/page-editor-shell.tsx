@@ -64,9 +64,9 @@ import {
   buildBalloonGroupOverlays,
   buildDefaultRegionInput,
   buildPanelOverlays,
+  buildRegionDisplayLabelLookup,
   formatBalloonGroupOverlayLabel,
   formatRegionBounds,
-  formatRegionReadingOrderLabel,
   formatPanelOverlayLabel,
   getBoundingBoxOverlayStyle,
   getBoundingBoxAdjustmentStep,
@@ -712,6 +712,12 @@ export function PageEditorShell({
     selectedRegion === null
       ? -1
       : orderedRegions.findIndex((candidate) => candidate.id === selectedRegion.id);
+  const regionDisplayLabels = buildRegionDisplayLabelLookup(orderedRegions);
+  const selectedRegionDisplayLabel =
+    selectedRegion === null
+      ? null
+      : (regionDisplayLabels.get(selectedRegion.id)
+        ?? `R${String(selectedRegionOrderIndex + 1).padStart(2, "0")}`);
   const selectedDialogue =
     dialogues.find((candidate) => candidate.id === selectedDialogueId) ?? null;
   const selectedDialogueAssignment =
@@ -1395,7 +1401,7 @@ export function PageEditorShell({
                     <article className={getRegionCardClassName(region, isSelected)} key={region.id}>
                       <div className="editor-region-card-header">
                         <span className="card-step">
-                          {formatRegionReadingOrderLabel(region, index)}
+                          {regionDisplayLabels.get(region.id) ?? `R${String(index + 1).padStart(2, "0")}`}
                         </span>
                         <span className="editor-region-state-pill">
                           {messages.editor.regionStateLabels[region.state]}
@@ -1432,7 +1438,7 @@ export function PageEditorShell({
                 <div className="editor-selection-meta">
                   <span className="status-item-label">{messages.editor.regionReadingOrderLabel}</span>
                   <strong>
-                    {selectedRegion.global_reading_order ?? messages.editor.regionOrderUnknown}
+                    {selectedRegionDisplayLabel ?? messages.editor.regionOrderUnknown}
                   </strong>
                 </div>
                 <p className="card-description">{messages.editor.readingOrderHint}</p>
@@ -2415,7 +2421,7 @@ export function PageEditorShell({
                           type="button"
                         >
                           <span className="editor-region-chip">
-                            {formatRegionReadingOrderLabel(region, index)}
+                            {regionDisplayLabels.get(region.id) ?? `R${String(index + 1).padStart(2, "0")}`}
                           </span>
                           <span className="editor-region-caption">
                             {messages.editor.regionTypeLabels[region.type]}
@@ -2450,7 +2456,7 @@ export function PageEditorShell({
                           type="button"
                         >
                           <span className="editor-region-chip">
-                            {formatRegionReadingOrderLabel(region, index)}
+                            {regionDisplayLabels.get(region.id) ?? `R${String(index + 1).padStart(2, "0")}`}
                           </span>
                           <span className="editor-region-caption">
                             {messages.editor.areaKindLabels.text_area}

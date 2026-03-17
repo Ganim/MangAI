@@ -19,6 +19,8 @@ export type RegionAreaKind = "text_area" | "context_area";
 export type ResizeHandle = "nw" | "ne" | "sw" | "se";
 
 type RegionOverlayInput = {
+  id?: string;
+  type?: string;
   bounding_box: RegionBoundingBox;
   text_area?: RegionBoundingBox;
   context_area?: RegionBoundingBox;
@@ -97,6 +99,27 @@ export function formatRegionReadingOrderLabel(
 ) {
   const readingOrder = region.global_reading_order ?? fallbackIndex + 1;
   return `R${String(readingOrder).padStart(2, "0")}`;
+}
+
+export function buildRegionDisplayLabelLookup(regions: RegionOverlayInput[]) {
+  const lookup = new Map<string, string>();
+  let readingIndex = 1;
+  let freeTextIndex = 1;
+
+  for (const region of regions) {
+    if (!region.id) {
+      continue;
+    }
+    if (region.type === "free_text") {
+      lookup.set(region.id, `F${String(freeTextIndex).padStart(2, "0")}`);
+      freeTextIndex += 1;
+      continue;
+    }
+    lookup.set(region.id, `R${String(readingIndex).padStart(2, "0")}`);
+    readingIndex += 1;
+  }
+
+  return lookup;
 }
 
 export function formatPanelOverlayLabel(overlay: StructureOverlay, fallbackIndex: number) {

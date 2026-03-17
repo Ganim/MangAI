@@ -1237,8 +1237,10 @@ def _build_reading_sort_key(
     reading_profile: str,
 ) -> tuple[float, float, float, float]:
     inline_direction = _get_inline_reading_direction(reading_profile)
+    row_bucket_size = 120.0 if reading_profile == "manga" else 96.0
+    row_anchor = float(bounding_box["y"]) + (float(bounding_box["height"]) * 0.35)
     return (
-        round(float(bounding_box["y"]) / 24),
+        round(row_anchor / row_bucket_size),
         -float(bounding_box["x"]) if inline_direction == "rtl" else float(bounding_box["x"]),
         float(bounding_box["y"]),
         float(bounding_box["x"]),

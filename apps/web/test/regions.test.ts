@@ -4,6 +4,7 @@ import {
   buildBalloonGroupOverlays,
   buildDefaultRegionInput,
   buildPanelOverlays,
+  buildRegionDisplayLabelLookup,
   formatBalloonGroupOverlayLabel,
   formatRegionBounds,
   formatRegionIndexLabel,
@@ -151,6 +152,27 @@ assert.equal(
   ),
   "R07",
 );
+
+const regionDisplayLabels = buildRegionDisplayLabelLookup([
+  {
+    id: "speech-1",
+    type: "speech_balloon",
+    bounding_box: { x: 0, y: 0, width: 10, height: 10 },
+  },
+  {
+    id: "margin-1",
+    type: "free_text",
+    bounding_box: { x: 0, y: 0, width: 10, height: 10 },
+  },
+  {
+    id: "speech-2",
+    type: "narration_box",
+    bounding_box: { x: 0, y: 0, width: 10, height: 10 },
+  },
+]);
+assert.equal(regionDisplayLabels.get("speech-1"), "R01");
+assert.equal(regionDisplayLabels.get("speech-2"), "R02");
+assert.equal(regionDisplayLabels.get("margin-1"), "F01");
 assert.equal(
   formatPanelOverlayLabel(
     {

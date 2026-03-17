@@ -786,6 +786,78 @@ def test_apply_region_reading_metadata_keeps_narration_and_margin_text_out_of_ba
     assert len({region["balloon_group_id"] for region in annotated}) == 4
 
 
+def test_apply_region_reading_metadata_prioritizes_right_group_within_same_manga_band() -> None:
+    annotated = _apply_region_reading_metadata(
+        [
+            {
+                "id": "margin-text",
+                "type": "free_text",
+                "bounding_box": {"x": 1023, "y": 1191, "width": 37, "height": 321},
+                "text_area": {"x": 1023, "y": 1191, "width": 37, "height": 321},
+                "context_area": {"x": 1019, "y": 1193, "width": 95, "height": 407},
+            },
+            {
+                "id": "left-top",
+                "type": "speech_balloon",
+                "bounding_box": {"x": 322, "y": 1253, "width": 44, "height": 108},
+                "text_area": {"x": 322, "y": 1253, "width": 44, "height": 108},
+                "context_area": {"x": 256, "y": 1215, "width": 176, "height": 184},
+            },
+            {
+                "id": "left-bottom",
+                "type": "speech_balloon",
+                "bounding_box": {"x": 192, "y": 1366, "width": 93, "height": 146},
+                "text_area": {"x": 192, "y": 1366, "width": 93, "height": 146},
+                "context_area": {"x": 160, "y": 1353, "width": 159, "height": 200},
+            },
+            {
+                "id": "right",
+                "type": "speech_balloon",
+                "bounding_box": {"x": 849, "y": 1249, "width": 129, "height": 216},
+                "text_area": {"x": 849, "y": 1249, "width": 129, "height": 216},
+                "context_area": {"x": 809, "y": 1251, "width": 191, "height": 233},
+            },
+        ],
+        source_language="ja-JP",
+        reading_profile="manga",
+        panel_boxes=[{"x": 0, "y": 1185, "width": 1114, "height": 415}],
+    )
+
+    assert [region["id"] for region in annotated] == [
+        "margin-text",
+        "right",
+        "left-top",
+        "left-bottom",
+    ]
+    assert annotated[2]["balloon_group_id"] == annotated[3]["balloon_group_id"]
+
+
+def test_apply_region_reading_metadata_keeps_same_band_left_to_right_for_manhwa() -> None:
+    annotated = _apply_region_reading_metadata(
+        [
+            {
+                "id": "left",
+                "type": "speech_balloon",
+                "bounding_box": {"x": 180, "y": 420, "width": 160, "height": 220},
+                "text_area": {"x": 180, "y": 420, "width": 160, "height": 220},
+                "context_area": {"x": 150, "y": 396, "width": 212, "height": 268},
+            },
+            {
+                "id": "right",
+                "type": "speech_balloon",
+                "bounding_box": {"x": 640, "y": 452, "width": 170, "height": 230},
+                "text_area": {"x": 640, "y": 452, "width": 170, "height": 230},
+                "context_area": {"x": 610, "y": 430, "width": 220, "height": 280},
+            },
+        ],
+        source_language="ko-KR",
+        reading_profile="manhwa",
+        panel_boxes=[{"x": 0, "y": 300, "width": 900, "height": 500}],
+    )
+
+    assert [region["id"] for region in annotated] == ["left", "right"]
+
+
 def test_process_next_job_returns_none_without_queued_jobs(tmp_path) -> None:
     data_dir = tmp_path / "worker-data"
     seed_state(data_dir, job_status="succeeded")
