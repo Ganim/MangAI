@@ -71,6 +71,18 @@ type UpdatePageRegionInput = {
     width: number;
     height: number;
   };
+  text_area?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  context_area?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
 };
 
 type PolygonPointInput = {

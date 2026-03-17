@@ -4,11 +4,14 @@ import {
   buildDefaultRegionInput,
   formatRegionBounds,
   formatRegionIndexLabel,
+  getBoundingBoxOverlayStyle,
   getBoundingBoxAdjustmentStep,
   getPageCanvasSize,
+  getRegionAreaBoundingBox,
   getRegionOverlayStyle,
   moveBoundingBox,
   resizeBoundingBox,
+  resizeBoundingBoxFromHandle,
 } from "../src/features/projects/regions.ts";
 
 const canvasSize = getPageCanvasSize({ width: 1600, height: 2400 });
@@ -48,6 +51,76 @@ assert.equal(overlayStyle.left, "7.5%");
 assert.equal(overlayStyle.top, "7.5%");
 assert.equal(overlayStyle.width, "25%");
 assert.equal(overlayStyle.height, "22.5%");
+const textOverlayStyle = getRegionOverlayStyle(
+  {
+    bounding_box: {
+      x: 160,
+      y: 240,
+      width: 320,
+      height: 480,
+    },
+    text_area: {
+      x: 170,
+      y: 250,
+      width: 200,
+      height: 300,
+    },
+    context_area: {
+      x: 120,
+      y: 180,
+      width: 400,
+      height: 540,
+    },
+  },
+  { width: 1600, height: 2400 },
+  "text_area",
+);
+assert.equal(textOverlayStyle.left, "10.625%");
+assert.equal(textOverlayStyle.width, "12.5%");
+
+assert.deepEqual(
+  getRegionAreaBoundingBox(
+    {
+      bounding_box: {
+        x: 160,
+        y: 240,
+        width: 320,
+        height: 480,
+      },
+      text_area: {
+        x: 170,
+        y: 250,
+        width: 200,
+        height: 300,
+      },
+      context_area: {
+        x: 120,
+        y: 180,
+        width: 400,
+        height: 540,
+      },
+    },
+    "text_area",
+  ),
+  {
+    x: 170,
+    y: 250,
+    width: 200,
+    height: 300,
+  },
+);
+
+const directOverlayStyle = getBoundingBoxOverlayStyle(
+  {
+    x: 200,
+    y: 300,
+    width: 400,
+    height: 600,
+  },
+  { width: 1600, height: 2400 },
+);
+assert.equal(directOverlayStyle.left, "12.5%");
+assert.equal(directOverlayStyle.height, "25%");
 assert.equal(formatRegionBounds({ bounding_box: defaultRegion.bounding_box }), "256, 384 - 544 x 384");
 assert.equal(
   formatRegionBounds({
@@ -95,6 +168,26 @@ assert.deepEqual(resizedBox, {
   y: 320,
   width: 80,
   height: 80,
+});
+
+const resizedFromHandle = resizeBoundingBoxFromHandle(
+  {
+    x: 120,
+    y: 100,
+    width: 160,
+    height: 180,
+  },
+  { width: 500, height: 600 },
+  "nw",
+  -20,
+  -30,
+);
+
+assert.deepEqual(resizedFromHandle, {
+  x: 100,
+  y: 70,
+  width: 180,
+  height: 210,
 });
 
 assert.equal(getBoundingBoxAdjustmentStep({ width: 1600, height: 2400 }), 32);

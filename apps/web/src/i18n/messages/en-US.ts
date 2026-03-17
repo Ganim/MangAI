@@ -204,7 +204,17 @@ export type AppMessages = {
     regionTypeLabels: RegionTypeLabels;
     regionStateLabels: RegionStateLabels;
     regionOriginLabels: RegionOriginLabels;
+    areaKindLabels: {
+      text_area: string;
+      context_area: string;
+    };
+    areaPurposeHints: {
+      text_area: string;
+      context_area: string;
+    };
+    editingAreaLabel: string;
     adjustBoundsLabel: string;
+    dragResizeHint: string;
     moveLeftAction: string;
     moveUpAction: string;
     moveDownAction: string;
@@ -242,6 +252,8 @@ export type AppMessages = {
     canvasCopy: string;
     showRegionsAction: string;
     hideRegionsAction: string;
+    showTextAreasAction: string;
+    hideTextAreasAction: string;
     addRegionAction: string;
     creatingRegionAction: string;
     markReviewedAction: string;
@@ -560,7 +572,17 @@ export const enUSMessages: AppMessages = {
       user_split: "User split",
       user_merged: "User merged",
     },
+    areaKindLabels: {
+      text_area: "Text area",
+      context_area: "Context area",
+    },
+    areaPurposeHints: {
+      text_area: "Use this tighter box for OCR and cleanup decisions.",
+      context_area: "Use this expanded box for balloon fit and text placement.",
+    },
+    editingAreaLabel: "Editing area",
     adjustBoundsLabel: "Bounding box controls",
+    dragResizeHint: "Tip: drag the selected area on the canvas or use the corner handles to resize it.",
     moveLeftAction: "Move left",
     moveUpAction: "Move up",
     moveDownAction: "Move down",
@@ -616,6 +638,8 @@ export const enUSMessages: AppMessages = {
       "The original uploaded page now carries real persisted review regions. This gives us a dependable base for cleanup masks, dialogue mapping, and later automation.",
     showRegionsAction: "Show overlays",
     hideRegionsAction: "Hide overlays",
+    showTextAreasAction: "Show text areas",
+    hideTextAreasAction: "Hide text areas",
     addRegionAction: "Add review region",
     creatingRegionAction: "Adding region...",
     markReviewedAction: "Mark reviewed",

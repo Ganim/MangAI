@@ -72,10 +72,18 @@ class UpdateRegionRequest(APIModel):
     type: RegionType | None = None
     state: RegionState | None = None
     bounding_box: BoundingBox | None = None
+    text_area: BoundingBox | None = None
+    context_area: BoundingBox | None = None
 
     @model_validator(mode="after")
     def validate_has_one_field(self) -> "UpdateRegionRequest":
-        if self.type is None and self.state is None and self.bounding_box is None:
+        if (
+            self.type is None
+            and self.state is None
+            and self.bounding_box is None
+            and self.text_area is None
+            and self.context_area is None
+        ):
             raise ValueError("At least one region field must be updated.")
         return self
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 
 import type { AppMessages } from "../i18n/index.ts";
 import type { SupportedUiLocale } from "../i18n/config.ts";
@@ -64,13 +64,15 @@ import {
   buildDefaultRegionInput,
   formatRegionBounds,
   formatRegionIndexLabel,
+  getBoundingBoxOverlayStyle,
   getBoundingBoxAdjustmentStep,
-  getEditableRegionBoundingBox,
   getPageCanvasSize,
-  getRegionOverlayStyle,
+  getRegionAreaBoundingBox,
   moveBoundingBox,
   resizeBoundingBox,
+  resizeBoundingBoxFromHandle,
 } from "../features/projects/regions.ts";
+import type { RegionAreaKind, ResizeHandle } from "../features/projects/regions.ts";
 import {
   buildProjectPageEditorHref,
   buildProjectWorkspaceHref,
@@ -100,6 +102,23 @@ type PageAssignmentsResponse = Awaited<ReturnType<typeof getPageAssignments>>;
 type PageAssignment = PageAssignmentsResponse["assignments"][number];
 type PagePlacementsResponse = Awaited<ReturnType<typeof getPagePlacements>>;
 type PagePlacement = PagePlacementsResponse["placements"][number];
+type RegionBoundingBox = PageRegion["bounding_box"];
+
+type ActiveRegionTransform = {
+  regionId: string;
+  area: RegionAreaKind;
+  mode: "move" | "resize";
+  handle?: ResizeHandle;
+  startClientX: number;
+  startClientY: number;
+  initialBox: RegionBoundingBox;
+};
+
+type RegionAreaDraft = {
+  regionId: string;
+  area: RegionAreaKind;
+  box: RegionBoundingBox;
+};
 
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiClientError) {
@@ -116,9 +135,29 @@ function getRegionCardClassName(region: PageRegion, isSelected: boolean) {
   return isSelected ? `${baseClass} editor-region-card-selected` : baseClass;
 }
 
-function getRegionOverlayClassName(region: PageRegion, isSelected: boolean) {
+function getRegionOverlayClassName(
+  region: PageRegion,
+  area: RegionAreaKind,
+  isSelected: boolean,
+  isActiveArea: boolean,
+) {
   const baseClass = `editor-region-overlay editor-region-overlay-${region.state}`;
-  return isSelected ? `${baseClass} editor-region-overlay-selected` : baseClass;
+  const areaClass =
+    area === "text_area"
+      ? "editor-region-overlay-text-area"
+      : "editor-region-overlay-context-area";
+  const selectedClass = isSelected ? " editor-region-overlay-selected" : "";
+  const activeAreaClass = isActiveArea ? " editor-region-overlay-active-area" : "";
+  return `${baseClass} ${areaClass}${selectedClass}${activeAreaClass}`;
+}
+
+function areBoundingBoxesEqual(left: RegionBoundingBox, right: RegionBoundingBox) {
+  return (
+    left.x === right.x
+    && left.y === right.y
+    && left.width === right.width
+    && left.height === right.height
+  );
 }
 
 export function PageEditorShell({
@@ -170,6 +209,11 @@ export function PageEditorShell({
   const [dialogueDraft, setDialogueDraft] = useState("");
   const [translationDraft, setTranslationDraft] = useState("");
   const [showRegions, setShowRegions] = useState(true);
+  const [showTextAreas, setShowTextAreas] = useState(true);
+  const [selectedRegionArea, setSelectedRegionArea] = useState<RegionAreaKind>("context_area");
+  const [activeRegionTransform, setActiveRegionTransform] = useState<ActiveRegionTransform | null>(null);
+  const [regionAreaDraft, setRegionAreaDraft] = useState<RegionAreaDraft | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let canceled = false;
@@ -203,6 +247,53 @@ export function PageEditorShell({
 
   const pages = projectDetail?.pages ?? [];
   const currentPage = pages.find((candidate) => candidate.id === pageId) ?? null;
+
+  function handleSelectRegion(regionId: string, area: RegionAreaKind = "context_area") {
+    setSelectedRegionId(regionId);
+    setSelectedRegionArea(area);
+  }
+
+  function getRegionAreaDisplayBoundingBox(
+    region: PageRegion,
+    area: RegionAreaKind,
+  ): RegionBoundingBox {
+    if (regionAreaDraft?.regionId === region.id && regionAreaDraft.area === area) {
+      return regionAreaDraft.box;
+    }
+    return getRegionAreaBoundingBox(region, area);
+  }
+
+  function buildTransformedRegionBox(
+    transform: ActiveRegionTransform,
+    clientX: number,
+    clientY: number,
+  ): RegionBoundingBox {
+    if (currentPage === null || stageRef.current === null) {
+      return transform.initialBox;
+    }
+
+    const stageRect = stageRef.current.getBoundingClientRect();
+    if (stageRect.width === 0 || stageRect.height === 0) {
+      return transform.initialBox;
+    }
+
+    const pageWidth = currentPage.width ?? 1000;
+    const pageHeight = currentPage.height ?? 1400;
+    const dx = ((clientX - transform.startClientX) / stageRect.width) * pageWidth;
+    const dy = ((clientY - transform.startClientY) / stageRect.height) * pageHeight;
+
+    if (transform.mode === "resize" && transform.handle !== undefined) {
+      return resizeBoundingBoxFromHandle(
+        transform.initialBox,
+        currentPage,
+        transform.handle,
+        dx,
+        dy,
+      );
+    }
+
+    return moveBoundingBox(transform.initialBox, currentPage, dx, dy);
+  }
 
   async function refreshProjectDetailState() {
     const response = await getProjectDetail(projectId);
@@ -528,6 +619,51 @@ export function PageEditorShell({
     setTranslationDraft(selectedTranslation?.content ?? "");
   }, [dialogues, selectedDialogueId, translations]);
 
+  useEffect(() => {
+    if (activeRegionTransform === null || currentPage === null) {
+      return;
+    }
+    const transform = activeRegionTransform;
+
+    function handleWindowMouseMove(event: MouseEvent) {
+      const nextBoundingBox = buildTransformedRegionBox(
+        transform,
+        event.clientX,
+        event.clientY,
+      );
+      setRegionAreaDraft({
+        regionId: transform.regionId,
+        area: transform.area,
+        box: nextBoundingBox,
+      });
+    }
+
+    function handleWindowMouseUp(event: MouseEvent) {
+      const nextBoundingBox = buildTransformedRegionBox(
+        transform,
+        event.clientX,
+        event.clientY,
+      );
+      setActiveRegionTransform(null);
+      setRegionAreaDraft(null);
+      if (areBoundingBoxesEqual(nextBoundingBox, transform.initialBox)) {
+        return;
+      }
+      void handleUpdateRegionAreaBoundingBox(
+        transform.regionId,
+        transform.area,
+        nextBoundingBox,
+      );
+    }
+
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", handleWindowMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", handleWindowMouseUp);
+    };
+  }, [activeRegionTransform, currentPage]);
+
   const selectedRegion =
     regions.find((candidate) => candidate.id === selectedRegionId) ?? null;
   const selectedDialogue =
@@ -550,6 +686,10 @@ export function PageEditorShell({
     selectedRegion === null
       ? null
       : getActiveMaskRevisionForRegion(maskRevisions, selectedRegion.id);
+  const selectedRegionAreaBoundingBox =
+    selectedRegion === null
+      ? null
+      : getRegionAreaDisplayBoundingBox(selectedRegion, selectedRegionArea);
   const approvedActiveMaskRevisionCount = countApprovedActiveMaskRevisions(maskRevisions);
   const ocrCandidateRegionCount = countOcrCandidateRegions(regions);
   const availableMatchingRegionCount = countAvailableMatchingRegions(regions, assignments);
@@ -586,8 +726,9 @@ export function PageEditorShell({
         }),
       );
       setRegions((currentRegions) => [...currentRegions, response.region]);
-      setSelectedRegionId(response.region.id);
+      handleSelectRegion(response.region.id, "context_area");
       setShowRegions(true);
+      setShowTextAreas(true);
     } catch (error) {
       setRegionActionError(getErrorMessage(error, messages.editor.regionCreateErrorFallback));
     } finally {
@@ -619,18 +760,29 @@ export function PageEditorShell({
     }
   }
 
-  async function handleUpdateRegionBoundingBox(nextBoundingBox: PageRegion["bounding_box"]) {
-    if (currentPage === null || selectedRegion === null) {
+  async function handleUpdateRegionAreaBoundingBox(
+    regionId: string,
+    area: RegionAreaKind,
+    nextBoundingBox: RegionBoundingBox,
+  ) {
+    if (currentPage === null) {
       return;
     }
 
-    setUpdatingRegionId(selectedRegion.id);
+    setUpdatingRegionId(regionId);
     setRegionActionError(null);
 
     try {
-      const response = await updatePageRegion(projectId, currentPage.id, selectedRegion.id, {
-        bounding_box: nextBoundingBox,
-      });
+      const response = await updatePageRegion(projectId, currentPage.id, regionId, (
+        area === "text_area"
+          ? {
+              bounding_box: nextBoundingBox,
+              text_area: nextBoundingBox,
+            }
+          : {
+              context_area: nextBoundingBox,
+            }
+      ));
       setRegions((currentRegions) =>
         currentRegions.map((region) =>
           region.id === response.region.id ? response.region : region,
@@ -641,6 +793,75 @@ export function PageEditorShell({
     } finally {
       setUpdatingRegionId(null);
     }
+  }
+
+  async function handleUpdateSelectedRegionBoundingBox(nextBoundingBox: RegionBoundingBox) {
+    if (selectedRegion === null) {
+      return;
+    }
+    await handleUpdateRegionAreaBoundingBox(
+      selectedRegion.id,
+      selectedRegionArea,
+      nextBoundingBox,
+    );
+  }
+
+  function handleRegionAreaMouseDown(
+    event: ReactMouseEvent<HTMLElement>,
+    region: PageRegion,
+    area: RegionAreaKind,
+  ) {
+    if (currentPage === null || updatingRegionId === region.id || hasRunningJobsForPage) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    const initialBox = getRegionAreaDisplayBoundingBox(region, area);
+    handleSelectRegion(region.id, area);
+    setRegionAreaDraft({
+      regionId: region.id,
+      area,
+      box: initialBox,
+    });
+    setActiveRegionTransform({
+      regionId: region.id,
+      area,
+      mode: "move",
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      initialBox,
+    });
+  }
+
+  function handleRegionResizeHandleMouseDown(
+    event: ReactMouseEvent<HTMLButtonElement>,
+    region: PageRegion,
+    area: RegionAreaKind,
+    handle: ResizeHandle,
+  ) {
+    if (currentPage === null || updatingRegionId === region.id || hasRunningJobsForPage) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    const initialBox = getRegionAreaDisplayBoundingBox(region, area);
+    handleSelectRegion(region.id, area);
+    setRegionAreaDraft({
+      regionId: region.id,
+      area,
+      box: initialBox,
+    });
+    setActiveRegionTransform({
+      regionId: region.id,
+      area,
+      mode: "resize",
+      handle,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      initialBox,
+    });
   }
 
   async function handleDeleteSelectedRegion() {
@@ -1099,7 +1320,7 @@ export function PageEditorShell({
                       <p className="card-description">{formatRegionBounds(region)}</p>
                       <button
                         className={isSelected ? "secondary-button" : "ghost-button"}
-                        onClick={() => setSelectedRegionId(region.id)}
+                        onClick={() => handleSelectRegion(region.id, "context_area")}
                         type="button"
                       >
                         {isSelected
@@ -1153,8 +1374,33 @@ export function PageEditorShell({
                         : `${messages.editor.cleanupStrategyLabels[selectedRegion.cleanup_strategy]} (${Math.round(selectedRegion.cleanup_confidence * 100)}%)`}
                   </strong>
                 </div>
+                <div className="editor-selection-meta">
+                  <span className="status-item-label">{messages.editor.editingAreaLabel}</span>
+                  <strong>{messages.editor.areaKindLabels[selectedRegionArea]}</strong>
+                </div>
+                <p className="card-description">
+                  {messages.editor.areaPurposeHints[selectedRegionArea]}
+                </p>
 
                 <div className="editor-selection-actions">
+                  <button
+                    className={
+                      selectedRegionArea === "context_area" ? "secondary-button" : "ghost-button"
+                    }
+                    onClick={() => setSelectedRegionArea("context_area")}
+                    type="button"
+                  >
+                    {messages.editor.areaKindLabels.context_area}
+                  </button>
+                  <button
+                    className={
+                      selectedRegionArea === "text_area" ? "secondary-button" : "ghost-button"
+                    }
+                    onClick={() => setSelectedRegionArea("text_area")}
+                    type="button"
+                  >
+                    {messages.editor.areaKindLabels.text_area}
+                  </button>
                   <button
                     className="ghost-button"
                     disabled={updatingRegionId === selectedRegion.id || hasRunningJobsForPage}
@@ -1193,14 +1439,19 @@ export function PageEditorShell({
 
                 <div className="editor-selection-adjustments">
                   <span className="status-item-label">{messages.editor.adjustBoundsLabel}</span>
+                  <p className="card-description">{messages.editor.dragResizeHint}</p>
                   <div className="editor-adjustment-group">
                     <button
                       className="ghost-button"
-                      disabled={updatingRegionId === selectedRegion.id}
+                      disabled={
+                        updatingRegionId === selectedRegion.id || selectedRegionAreaBoundingBox === null
+                      }
                       onClick={() =>
-                        void handleUpdateRegionBoundingBox(
+                        selectedRegionAreaBoundingBox === null
+                          ? undefined
+                          : void handleUpdateSelectedRegionBoundingBox(
                           moveBoundingBox(
-                            getEditableRegionBoundingBox(selectedRegion),
+                            selectedRegionAreaBoundingBox,
                             currentPage,
                             -regionAdjustmentStep,
                             0,
@@ -1213,11 +1464,15 @@ export function PageEditorShell({
                     </button>
                     <button
                       className="ghost-button"
-                      disabled={updatingRegionId === selectedRegion.id}
+                      disabled={
+                        updatingRegionId === selectedRegion.id || selectedRegionAreaBoundingBox === null
+                      }
                       onClick={() =>
-                        void handleUpdateRegionBoundingBox(
+                        selectedRegionAreaBoundingBox === null
+                          ? undefined
+                          : void handleUpdateSelectedRegionBoundingBox(
                           moveBoundingBox(
-                            getEditableRegionBoundingBox(selectedRegion),
+                            selectedRegionAreaBoundingBox,
                             currentPage,
                             0,
                             -regionAdjustmentStep,
@@ -1230,11 +1485,15 @@ export function PageEditorShell({
                     </button>
                     <button
                       className="ghost-button"
-                      disabled={updatingRegionId === selectedRegion.id}
+                      disabled={
+                        updatingRegionId === selectedRegion.id || selectedRegionAreaBoundingBox === null
+                      }
                       onClick={() =>
-                        void handleUpdateRegionBoundingBox(
+                        selectedRegionAreaBoundingBox === null
+                          ? undefined
+                          : void handleUpdateSelectedRegionBoundingBox(
                           moveBoundingBox(
-                            getEditableRegionBoundingBox(selectedRegion),
+                            selectedRegionAreaBoundingBox,
                             currentPage,
                             0,
                             regionAdjustmentStep,
@@ -1247,11 +1506,15 @@ export function PageEditorShell({
                     </button>
                     <button
                       className="ghost-button"
-                      disabled={updatingRegionId === selectedRegion.id}
+                      disabled={
+                        updatingRegionId === selectedRegion.id || selectedRegionAreaBoundingBox === null
+                      }
                       onClick={() =>
-                        void handleUpdateRegionBoundingBox(
+                        selectedRegionAreaBoundingBox === null
+                          ? undefined
+                          : void handleUpdateSelectedRegionBoundingBox(
                           moveBoundingBox(
-                            getEditableRegionBoundingBox(selectedRegion),
+                            selectedRegionAreaBoundingBox,
                             currentPage,
                             regionAdjustmentStep,
                             0,
@@ -1266,11 +1529,15 @@ export function PageEditorShell({
                   <div className="editor-adjustment-group">
                     <button
                       className="ghost-button"
-                      disabled={updatingRegionId === selectedRegion.id}
+                      disabled={
+                        updatingRegionId === selectedRegion.id || selectedRegionAreaBoundingBox === null
+                      }
                       onClick={() =>
-                        void handleUpdateRegionBoundingBox(
+                        selectedRegionAreaBoundingBox === null
+                          ? undefined
+                          : void handleUpdateSelectedRegionBoundingBox(
                           resizeBoundingBox(
-                            getEditableRegionBoundingBox(selectedRegion),
+                            selectedRegionAreaBoundingBox,
                             currentPage,
                             -regionAdjustmentStep,
                             0,
@@ -1283,11 +1550,15 @@ export function PageEditorShell({
                     </button>
                     <button
                       className="ghost-button"
-                      disabled={updatingRegionId === selectedRegion.id}
+                      disabled={
+                        updatingRegionId === selectedRegion.id || selectedRegionAreaBoundingBox === null
+                      }
                       onClick={() =>
-                        void handleUpdateRegionBoundingBox(
+                        selectedRegionAreaBoundingBox === null
+                          ? undefined
+                          : void handleUpdateSelectedRegionBoundingBox(
                           resizeBoundingBox(
-                            getEditableRegionBoundingBox(selectedRegion),
+                            selectedRegionAreaBoundingBox,
                             currentPage,
                             regionAdjustmentStep,
                             0,
@@ -1300,11 +1571,15 @@ export function PageEditorShell({
                     </button>
                     <button
                       className="ghost-button"
-                      disabled={updatingRegionId === selectedRegion.id}
+                      disabled={
+                        updatingRegionId === selectedRegion.id || selectedRegionAreaBoundingBox === null
+                      }
                       onClick={() =>
-                        void handleUpdateRegionBoundingBox(
+                        selectedRegionAreaBoundingBox === null
+                          ? undefined
+                          : void handleUpdateSelectedRegionBoundingBox(
                           resizeBoundingBox(
-                            getEditableRegionBoundingBox(selectedRegion),
+                            selectedRegionAreaBoundingBox,
                             currentPage,
                             0,
                             -regionAdjustmentStep,
@@ -1317,11 +1592,15 @@ export function PageEditorShell({
                     </button>
                     <button
                       className="ghost-button"
-                      disabled={updatingRegionId === selectedRegion.id}
+                      disabled={
+                        updatingRegionId === selectedRegion.id || selectedRegionAreaBoundingBox === null
+                      }
                       onClick={() =>
-                        void handleUpdateRegionBoundingBox(
+                        selectedRegionAreaBoundingBox === null
+                          ? undefined
+                          : void handleUpdateSelectedRegionBoundingBox(
                           resizeBoundingBox(
-                            getEditableRegionBoundingBox(selectedRegion),
+                            selectedRegionAreaBoundingBox,
                             currentPage,
                             0,
                             regionAdjustmentStep,
@@ -1825,6 +2104,15 @@ export function PageEditorShell({
                     : messages.editor.showRegionsAction}
                 </button>
                 <button
+                  className="ghost-button"
+                  onClick={() => setShowTextAreas((currentValue) => !currentValue)}
+                  type="button"
+                >
+                  {showTextAreas
+                    ? messages.editor.hideTextAreasAction
+                    : messages.editor.showTextAreasAction}
+                </button>
+                <button
                   className="primary-button"
                   disabled={isCreatingRegion}
                   onClick={() => void handleCreateRegion()}
@@ -1874,6 +2162,7 @@ export function PageEditorShell({
             <div className="editor-canvas-frame">
               <div
                 className="editor-page-stage"
+                ref={stageRef}
                 style={{
                   aspectRatio: `${currentCanvasSize?.width ?? 1000} / ${currentCanvasSize?.height ?? 1400}`,
                 }}
@@ -1899,13 +2188,25 @@ export function PageEditorShell({
                 {showRegions
                   ? regions.map((region, index) => {
                       const isSelected = region.id === selectedRegionId;
+                      const isActiveArea = isSelected && selectedRegionArea === "context_area";
                       return (
                         <button
                           aria-pressed={isSelected}
-                          className={getRegionOverlayClassName(region, isSelected)}
+                          className={getRegionOverlayClassName(
+                            region,
+                            "context_area",
+                            isSelected,
+                            isActiveArea,
+                          )}
                           key={region.id}
-                          onClick={() => setSelectedRegionId(region.id)}
-                          style={getRegionOverlayStyle(region, currentPage)}
+                          onClick={() => handleSelectRegion(region.id, "context_area")}
+                          onMouseDown={(event) =>
+                            handleRegionAreaMouseDown(event, region, "context_area")
+                          }
+                          style={getBoundingBoxOverlayStyle(
+                            getRegionAreaDisplayBoundingBox(region, "context_area"),
+                            currentPage,
+                          )}
                           type="button"
                         >
                           <span className="editor-region-chip">{formatRegionIndexLabel(index)}</span>
@@ -1916,6 +2217,62 @@ export function PageEditorShell({
                       );
                     })
                   : null}
+
+                {showRegions && showTextAreas
+                  ? regions.map((region, index) => {
+                      const isSelected = region.id === selectedRegionId;
+                      const isActiveArea = isSelected && selectedRegionArea === "text_area";
+                      return (
+                        <button
+                          aria-pressed={isSelected}
+                          className={getRegionOverlayClassName(
+                            region,
+                            "text_area",
+                            isSelected,
+                            isActiveArea,
+                          )}
+                          key={`${region.id}-text`}
+                          onClick={() => handleSelectRegion(region.id, "text_area")}
+                          onMouseDown={(event) =>
+                            handleRegionAreaMouseDown(event, region, "text_area")
+                          }
+                          style={getBoundingBoxOverlayStyle(
+                            getRegionAreaDisplayBoundingBox(region, "text_area"),
+                            currentPage,
+                          )}
+                          type="button"
+                        >
+                          <span className="editor-region-chip">{formatRegionIndexLabel(index)}</span>
+                          <span className="editor-region-caption">
+                            {messages.editor.areaKindLabels.text_area}
+                          </span>
+                        </button>
+                      );
+                    })
+                  : null}
+
+                {showRegions && selectedRegion !== null && selectedRegionAreaBoundingBox !== null ? (
+                  <div
+                    className="editor-region-handle-layer"
+                    style={getBoundingBoxOverlayStyle(selectedRegionAreaBoundingBox, currentPage)}
+                  >
+                    {(["nw", "ne", "sw", "se"] as const).map((handle) => (
+                      <button
+                        className={`editor-region-handle editor-region-handle-${handle}`}
+                        key={handle}
+                        onMouseDown={(event) =>
+                          handleRegionResizeHandleMouseDown(
+                            event,
+                            selectedRegion,
+                            selectedRegionArea,
+                            handle,
+                          )
+                        }
+                        type="button"
+                      />
+                    ))}
+                  </div>
+                ) : null}
 
                 {textPreviewEntries.map((entry) => (
                   <div

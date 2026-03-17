@@ -741,12 +741,34 @@ button:hover {
   background: var(--region-fill, rgba(181, 72, 33, 0.12));
   color: var(--text);
   cursor: pointer;
+  user-select: none;
+  z-index: 20;
 }
 
 .editor-region-overlay-selected {
   box-shadow:
     0 0 0 3px rgba(255, 255, 255, 0.8),
     0 16px 30px rgba(78, 49, 25, 0.18);
+}
+
+.editor-region-overlay-active-area {
+  z-index: 30;
+}
+
+.editor-region-overlay-context-area {
+  background: var(--region-fill, rgba(181, 72, 33, 0.12));
+}
+
+.editor-region-overlay-text-area {
+  border-style: dashed;
+  border-width: 2px;
+  background: rgba(255, 252, 247, 0.74);
+  backdrop-filter: blur(4px);
+  z-index: 32;
+}
+
+.editor-region-overlay-text-area .editor-region-caption {
+  background: rgba(255, 252, 247, 0.94);
 }
 
 .editor-region-chip {
@@ -771,6 +793,47 @@ button:hover {
   font-size: 0.78rem;
   font-weight: 700;
   line-height: 1.35;
+}
+
+.editor-region-handle-layer {
+  position: absolute;
+  inset: auto;
+  pointer-events: none;
+  z-index: 48;
+}
+
+.editor-region-handle {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 252, 247, 0.98);
+  background: var(--accent);
+  box-shadow: 0 10px 18px rgba(78, 49, 25, 0.2);
+  pointer-events: auto;
+  cursor: nwse-resize;
+}
+
+.editor-region-handle-nw {
+  top: -8px;
+  left: -8px;
+}
+
+.editor-region-handle-ne {
+  top: -8px;
+  right: -8px;
+  cursor: nesw-resize;
+}
+
+.editor-region-handle-sw {
+  bottom: -8px;
+  left: -8px;
+  cursor: nesw-resize;
+}
+
+.editor-region-handle-se {
+  right: -8px;
+  bottom: -8px;
 }
 
 .dashboard-span-2 {

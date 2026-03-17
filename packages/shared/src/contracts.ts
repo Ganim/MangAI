@@ -233,12 +233,24 @@ export function parseUpdatePageRegionRequest(value: unknown, path: Array<string 
       (input, inputPath) => parseBoundingBox(input, inputPath),
       atPath(path, "bounding_box"),
     ),
+    text_area: readOptional(
+      objectValue.text_area,
+      (input, inputPath) => parseBoundingBox(input, inputPath),
+      atPath(path, "text_area"),
+    ),
+    context_area: readOptional(
+      objectValue.context_area,
+      (input, inputPath) => parseBoundingBox(input, inputPath),
+      atPath(path, "context_area"),
+    ),
   };
 
   if (
     parsedValue.type === undefined &&
     parsedValue.state === undefined &&
-    parsedValue.bounding_box === undefined
+    parsedValue.bounding_box === undefined &&
+    parsedValue.text_area === undefined &&
+    parsedValue.context_area === undefined
   ) {
     throw new ValidationError("At least one region field must be updated", path);
   }

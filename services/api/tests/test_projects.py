@@ -301,6 +301,31 @@ def test_page_regions_can_be_created_listed_and_updated(client: TestClient) -> N
     assert updated_region["context_area"]["x"] == 30
     assert updated_region["shape"]["points"][1]["x"] == 162
 
+    split_update_response = client.patch(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/regions/{created_region['id']}",
+        json={
+            "text_area": {
+                "x": 36,
+                "y": 28,
+                "width": 110,
+                "height": 92,
+            },
+            "context_area": {
+                "x": 12,
+                "y": 10,
+                "width": 188,
+                "height": 154,
+            },
+        },
+    )
+
+    assert split_update_response.status_code == 200
+    split_updated_region = split_update_response.json()["region"]
+    assert split_updated_region["bounding_box"]["x"] == 36
+    assert split_updated_region["text_area"]["x"] == 36
+    assert split_updated_region["context_area"]["x"] == 12
+    assert split_updated_region["shape"]["points"][1]["x"] == 146
+
 
 def test_reset_page_regions_clears_regions_and_pending_region_jobs(client: TestClient) -> None:
     project_id = create_project(client)

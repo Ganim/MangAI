@@ -15,8 +15,12 @@ type RegionBoundingBox = {
   height: number;
 };
 
+export type RegionAreaKind = "text_area" | "context_area";
+export type ResizeHandle = "nw" | "ne" | "sw" | "se";
+
 type RegionOverlayInput = {
   bounding_box: RegionBoundingBox;
+  text_area?: RegionBoundingBox;
   context_area?: RegionBoundingBox;
 };
 
@@ -46,15 +50,9 @@ export function buildDefaultRegionInput(page: PageCanvasInput) {
 export function getRegionOverlayStyle(
   region: RegionOverlayInput,
   page: PageCanvasInput,
+  area: RegionAreaKind = "context_area",
 ): CSSProperties {
-  const { width, height } = getPageCanvasSize(page);
-  const box = getEditableRegionBoundingBox(region);
-  return {
-    left: `${(box.x / width) * 100}%`,
-    top: `${(box.y / height) * 100}%`,
-    width: `${(box.width / width) * 100}%`,
-    height: `${(box.height / height) * 100}%`,
-  };
+  return getBoundingBoxOverlayStyle(getRegionAreaBoundingBox(region, area), page);
 }
 
 export function formatRegionBounds(region: RegionOverlayInput) {
@@ -125,6 +123,113 @@ export function getBoundingBoxAdjustmentStep(page: PageCanvasInput) {
 
 export function getEditableRegionBoundingBox(region: RegionOverlayInput) {
   return region.context_area ?? region.bounding_box;
+}
+
+export function getRegionAreaBoundingBox(
+  region: RegionOverlayInput,
+  area: RegionAreaKind,
+) {
+  if (area === "text_area") {
+    return region.text_area ?? region.bounding_box;
+  }
+  return region.context_area ?? region.bounding_box;
+}
+
+export function getBoundingBoxOverlayStyle(
+  boundingBox: RegionBoundingBox,
+  page: PageCanvasInput,
+): CSSProperties {
+  const { width, height } = getPageCanvasSize(page);
+  return {
+    left: `${(boundingBox.x / width) * 100}%`,
+    top: `${(boundingBox.y / height) * 100}%`,
+    width: `${(boundingBox.width / width) * 100}%`,
+    height: `${(boundingBox.height / height) * 100}%`,
+  };
+}
+
+export function resizeBoundingBoxFromHandle(
+  boundingBox: RegionBoundingBox,
+  page: PageCanvasInput,
+  handle: ResizeHandle,
+  dx: number,
+  dy: number,
+) {
+  const { width: pageWidth, height: pageHeight } = getPageCanvasSize(page);
+  const maxX = pageWidth;
+  const maxY = pageHeight;
+
+  let nextX = boundingBox.x;
+  let nextY = boundingBox.y;
+  let nextWidth = boundingBox.width;
+  let nextHeight = boundingBox.height;
+
+  if (handle.includes("w")) {
+    nextX = boundingBox.x + dx;
+    nextWidth = boundingBox.width - dx;
+  } else {
+    nextWidth = boundingBox.width + dx;
+  }
+
+  if (handle.includes("n")) {
+    nextY = boundingBox.y + dy;
+    nextHeight = boundingBox.height - dy;
+  } else {
+    nextHeight = boundingBox.height + dy;
+  }
+
+  if (nextWidth < MIN_REGION_SIZE) {
+    if (handle.includes("w")) {
+      nextX -= MIN_REGION_SIZE - nextWidth;
+    }
+    nextWidth = MIN_REGION_SIZE;
+  }
+
+  if (nextHeight < MIN_REGION_SIZE) {
+    if (handle.includes("n")) {
+      nextY -= MIN_REGION_SIZE - nextHeight;
+    }
+    nextHeight = MIN_REGION_SIZE;
+  }
+
+  if (nextX < 0) {
+    if (handle.includes("w")) {
+      nextWidth += nextX;
+    }
+    nextX = 0;
+  }
+
+  if (nextY < 0) {
+    if (handle.includes("n")) {
+      nextHeight += nextY;
+    }
+    nextY = 0;
+  }
+
+  if (nextX + nextWidth > maxX) {
+    nextWidth = maxX - nextX;
+  }
+
+  if (nextY + nextHeight > maxY) {
+    nextHeight = maxY - nextY;
+  }
+
+  if (nextWidth < MIN_REGION_SIZE) {
+    nextWidth = MIN_REGION_SIZE;
+    nextX = Math.max(0, Math.min(nextX, maxX - nextWidth));
+  }
+
+  if (nextHeight < MIN_REGION_SIZE) {
+    nextHeight = MIN_REGION_SIZE;
+    nextY = Math.max(0, Math.min(nextY, maxY - nextHeight));
+  }
+
+  return {
+    x: Math.round(nextX),
+    y: Math.round(nextY),
+    width: Math.round(nextWidth),
+    height: Math.round(nextHeight),
+  };
 }
 
 function formatBoundingBox(boundingBox: RegionBoundingBox) {

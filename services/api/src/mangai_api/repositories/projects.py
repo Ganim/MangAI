@@ -738,9 +738,19 @@ class LocalProjectStore:
             self._require_project(state, project_id)
             self._require_page(state, project_id, page_id)
             region = self._require_region(state, page_id, region_id)
-            next_bounding_box = payload.bounding_box or region.bounding_box
-            next_text_area = payload.bounding_box or region.text_area or next_bounding_box
-            next_context_area = payload.bounding_box or region.context_area or next_bounding_box
+            if (
+                payload.bounding_box is not None
+                and payload.text_area is None
+                and payload.context_area is None
+            ):
+                next_text_area = payload.bounding_box
+                next_context_area = payload.bounding_box
+            else:
+                next_text_area = payload.text_area or region.text_area or region.bounding_box
+                next_context_area = (
+                    payload.context_area or region.context_area or region.bounding_box
+                )
+            next_bounding_box = payload.bounding_box or next_text_area
             next_region = region.model_copy(
                 update={
                     "type": payload.type or region.type,
