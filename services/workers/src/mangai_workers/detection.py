@@ -1446,6 +1446,17 @@ def _refine_single_candidate_context_area(
             ),
         )
 
+    if candidate.type == "speech_balloon":
+        return replace(
+            candidate,
+            context_area=_normalize_speech_balloon_context_area(
+                context_area=candidate.context_area or candidate.bounding_box,
+                text_area=text_area,
+                page_width=page_width,
+                page_height=page_height,
+            ),
+        )
+
     return candidate
 
 
@@ -1534,24 +1545,25 @@ def _shrink_overlapping_speech_context_pair(
         ),
         1.0,
     )
-    if (old_overlap_area / minimum_area) < 0.08:
+    if (old_overlap_area / minimum_area) < 0.05:
         return None
 
-    split_axis = _choose_speech_context_split_axis(left=left, right=right)
-    if split_axis == "x":
-        next_left_box, next_right_box = _split_speech_context_pair_along_x(
+    next_left_box, next_right_box = _choose_best_speech_context_split(
+        left=left,
+        right=right,
+        split_x=_split_speech_context_pair_along_x(
             left=left,
             right=right,
             page_width=page_width,
             page_height=page_height,
-        )
-    else:
-        next_left_box, next_right_box = _split_speech_context_pair_along_y(
+        ),
+        split_y=_split_speech_context_pair_along_y(
             left=left,
             right=right,
             page_width=page_width,
             page_height=page_height,
-        )
+        ),
+    )
 
     new_overlap_area = _bounding_box_intersection_area(next_left_box, next_right_box)
     if new_overlap_area >= (old_overlap_area - 24.0):
@@ -1578,6 +1590,42 @@ def _choose_speech_context_split_axis(
     normalized_dx = center_dx / max(min(left_context["width"], right_context["width"]), 1.0)
     normalized_dy = center_dy / max(min(left_context["height"], right_context["height"]), 1.0)
     return "x" if normalized_dx >= normalized_dy else "y"
+
+
+def _choose_best_speech_context_split(
+    *,
+    left: DetectedRegionCandidate,
+    right: DetectedRegionCandidate,
+    split_x: tuple[dict[str, float], dict[str, float]],
+    split_y: tuple[dict[str, float], dict[str, float]],
+) -> tuple[dict[str, float], dict[str, float]]:
+    preferred_axis = _choose_speech_context_split_axis(left=left, right=right)
+    left_context = left.context_area or left.bounding_box
+    right_context = right.context_area or right.bounding_box
+
+    def score_split(
+        split_pair: tuple[dict[str, float], dict[str, float]],
+    ) -> tuple[float, float]:
+        split_left, split_right = split_pair
+        overlap_area = _bounding_box_intersection_area(split_left, split_right)
+        total_area_loss = (
+            (left_context["width"] * left_context["height"]) - (split_left["width"] * split_left["height"])
+        ) + (
+            (right_context["width"] * right_context["height"]) - (split_right["width"] * split_right["height"])
+        )
+        return overlap_area, total_area_loss
+
+    score_x = score_split(split_x)
+    score_y = score_split(split_y)
+    if score_x[0] < score_y[0]:
+        return split_x
+    if score_y[0] < score_x[0]:
+        return split_y
+    if score_x[1] < score_y[1]:
+        return split_x
+    if score_y[1] < score_x[1]:
+        return split_y
+    return split_x if preferred_axis == "x" else split_y
 
 
 def _split_speech_context_pair_along_x(
@@ -1619,19 +1667,29 @@ def _split_speech_context_pair_along_x(
         right_guard_x1,
     )
 
-    next_left = _clamp_bounding_box(
-        x=left_context["x"],
-        y=left_context["y"],
-        width=max(left_x2 - left_context["x"], 1.0),
-        height=left_context["height"],
+    next_left = _normalize_speech_balloon_context_area(
+        context_area=_clamp_bounding_box(
+            x=left_context["x"],
+            y=left_context["y"],
+            width=max(left_x2 - left_context["x"], 1.0),
+            height=left_context["height"],
+            page_width=page_width,
+            page_height=page_height,
+        ),
+        text_area=left_text,
         page_width=page_width,
         page_height=page_height,
     )
-    next_right = _clamp_bounding_box(
-        x=right_x1,
-        y=right_context["y"],
-        width=max((right_context["x"] + right_context["width"]) - right_x1, 1.0),
-        height=right_context["height"],
+    next_right = _normalize_speech_balloon_context_area(
+        context_area=_clamp_bounding_box(
+            x=right_x1,
+            y=right_context["y"],
+            width=max((right_context["x"] + right_context["width"]) - right_x1, 1.0),
+            height=right_context["height"],
+            page_width=page_width,
+            page_height=page_height,
+        ),
+        text_area=right_text,
         page_width=page_width,
         page_height=page_height,
     )
@@ -1680,19 +1738,29 @@ def _split_speech_context_pair_along_y(
         bottom_guard_y1,
     )
 
-    next_top = _clamp_bounding_box(
-        x=left_context["x"],
-        y=left_context["y"],
-        width=left_context["width"],
-        height=max(top_y2 - left_context["y"], 1.0),
+    next_top = _normalize_speech_balloon_context_area(
+        context_area=_clamp_bounding_box(
+            x=left_context["x"],
+            y=left_context["y"],
+            width=left_context["width"],
+            height=max(top_y2 - left_context["y"], 1.0),
+            page_width=page_width,
+            page_height=page_height,
+        ),
+        text_area=left_text,
         page_width=page_width,
         page_height=page_height,
     )
-    next_bottom = _clamp_bounding_box(
-        x=right_context["x"],
-        y=bottom_y1,
-        width=right_context["width"],
-        height=max((right_context["y"] + right_context["height"]) - bottom_y1, 1.0),
+    next_bottom = _normalize_speech_balloon_context_area(
+        context_area=_clamp_bounding_box(
+            x=right_context["x"],
+            y=bottom_y1,
+            width=right_context["width"],
+            height=max((right_context["y"] + right_context["height"]) - bottom_y1, 1.0),
+            page_width=page_width,
+            page_height=page_height,
+        ),
+        text_area=right_text,
         page_width=page_width,
         page_height=page_height,
     )
@@ -1700,6 +1768,82 @@ def _split_speech_context_pair_along_y(
     if swapped:
         return next_bottom, next_top
     return next_top, next_bottom
+
+
+def _normalize_speech_balloon_context_area(
+    *,
+    context_area: dict[str, float],
+    text_area: dict[str, float],
+    page_width: int,
+    page_height: int,
+) -> dict[str, float]:
+    is_vertical = text_area["height"] >= text_area["width"] * 1.12
+    left_padding = max(text_area["x"] - context_area["x"], 0.0)
+    right_padding = max(
+        (context_area["x"] + context_area["width"]) - (text_area["x"] + text_area["width"]),
+        0.0,
+    )
+    top_padding = max(text_area["y"] - context_area["y"], 0.0)
+    bottom_padding = max(
+        (context_area["y"] + context_area["height"]) - (text_area["y"] + text_area["height"]),
+        0.0,
+    )
+
+    if is_vertical:
+        max_padding_x = min(82.0, max(24.0, text_area["width"] * 1.25, text_area["height"] * 0.5))
+        max_padding_y = min(68.0, max(18.0, text_area["height"] * 0.55, text_area["width"] * 1.2))
+        asymmetry_bias_x = 1.6
+        asymmetry_bias_y = 1.8
+        asymmetry_offset_x = 9.0
+        asymmetry_offset_y = 10.0
+    else:
+        max_padding_x = min(52.0, max(14.0, text_area["width"] * 0.24, text_area["height"] * 0.5))
+        max_padding_y = min(44.0, max(14.0, text_area["height"] * 0.34, text_area["width"] * 0.16))
+        asymmetry_bias_x = 1.8
+        asymmetry_bias_y = 1.6
+        asymmetry_offset_x = 10.0
+        asymmetry_offset_y = 12.0
+
+    left_padding, right_padding = _rebalance_edge_paddings(
+        left_padding,
+        right_padding,
+        max_padding=max_padding_x,
+        asymmetry_bias=asymmetry_bias_x,
+        asymmetry_offset=asymmetry_offset_x,
+    )
+    top_padding, bottom_padding = _rebalance_edge_paddings(
+        top_padding,
+        bottom_padding,
+        max_padding=max_padding_y,
+        asymmetry_bias=asymmetry_bias_y,
+        asymmetry_offset=asymmetry_offset_y,
+    )
+
+    return _clamp_bounding_box(
+        x=text_area["x"] - left_padding,
+        y=text_area["y"] - top_padding,
+        width=text_area["width"] + left_padding + right_padding,
+        height=text_area["height"] + top_padding + bottom_padding,
+        page_width=page_width,
+        page_height=page_height,
+    )
+
+
+def _rebalance_edge_paddings(
+    leading_padding: float,
+    trailing_padding: float,
+    *,
+    max_padding: float,
+    asymmetry_bias: float,
+    asymmetry_offset: float,
+) -> tuple[float, float]:
+    leading = min(leading_padding, max_padding)
+    trailing = min(trailing_padding, max_padding)
+    if leading > (trailing * asymmetry_bias) + asymmetry_offset:
+        leading = min(max_padding, (trailing * asymmetry_bias) + asymmetry_offset)
+    if trailing > (leading * asymmetry_bias) + asymmetry_offset:
+        trailing = min(max_padding, (leading * asymmetry_bias) + asymmetry_offset)
+    return max(leading, 0.0), max(trailing, 0.0)
 
 
 def _bounding_box_center_x(bounding_box: dict[str, float]) -> float:

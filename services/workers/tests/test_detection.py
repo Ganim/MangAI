@@ -334,6 +334,67 @@ def test_refine_candidate_context_areas_reduces_overlap_for_stacked_balloons() -
     assert refined_upper.context_area["height"] < upper.context_area["height"]
 
 
+def test_refine_candidate_context_areas_rebalances_asymmetric_speech_balloon_padding() -> None:
+    candidate = DetectedRegionCandidate(
+        type="speech_balloon",
+        confidence=0.95,
+        bounding_box={"x": 673.48, "y": 67.52, "width": 68.04, "height": 147.96},
+        text_area={"x": 673.48, "y": 67.52, "width": 68.04, "height": 147.96},
+        context_area={"x": 602.0, "y": 45.0, "width": 165.0, "height": 193.0},
+    )
+
+    (refined,) = _refine_candidate_context_areas(
+        [candidate],
+        page_width=1114,
+        page_height=1600,
+    )
+
+    left_padding = refined.text_area["x"] - refined.context_area["x"]
+    right_padding = (
+        refined.context_area["x"] + refined.context_area["width"]
+    ) - (refined.text_area["x"] + refined.text_area["width"])
+
+    assert left_padding < 52
+    assert left_padding < right_padding + 25
+
+
+def test_refine_candidate_context_areas_preserves_text_and_reduces_diagonal_overlap() -> None:
+    upper_right = DetectedRegionCandidate(
+        type="speech_balloon",
+        confidence=0.95,
+        bounding_box={"x": 322.0, "y": 1253.0, "width": 44.0, "height": 108.0},
+        text_area={"x": 322.0, "y": 1253.0, "width": 44.0, "height": 108.0},
+        context_area={"x": 256.0, "y": 1215.0, "width": 176.0, "height": 170.71},
+    )
+    lower_left = DetectedRegionCandidate(
+        type="speech_balloon",
+        confidence=0.95,
+        bounding_box={"x": 191.56, "y": 1365.6, "width": 92.88, "height": 145.8},
+        text_area={"x": 191.56, "y": 1365.6, "width": 92.88, "height": 145.8},
+        context_area={"x": 160.0, "y": 1352.64, "width": 159.0, "height": 200.36},
+    )
+
+    before_overlap = _bounding_box_intersection_area(
+        upper_right.context_area,
+        lower_left.context_area,
+    )
+    refined_upper, refined_lower = _refine_candidate_context_areas(
+        [upper_right, lower_left],
+        page_width=1114,
+        page_height=1600,
+    )
+    after_overlap = _bounding_box_intersection_area(
+        refined_upper.context_area,
+        refined_lower.context_area,
+    )
+
+    assert after_overlap < before_overlap
+    assert refined_upper.context_area["y"] <= refined_upper.text_area["y"]
+    assert (
+        refined_upper.context_area["y"] + refined_upper.context_area["height"]
+    ) >= (refined_upper.text_area["y"] + refined_upper.text_area["height"])
+
+
 def test_detect_regions_prefers_comic_text_detector_provider(monkeypatch, tmp_path) -> None:
     asset_path = tmp_path / "page-a.bin"
     asset_path.write_bytes(b"asset-a" * 32)
