@@ -171,6 +171,11 @@ def build_detected_regions_from_comic_text_blocks(
         )
 
     deduplicated = _deduplicate_candidates(candidates)
+    deduplicated = _refine_candidate_context_areas(
+        deduplicated,
+        page_width=page_width,
+        page_height=page_height,
+    )
     return sorted(
         deduplicated,
         key=lambda candidate: (
@@ -982,6 +987,11 @@ def build_detected_regions_from_recognized_lines(
         candidates.append(candidate)
 
     deduplicated = _deduplicate_candidates(candidates)
+    deduplicated = _refine_candidate_context_areas(
+        deduplicated,
+        page_width=page_width,
+        page_height=page_height,
+    )
     return sorted(
         deduplicated,
         key=lambda candidate: (
@@ -1378,6 +1388,345 @@ def _deduplicate_candidates(
             continue
         deduplicated.append(candidate)
     return deduplicated
+
+
+def _refine_candidate_context_areas(
+    candidates: list[DetectedRegionCandidate],
+    *,
+    page_width: int,
+    page_height: int,
+) -> list[DetectedRegionCandidate]:
+    refined = [
+        _refine_single_candidate_context_area(
+            candidate,
+            page_width=page_width,
+            page_height=page_height,
+        )
+        for candidate in candidates
+    ]
+    return _resolve_overlapping_speech_balloon_context_areas(
+        refined,
+        page_width=page_width,
+        page_height=page_height,
+    )
+
+
+def _refine_single_candidate_context_area(
+    candidate: DetectedRegionCandidate,
+    *,
+    page_width: int,
+    page_height: int,
+) -> DetectedRegionCandidate:
+    text_area = candidate.text_area or candidate.bounding_box
+    if candidate.type == "narration_box":
+        padding_x = min(32.0, max(14.0, text_area["width"] * 0.05, text_area["height"] * 0.62))
+        padding_y = min(20.0, max(8.0, text_area["height"] * 0.34, text_area["width"] * 0.012))
+        return replace(
+            candidate,
+            context_area=_build_context_box_around_text(
+                text_area=text_area,
+                padding_x=padding_x,
+                padding_y=padding_y,
+                page_width=page_width,
+                page_height=page_height,
+            ),
+        )
+
+    if candidate.type == "free_text":
+        padding_x = min(24.0, max(8.0, text_area["width"] * 0.18, text_area["height"] * 0.08))
+        padding_y = min(28.0, max(12.0, text_area["height"] * 0.12, text_area["width"] * 0.08))
+        return replace(
+            candidate,
+            context_area=_build_context_box_around_text(
+                text_area=text_area,
+                padding_x=padding_x,
+                padding_y=padding_y,
+                page_width=page_width,
+                page_height=page_height,
+            ),
+        )
+
+    return candidate
+
+
+def _build_context_box_around_text(
+    *,
+    text_area: dict[str, float],
+    padding_x: float,
+    padding_y: float,
+    page_width: int,
+    page_height: int,
+) -> dict[str, float]:
+    return _clamp_bounding_box(
+        x=text_area["x"] - padding_x,
+        y=text_area["y"] - padding_y,
+        width=text_area["width"] + (padding_x * 2.0),
+        height=text_area["height"] + (padding_y * 2.0),
+        page_width=page_width,
+        page_height=page_height,
+    )
+
+
+def _resolve_overlapping_speech_balloon_context_areas(
+    candidates: list[DetectedRegionCandidate],
+    *,
+    page_width: int,
+    page_height: int,
+) -> list[DetectedRegionCandidate]:
+    refined = list(candidates)
+    for _pass in range(3):
+        changed = False
+        for left_index in range(len(refined)):
+            for right_index in range(left_index + 1, len(refined)):
+                next_pair = _shrink_overlapping_speech_context_pair(
+                    left=refined[left_index],
+                    right=refined[right_index],
+                    page_width=page_width,
+                    page_height=page_height,
+                )
+                if next_pair is None:
+                    continue
+                next_left, next_right = next_pair
+                if (
+                    next_left.context_area != refined[left_index].context_area
+                    or next_right.context_area != refined[right_index].context_area
+                ):
+                    refined[left_index] = next_left
+                    refined[right_index] = next_right
+                    changed = True
+        if not changed:
+            break
+    return refined
+
+
+def _shrink_overlapping_speech_context_pair(
+    *,
+    left: DetectedRegionCandidate,
+    right: DetectedRegionCandidate,
+    page_width: int,
+    page_height: int,
+) -> tuple[DetectedRegionCandidate, DetectedRegionCandidate] | None:
+    if left.type != "speech_balloon" or right.type != "speech_balloon":
+        return None
+
+    left_context = left.context_area or left.bounding_box
+    right_context = right.context_area or right.bounding_box
+    overlap_x = _axis_overlap(
+        left_context["x"],
+        left_context["x"] + left_context["width"],
+        right_context["x"],
+        right_context["x"] + right_context["width"],
+    )
+    overlap_y = _axis_overlap(
+        left_context["y"],
+        left_context["y"] + left_context["height"],
+        right_context["y"],
+        right_context["y"] + right_context["height"],
+    )
+    if overlap_x < 14.0 or overlap_y < 14.0:
+        return None
+
+    old_overlap_area = overlap_x * overlap_y
+    minimum_area = max(
+        min(
+            left_context["width"] * left_context["height"],
+            right_context["width"] * right_context["height"],
+        ),
+        1.0,
+    )
+    if (old_overlap_area / minimum_area) < 0.08:
+        return None
+
+    split_axis = _choose_speech_context_split_axis(left=left, right=right)
+    if split_axis == "x":
+        next_left_box, next_right_box = _split_speech_context_pair_along_x(
+            left=left,
+            right=right,
+            page_width=page_width,
+            page_height=page_height,
+        )
+    else:
+        next_left_box, next_right_box = _split_speech_context_pair_along_y(
+            left=left,
+            right=right,
+            page_width=page_width,
+            page_height=page_height,
+        )
+
+    new_overlap_area = _bounding_box_intersection_area(next_left_box, next_right_box)
+    if new_overlap_area >= (old_overlap_area - 24.0):
+        return None
+
+    return (
+        replace(left, context_area=next_left_box),
+        replace(right, context_area=next_right_box),
+    )
+
+
+def _choose_speech_context_split_axis(
+    *,
+    left: DetectedRegionCandidate,
+    right: DetectedRegionCandidate,
+) -> str:
+    left_text = left.text_area or left.bounding_box
+    right_text = right.text_area or right.bounding_box
+    left_context = left.context_area or left.bounding_box
+    right_context = right.context_area or right.bounding_box
+
+    center_dx = abs(_bounding_box_center_x(left_text) - _bounding_box_center_x(right_text))
+    center_dy = abs(_bounding_box_center_y(left_text) - _bounding_box_center_y(right_text))
+    normalized_dx = center_dx / max(min(left_context["width"], right_context["width"]), 1.0)
+    normalized_dy = center_dy / max(min(left_context["height"], right_context["height"]), 1.0)
+    return "x" if normalized_dx >= normalized_dy else "y"
+
+
+def _split_speech_context_pair_along_x(
+    *,
+    left: DetectedRegionCandidate,
+    right: DetectedRegionCandidate,
+    page_width: int,
+    page_height: int,
+) -> tuple[dict[str, float], dict[str, float]]:
+    left_text = left.text_area or left.bounding_box
+    right_text = right.text_area or right.bounding_box
+    left_context = left.context_area or left.bounding_box
+    right_context = right.context_area or right.bounding_box
+    if _bounding_box_center_x(left_text) > _bounding_box_center_x(right_text):
+        left_text, right_text = right_text, left_text
+        left_context, right_context = right_context, left_context
+        swapped = True
+    else:
+        swapped = False
+
+    cut_x = (_bounding_box_center_x(left_text) + _bounding_box_center_x(right_text)) / 2.0
+    guard_padding = min(
+        28.0,
+        max(
+            12.0,
+            min(left_text["width"], right_text["width"]) * 0.2,
+            min(left_text["height"], right_text["height"]) * 0.08,
+        ),
+    )
+
+    left_guard_x2 = left_text["x"] + left_text["width"] + guard_padding
+    right_guard_x1 = right_text["x"] - guard_padding
+    left_x2 = max(
+        min(left_context["x"] + left_context["width"], cut_x + guard_padding),
+        left_guard_x2,
+    )
+    right_x1 = min(
+        max(right_context["x"], cut_x - guard_padding),
+        right_guard_x1,
+    )
+
+    next_left = _clamp_bounding_box(
+        x=left_context["x"],
+        y=left_context["y"],
+        width=max(left_x2 - left_context["x"], 1.0),
+        height=left_context["height"],
+        page_width=page_width,
+        page_height=page_height,
+    )
+    next_right = _clamp_bounding_box(
+        x=right_x1,
+        y=right_context["y"],
+        width=max((right_context["x"] + right_context["width"]) - right_x1, 1.0),
+        height=right_context["height"],
+        page_width=page_width,
+        page_height=page_height,
+    )
+
+    if swapped:
+        return next_right, next_left
+    return next_left, next_right
+
+
+def _split_speech_context_pair_along_y(
+    *,
+    left: DetectedRegionCandidate,
+    right: DetectedRegionCandidate,
+    page_width: int,
+    page_height: int,
+) -> tuple[dict[str, float], dict[str, float]]:
+    left_text = left.text_area or left.bounding_box
+    right_text = right.text_area or right.bounding_box
+    left_context = left.context_area or left.bounding_box
+    right_context = right.context_area or right.bounding_box
+    if _bounding_box_center_y(left_text) > _bounding_box_center_y(right_text):
+        left_text, right_text = right_text, left_text
+        left_context, right_context = right_context, left_context
+        swapped = True
+    else:
+        swapped = False
+
+    cut_y = (_bounding_box_center_y(left_text) + _bounding_box_center_y(right_text)) / 2.0
+    guard_padding = min(
+        28.0,
+        max(
+            12.0,
+            min(left_text["height"], right_text["height"]) * 0.12,
+            min(left_text["width"], right_text["width"]) * 0.22,
+        ),
+    )
+
+    top_guard_y2 = left_text["y"] + left_text["height"] + guard_padding
+    bottom_guard_y1 = right_text["y"] - guard_padding
+    top_y2 = max(
+        min(left_context["y"] + left_context["height"], cut_y + guard_padding),
+        top_guard_y2,
+    )
+    bottom_y1 = min(
+        max(right_context["y"], cut_y - guard_padding),
+        bottom_guard_y1,
+    )
+
+    next_top = _clamp_bounding_box(
+        x=left_context["x"],
+        y=left_context["y"],
+        width=left_context["width"],
+        height=max(top_y2 - left_context["y"], 1.0),
+        page_width=page_width,
+        page_height=page_height,
+    )
+    next_bottom = _clamp_bounding_box(
+        x=right_context["x"],
+        y=bottom_y1,
+        width=right_context["width"],
+        height=max((right_context["y"] + right_context["height"]) - bottom_y1, 1.0),
+        page_width=page_width,
+        page_height=page_height,
+    )
+
+    if swapped:
+        return next_bottom, next_top
+    return next_top, next_bottom
+
+
+def _bounding_box_center_x(bounding_box: dict[str, float]) -> float:
+    return bounding_box["x"] + (bounding_box["width"] / 2.0)
+
+
+def _bounding_box_center_y(bounding_box: dict[str, float]) -> float:
+    return bounding_box["y"] + (bounding_box["height"] / 2.0)
+
+
+def _bounding_box_intersection_area(
+    left: dict[str, float],
+    right: dict[str, float],
+) -> float:
+    overlap_x = _axis_overlap(
+        left["x"],
+        left["x"] + left["width"],
+        right["x"],
+        right["x"] + right["width"],
+    )
+    overlap_y = _axis_overlap(
+        left["y"],
+        left["y"] + left["height"],
+        right["y"],
+        right["y"] + right["height"],
+    )
+    return overlap_x * overlap_y
 
 
 def _candidate_iou(
