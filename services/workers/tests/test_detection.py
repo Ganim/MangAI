@@ -1,3 +1,5 @@
+import cv2
+
 from mangai_workers.config import WorkerSettings
 from mangai_workers.comic_text_detector import ComicTextBlock
 from mangai_workers.detection import (
@@ -107,6 +109,79 @@ def test_build_detected_regions_from_comic_text_blocks_preserves_panel_detector_
     assert candidates[1].type == "narration_box"
     assert candidates[0].bounding_box["x"] < 680
     assert candidates[1].bounding_box["width"] > 560
+
+
+def test_build_detected_regions_from_comic_text_blocks_fits_single_balloon_container() -> None:
+    image = np.full((240, 240), 225, dtype=np.uint8)
+    cv2.rectangle(image, (56, 36), (184, 204), 0, thickness=3)
+    image[39:201, 59:181] = 245
+    image[84:164, 112:130] = 18
+
+    candidates = build_detected_regions_from_comic_text_blocks(
+        text_blocks=[
+            ComicTextBlock(
+                x=112,
+                y=84,
+                width=18,
+                height=80,
+                language="ja",
+                vertical=True,
+            )
+        ],
+        page_width=240,
+        page_height=240,
+        grayscale_image=image,
+    )
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate.type == "speech_balloon"
+    assert candidate.bounding_box["x"] <= 62
+    assert candidate.bounding_box["y"] <= 42
+    assert candidate.bounding_box["width"] >= 118
+    assert candidate.bounding_box["height"] >= 156
+
+
+def test_build_detected_regions_from_comic_text_blocks_splits_merged_balloon_component() -> None:
+    image = np.zeros((260, 340), dtype=np.uint8)
+    cv2.circle(image, (118, 130), 62, 245, thickness=-1)
+    cv2.circle(image, (218, 130), 62, 245, thickness=-1)
+    cv2.circle(image, (118, 130), 62, 0, thickness=3)
+    cv2.circle(image, (218, 130), 62, 0, thickness=3)
+    image[88:176, 108:126] = 15
+    image[88:176, 208:226] = 15
+
+    candidates = build_detected_regions_from_comic_text_blocks(
+        text_blocks=[
+            ComicTextBlock(
+                x=108,
+                y=88,
+                width=18,
+                height=88,
+                language="ja",
+                vertical=True,
+            ),
+            ComicTextBlock(
+                x=208,
+                y=88,
+                width=18,
+                height=88,
+                language="ja",
+                vertical=True,
+            ),
+        ],
+        page_width=340,
+        page_height=260,
+        grayscale_image=image,
+    )
+
+    assert len(candidates) == 2
+    left_candidate, right_candidate = sorted(candidates, key=lambda candidate: candidate.bounding_box["x"])
+    assert left_candidate.bounding_box["x"] < 96
+    assert right_candidate.bounding_box["x"] > 154
+    assert left_candidate.bounding_box["width"] < 120
+    assert right_candidate.bounding_box["width"] < 120
+    assert left_candidate.bounding_box["x"] + left_candidate.bounding_box["width"] < right_candidate.bounding_box["x"] + 22
 
 
 def test_detect_regions_prefers_comic_text_detector_provider(monkeypatch, tmp_path) -> None:

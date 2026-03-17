@@ -14,7 +14,7 @@ from mangai_workers.comic_text_detector import (
     ComicTextBlock,
     extract_comic_text_detector_blocks,
 )
-from mangai_workers.ocr import OcrProviderError, RecognizedLine, extract_paddle_recognized_lines
+from mangai_workers.ocr import RecognizedLine, extract_paddle_recognized_lines
 from mangai_workers.runner import WorkerExecutionError
 
 
@@ -41,6 +41,14 @@ class RecognizedTextBox:
     height: float
 
 
+@dataclass(frozen=True)
+class _ComicTextContainerFit:
+    block: ComicTextBlock
+    bounding_box: dict[str, float]
+    seed_point: tuple[int, int]
+    fitted_from_container: bool
+
+
 def detect_regions_from_asset(
     *,
     asset_path: Path,
@@ -56,6 +64,8 @@ def detect_regions_from_asset(
     if len(asset_bytes) == 0:
         raise WorkerExecutionError(f"Source asset '{asset_path}' is empty.")
 
+    grayscale_image = _decode_grayscale_image(asset_bytes)
+
     if settings is not None:
         if settings.detection_provider == "comic_text_detector":
             try:
@@ -67,6 +77,7 @@ def detect_regions_from_asset(
                     text_blocks=detected_blocks,
                     page_width=page_width,
                     page_height=page_height,
+                    grayscale_image=grayscale_image,
                 )
                 if len(candidates) > 0:
                     return _annotate_cleanup_candidates(asset_path=asset_path, candidates=candidates)
@@ -104,29 +115,41 @@ def build_detected_regions_from_comic_text_blocks(
     text_blocks: list[ComicTextBlock],
     page_width: int,
     page_height: int,
+    grayscale_image: np.ndarray | None = None,
 ) -> list[DetectedRegionCandidate]:
-    candidates: list[DetectedRegionCandidate] = []
-    for block in text_blocks:
-        if block.width < 10 or block.height < 10:
-            continue
-
-        padding_x = min(18.0, max(6.0, block.width * 0.08))
-        padding_y = min(18.0, max(6.0, block.height * 0.08))
-        bounding_box = _clamp_bounding_box(
-            x=block.x - padding_x,
-            y=block.y - padding_y,
-            width=block.width + (padding_x * 2.0),
-            height=block.height + (padding_y * 2.0),
+    if grayscale_image is None:
+        fits = [
+            _build_simple_comic_text_fit(
+                block=block,
+                page_width=page_width,
+                page_height=page_height,
+            )
+            for block in text_blocks
+            if block.width >= 10 and block.height >= 10
+        ]
+    else:
+        fits = _fit_comic_text_blocks_to_containers(
+            text_blocks=text_blocks,
+            grayscale_image=grayscale_image,
             page_width=page_width,
             page_height=page_height,
         )
-        region_type = _classify_comic_text_block(block, bounding_box)
-        confidence = 0.94 if block.language != "unknown" else 0.84
+
+    candidates: list[DetectedRegionCandidate] = []
+    for fit in fits:
+        region_type = _classify_comic_text_block(
+            block=fit.block,
+            bounding_box=fit.bounding_box,
+            fitted_from_container=fit.fitted_from_container,
+        )
+        confidence = 0.95 if fit.fitted_from_container and fit.block.language != "unknown" else 0.9
+        if fit.block.language == "unknown":
+            confidence -= 0.08
         candidates.append(
             DetectedRegionCandidate(
                 type=region_type,
                 confidence=confidence,
-                bounding_box=bounding_box,
+                bounding_box=fit.bounding_box,
             )
         )
 
@@ -138,6 +161,586 @@ def build_detected_regions_from_comic_text_blocks(
             candidate.bounding_box["x"],
             candidate.type,
         ),
+    )
+
+
+def _fit_comic_text_blocks_to_containers(
+    *,
+    text_blocks: list[ComicTextBlock],
+    grayscale_image: np.ndarray,
+    page_width: int,
+    page_height: int,
+) -> list[_ComicTextContainerFit]:
+    initial_fits: list[_ComicTextContainerFit] = []
+    for block in text_blocks:
+        if block.width < 10 or block.height < 10:
+            continue
+        initial_fits.append(
+            _fit_single_comic_text_block_to_container(
+                block=block,
+                grayscale_image=grayscale_image,
+                page_width=page_width,
+                page_height=page_height,
+            )
+        )
+
+    grouped_fits = _group_overlapping_container_fits(initial_fits)
+    resolved_fits: list[_ComicTextContainerFit] = []
+    for group in grouped_fits:
+        resolved_fits.extend(
+            _resolve_container_fit_group(
+                group=group,
+                grayscale_image=grayscale_image,
+                page_width=page_width,
+                page_height=page_height,
+            )
+        )
+
+    return sorted(
+        resolved_fits,
+        key=lambda fit: (
+            fit.bounding_box["y"],
+            fit.bounding_box["x"],
+            fit.block.language,
+        ),
+    )
+
+
+def _fit_single_comic_text_block_to_container(
+    *,
+    block: ComicTextBlock,
+    grayscale_image: np.ndarray,
+    page_width: int,
+    page_height: int,
+) -> _ComicTextContainerFit:
+    group_fit = _resolve_blocks_within_container_crop(
+        blocks=[block],
+        fallback_fits=[
+            _build_simple_comic_text_fit(
+                block=block,
+                page_width=page_width,
+                page_height=page_height,
+            )
+        ],
+        grayscale_image=grayscale_image,
+        page_width=page_width,
+        page_height=page_height,
+    )
+    return group_fit[0]
+
+
+def _resolve_container_fit_group(
+    *,
+    group: list[_ComicTextContainerFit],
+    grayscale_image: np.ndarray,
+    page_width: int,
+    page_height: int,
+) -> list[_ComicTextContainerFit]:
+    if len(group) <= 1:
+        return group
+
+    return _resolve_blocks_within_container_crop(
+        blocks=[fit.block for fit in group],
+        fallback_fits=group,
+        grayscale_image=grayscale_image,
+        page_width=page_width,
+        page_height=page_height,
+    )
+
+
+def _resolve_blocks_within_container_crop(
+    *,
+    blocks: list[ComicTextBlock],
+    fallback_fits: list[_ComicTextContainerFit],
+    grayscale_image: np.ndarray,
+    page_width: int,
+    page_height: int,
+) -> list[_ComicTextContainerFit]:
+    crop_bounds = _compute_container_crop_bounds(
+        blocks=blocks,
+        page_width=page_width,
+        page_height=page_height,
+    )
+    crop_x1, crop_y1, crop_x2, crop_y2 = crop_bounds
+    crop = grayscale_image[crop_y1:crop_y2, crop_x1:crop_x2]
+    if crop.size == 0:
+        return fallback_fits
+
+    barrier_mask = _build_container_barrier_mask(crop)
+    free_mask = np.logical_not(barrier_mask)
+    if np.count_nonzero(free_mask) == 0:
+        return fallback_fits
+
+    distance_map = cv2.distanceTransform(free_mask.astype(np.uint8), cv2.DIST_L2, 5)
+    _label_count, labels, _stats, _centroids = cv2.connectedComponentsWithStats(
+        free_mask.astype(np.uint8),
+        connectivity=8,
+    )
+
+    seed_lookup: dict[int, tuple[int, int]] = {}
+    support_masks: dict[int, np.ndarray] = {}
+    for index, block in enumerate(blocks):
+        local_seed = _find_best_seed_point(
+            distance_map=distance_map,
+            free_mask=free_mask,
+            block=block,
+            crop_origin=(crop_x1, crop_y1),
+        )
+        seed_lookup[index] = local_seed
+        support_masks[index] = _build_support_mask_for_block(
+            labels=labels,
+            block=block,
+            crop_origin=(crop_x1, crop_y1),
+            seed_point=local_seed,
+        )
+
+    grouped_indexes = _group_block_support_masks(support_masks)
+
+    resolved_lookup: dict[int, _ComicTextContainerFit] = {}
+    for member_indexes in grouped_indexes:
+        component_masks = [support_masks[member_index] for member_index in member_indexes]
+        component_mask = np.logical_or.reduce(component_masks)
+        if np.count_nonzero(component_mask) == 0:
+            for member_index in member_indexes:
+                resolved_lookup[member_index] = fallback_fits[member_index]
+            continue
+
+        if len(member_indexes) == 1:
+            member_index = member_indexes[0]
+            bounding_box = _build_container_bounding_box_for_block(
+                component_mask=component_mask,
+                block=blocks[member_index],
+                crop_origin=(crop_x1, crop_y1),
+                page_width=page_width,
+                page_height=page_height,
+            )
+            resolved_lookup[member_index] = _ComicTextContainerFit(
+                block=blocks[member_index],
+                bounding_box=bounding_box,
+                seed_point=(
+                    crop_x1 + seed_lookup[member_index][0],
+                    crop_y1 + seed_lookup[member_index][1],
+                ),
+                fitted_from_container=True,
+            )
+            continue
+
+        split_fits = _split_shared_container_component(
+            component_mask=component_mask,
+            member_indexes=member_indexes,
+            blocks=blocks,
+            seed_lookup=seed_lookup,
+            crop_origin=(crop_x1, crop_y1),
+            page_width=page_width,
+            page_height=page_height,
+        )
+        if split_fits is None:
+            for member_index in member_indexes:
+                resolved_lookup[member_index] = fallback_fits[member_index]
+            continue
+
+        for member_index, fit in split_fits.items():
+            resolved_lookup[member_index] = fit
+
+    return [resolved_lookup.get(index, fallback_fits[index]) for index in range(len(blocks))]
+
+
+def _group_overlapping_container_fits(
+    fits: list[_ComicTextContainerFit],
+) -> list[list[_ComicTextContainerFit]]:
+    if len(fits) <= 1:
+        return [[fit] for fit in fits]
+
+    parents = list(range(len(fits)))
+
+    def find(index: int) -> int:
+        while parents[index] != index:
+            parents[index] = parents[parents[index]]
+            index = parents[index]
+        return index
+
+    def union(left: int, right: int) -> None:
+        left_root = find(left)
+        right_root = find(right)
+        if left_root != right_root:
+            parents[right_root] = left_root
+
+    for left_index in range(len(fits)):
+        for right_index in range(left_index + 1, len(fits)):
+            if _should_group_container_fits(fits[left_index], fits[right_index]):
+                union(left_index, right_index)
+
+    grouped: dict[int, list[_ComicTextContainerFit]] = {}
+    for index, fit in enumerate(fits):
+        grouped.setdefault(find(index), []).append(fit)
+
+    return sorted(
+        grouped.values(),
+        key=lambda group: (
+            min(fit.bounding_box["y"] for fit in group),
+            min(fit.bounding_box["x"] for fit in group),
+        ),
+    )
+
+
+def _should_group_container_fits(
+    left: _ComicTextContainerFit,
+    right: _ComicTextContainerFit,
+) -> bool:
+    left_box = left.bounding_box
+    right_box = right.bounding_box
+    iou = _bounding_box_iou(left_box, right_box)
+    if iou >= 0.18:
+        return True
+
+    horizontal_gap = _axis_gap(
+        left_box["x"],
+        left_box["x"] + left_box["width"],
+        right_box["x"],
+        right_box["x"] + right_box["width"],
+    )
+    vertical_gap = _axis_gap(
+        left_box["y"],
+        left_box["y"] + left_box["height"],
+        right_box["y"],
+        right_box["y"] + right_box["height"],
+    )
+    horizontal_overlap = _axis_overlap(
+        left_box["x"],
+        left_box["x"] + left_box["width"],
+        right_box["x"],
+        right_box["x"] + right_box["width"],
+    )
+    vertical_overlap = _axis_overlap(
+        left_box["y"],
+        left_box["y"] + left_box["height"],
+        right_box["y"],
+        right_box["y"] + right_box["height"],
+    )
+
+    min_width = max(min(left_box["width"], right_box["width"]), 1.0)
+    min_height = max(min(left_box["height"], right_box["height"]), 1.0)
+    if horizontal_gap <= max(18.0, min_width * 0.18) and vertical_overlap >= min_height * 0.42:
+        return True
+    if vertical_gap <= max(18.0, min_height * 0.18) and horizontal_overlap >= min_width * 0.42:
+        return True
+    return False
+
+
+def _build_support_mask_for_block(
+    *,
+    labels: np.ndarray,
+    block: ComicTextBlock,
+    crop_origin: tuple[int, int],
+    seed_point: tuple[int, int],
+) -> np.ndarray:
+    crop_x, crop_y = crop_origin
+    halo_x = max(18, int(round(max(block.width * 2.2, block.height * 0.55))))
+    halo_y = max(12, int(round(max(block.height * 0.24, block.width * 1.4))))
+    x1 = max(int(np.floor(block.x - crop_x - halo_x)), 0)
+    y1 = max(int(np.floor(block.y - crop_y - halo_y)), 0)
+    x2 = min(int(np.ceil(block.x + block.width - crop_x + halo_x)), labels.shape[1])
+    y2 = min(int(np.ceil(block.y + block.height - crop_y + halo_y)), labels.shape[0])
+
+    label_window = labels[y1:y2, x1:x2]
+    component_labels = {int(value) for value in np.unique(label_window) if int(value) > 0}
+    seed_label = int(labels[seed_point[1], seed_point[0]])
+    if seed_label > 0:
+        component_labels.add(seed_label)
+
+    if len(component_labels) == 0:
+        return np.zeros_like(labels, dtype=bool)
+    return np.isin(labels, list(component_labels))
+
+
+def _group_block_support_masks(
+    support_masks: dict[int, np.ndarray],
+) -> list[list[int]]:
+    indexes = sorted(support_masks.keys())
+    if len(indexes) <= 1:
+        return [[index] for index in indexes]
+
+    parents = list(range(len(indexes)))
+
+    def find(index: int) -> int:
+        while parents[index] != index:
+            parents[index] = parents[parents[index]]
+            index = parents[index]
+        return index
+
+    def union(left: int, right: int) -> None:
+        left_root = find(left)
+        right_root = find(right)
+        if left_root != right_root:
+            parents[right_root] = left_root
+
+    for left_position in range(len(indexes)):
+        for right_position in range(left_position + 1, len(indexes)):
+            left_mask = support_masks[indexes[left_position]]
+            right_mask = support_masks[indexes[right_position]]
+            if np.any(np.logical_and(left_mask, right_mask)):
+                union(left_position, right_position)
+
+    grouped: dict[int, list[int]] = {}
+    for position, index in enumerate(indexes):
+        grouped.setdefault(find(position), []).append(index)
+
+    return list(grouped.values())
+
+
+def _split_shared_container_component(
+    *,
+    component_mask: np.ndarray,
+    member_indexes: list[int],
+    blocks: list[ComicTextBlock],
+    seed_lookup: dict[int, tuple[int, int]],
+    crop_origin: tuple[int, int],
+    page_width: int,
+    page_height: int,
+) -> dict[int, _ComicTextContainerFit] | None:
+    y_values, x_values = np.nonzero(component_mask)
+    if len(x_values) == 0:
+        return None
+
+    seed_points = np.array([seed_lookup[member_index] for member_index in member_indexes], dtype=np.int32)
+    pixel_points = np.column_stack((x_values, y_values)).astype(np.float32)
+    distances = np.sum(
+        (pixel_points[:, None, :] - seed_points[None, :, :].astype(np.float32)) ** 2,
+        axis=2,
+    )
+    assignments = np.argmin(distances, axis=1)
+
+    resolved: dict[int, _ComicTextContainerFit] = {}
+    for assignment_index, member_index in enumerate(member_indexes):
+        assigned_mask = np.zeros_like(component_mask, dtype=np.uint8)
+        assigned_pixels = assignments == assignment_index
+        assigned_mask[y_values[assigned_pixels], x_values[assigned_pixels]] = 1
+        if np.count_nonzero(assigned_mask) == 0:
+            return None
+
+        local_seed = seed_lookup[member_index]
+        seed_x = min(max(local_seed[0], 0), assigned_mask.shape[1] - 1)
+        seed_y = min(max(local_seed[1], 0), assigned_mask.shape[0] - 1)
+        label_count, labels, _stats, _centroids = cv2.connectedComponentsWithStats(assigned_mask, connectivity=8)
+        if label_count <= 1:
+            return None
+        seed_label = int(labels[seed_y, seed_x])
+        if seed_label <= 0:
+            return None
+
+        split_mask = labels == seed_label
+        bounding_box = _build_container_bounding_box_for_block(
+            component_mask=split_mask,
+            block=blocks[member_index],
+            crop_origin=crop_origin,
+            page_width=page_width,
+            page_height=page_height,
+        )
+        resolved[member_index] = _ComicTextContainerFit(
+            block=blocks[member_index],
+            bounding_box=bounding_box,
+            seed_point=(crop_origin[0] + seed_x, crop_origin[1] + seed_y),
+            fitted_from_container=True,
+        )
+    return resolved
+
+
+def _compute_container_crop_bounds(
+    *,
+    blocks: list[ComicTextBlock],
+    page_width: int,
+    page_height: int,
+) -> tuple[int, int, int, int]:
+    min_x = min(block.x for block in blocks)
+    min_y = min(block.y for block in blocks)
+    max_x = max(block.x + block.width for block in blocks)
+    max_y = max(block.y + block.height for block in blocks)
+    max_block_width = max(block.width for block in blocks)
+    max_block_height = max(block.height for block in blocks)
+    group_scale = 1.0 + min(0.45, max(0, len(blocks) - 1) * 0.12)
+
+    margin_x = max(48.0, max_block_width * 1.05, max_block_height * 0.7) * group_scale
+    margin_y = max(38.0, max_block_height * 0.5, max_block_width * 0.9) * group_scale
+
+    x1 = max(int(np.floor(min_x - margin_x)), 0)
+    y1 = max(int(np.floor(min_y - margin_y)), 0)
+    x2 = min(int(np.ceil(max_x + margin_x)), page_width)
+    y2 = min(int(np.ceil(max_y + margin_y)), page_height)
+    return x1, y1, x2, y2
+
+
+def _build_container_barrier_mask(grayscale_crop: np.ndarray) -> np.ndarray:
+    blurred = cv2.GaussianBlur(grayscale_crop, (0, 0), sigmaX=1.8, sigmaY=1.8)
+    dark_threshold = _pick_container_dark_threshold(blurred)
+    barrier_mask = blurred <= dark_threshold
+    edge_mask = cv2.Canny(
+        blurred,
+        threshold1=max(30, int(dark_threshold * 0.5)),
+        threshold2=max(60, int(dark_threshold * 1.1)),
+    ) > 0
+    barrier_mask = np.logical_or(barrier_mask, edge_mask)
+    barrier_mask = cv2.dilate(barrier_mask.astype(np.uint8), np.ones((3, 3), dtype=np.uint8), iterations=1).astype(bool)
+    barrier_mask[0, :] = True
+    barrier_mask[-1, :] = True
+    barrier_mask[:, 0] = True
+    barrier_mask[:, -1] = True
+    return barrier_mask
+
+
+def _pick_container_dark_threshold(grayscale_crop: np.ndarray) -> int:
+    p10 = float(np.percentile(grayscale_crop, 10))
+    p25 = float(np.percentile(grayscale_crop, 25))
+    threshold = int(round((p10 * 0.38) + (p25 * 0.62) + 16.0))
+    return max(135, min(185, threshold))
+
+
+def _find_best_seed_point(
+    *,
+    distance_map: np.ndarray,
+    free_mask: np.ndarray,
+    block: ComicTextBlock,
+    crop_origin: tuple[int, int],
+) -> tuple[int, int]:
+    crop_x, crop_y = crop_origin
+    margin_x = max(8, int(round(block.width * 0.18)))
+    margin_y = max(8, int(round(block.height * 0.12)))
+    x1 = max(int(np.floor(block.x - crop_x - margin_x)), 0)
+    y1 = max(int(np.floor(block.y - crop_y - margin_y)), 0)
+    x2 = min(int(np.ceil(block.x + block.width - crop_x + margin_x)), free_mask.shape[1])
+    y2 = min(int(np.ceil(block.y + block.height - crop_y + margin_y)), free_mask.shape[0])
+
+    if x2 > x1 and y2 > y1:
+        region_distance = distance_map[y1:y2, x1:x2]
+        if region_distance.size > 0 and float(np.max(region_distance)) > 0:
+            local_y, local_x = np.unravel_index(np.argmax(region_distance), region_distance.shape)
+            return x1 + int(local_x), y1 + int(local_y)
+
+    free_y, free_x = np.nonzero(free_mask)
+    if len(free_x) == 0:
+        return min(max(x1, 0), free_mask.shape[1] - 1), min(max(y1, 0), free_mask.shape[0] - 1)
+
+    target_x = (block.x + (block.width / 2.0)) - crop_x
+    target_y = (block.y + (block.height / 2.0)) - crop_y
+    distances = ((free_x - target_x) ** 2) + ((free_y - target_y) ** 2)
+    best_index = int(np.argmin(distances))
+    return int(free_x[best_index]), int(free_y[best_index])
+
+
+def _build_container_bounding_box_for_block(
+    *,
+    component_mask: np.ndarray,
+    block: ComicTextBlock,
+    crop_origin: tuple[int, int],
+    page_width: int,
+    page_height: int,
+) -> dict[str, float]:
+    component_box = _mask_to_bounding_box(
+        mask=component_mask,
+        crop_origin=crop_origin,
+        page_width=page_width,
+        page_height=page_height,
+    )
+    text_guard_box = _clamp_bounding_box(
+        x=block.x - 6.0,
+        y=block.y - 6.0,
+        width=block.width + 12.0,
+        height=block.height + 12.0,
+        page_width=page_width,
+        page_height=page_height,
+    )
+    return _merge_bounding_boxes(component_box, text_guard_box, page_width=page_width, page_height=page_height)
+
+
+def _mask_to_bounding_box(
+    *,
+    mask: np.ndarray,
+    crop_origin: tuple[int, int],
+    page_width: int,
+    page_height: int,
+) -> dict[str, float]:
+    y_values, x_values = np.nonzero(mask)
+    if len(x_values) == 0:
+        return _clamp_bounding_box(
+            x=float(crop_origin[0]),
+            y=float(crop_origin[1]),
+            width=1.0,
+            height=1.0,
+            page_width=page_width,
+            page_height=page_height,
+        )
+
+    x1 = crop_origin[0] + int(np.min(x_values))
+    y1 = crop_origin[1] + int(np.min(y_values))
+    x2 = crop_origin[0] + int(np.max(x_values)) + 1
+    y2 = crop_origin[1] + int(np.max(y_values)) + 1
+    padding = 3.0
+    return _clamp_bounding_box(
+        x=float(x1 - padding),
+        y=float(y1 - padding),
+        width=float((x2 - x1) + (padding * 2)),
+        height=float((y2 - y1) + (padding * 2)),
+        page_width=page_width,
+        page_height=page_height,
+    )
+
+
+def _merge_bounding_boxes(
+    left: dict[str, float],
+    right: dict[str, float],
+    *,
+    page_width: int,
+    page_height: int,
+) -> dict[str, float]:
+    min_x = min(left["x"], right["x"])
+    min_y = min(left["y"], right["y"])
+    max_x = max(left["x"] + left["width"], right["x"] + right["width"])
+    max_y = max(left["y"] + left["height"], right["y"] + right["height"])
+    return _clamp_bounding_box(
+        x=min_x,
+        y=min_y,
+        width=max_x - min_x,
+        height=max_y - min_y,
+        page_width=page_width,
+        page_height=page_height,
+    )
+
+
+def _build_simple_comic_text_fit(
+    *,
+    block: ComicTextBlock,
+    page_width: int,
+    page_height: int,
+) -> _ComicTextContainerFit:
+    bounding_box = _build_simple_comic_text_bounding_box(
+        block=block,
+        page_width=page_width,
+        page_height=page_height,
+    )
+    seed_x = int(round(block.x + (block.width / 2.0)))
+    seed_y = int(round(block.y + (block.height / 2.0)))
+    return _ComicTextContainerFit(
+        block=block,
+        bounding_box=bounding_box,
+        seed_point=(seed_x, seed_y),
+        fitted_from_container=False,
+    )
+
+
+def _build_simple_comic_text_bounding_box(
+    *,
+    block: ComicTextBlock,
+    page_width: int,
+    page_height: int,
+) -> dict[str, float]:
+    padding_x = min(18.0, max(6.0, block.width * 0.08))
+    padding_y = min(18.0, max(6.0, block.height * 0.08))
+    return _clamp_bounding_box(
+        x=block.x - padding_x,
+        y=block.y - padding_y,
+        width=block.width + (padding_x * 2.0),
+        height=block.height + (padding_y * 2.0),
+        page_width=page_width,
+        page_height=page_height,
     )
 
 
@@ -458,11 +1061,21 @@ def _classify_cluster(
 
 
 def _classify_comic_text_block(
+    *,
     block: ComicTextBlock,
     bounding_box: dict[str, float],
+    fitted_from_container: bool,
 ) -> str:
     width = bounding_box["width"]
     height = bounding_box["height"]
+    if (
+        not fitted_from_container
+        and not block.vertical
+        and width >= height * 1.35
+        and width < 220
+        and height < 120
+    ):
+        return "free_text"
     if not block.vertical and width >= height * 1.1:
         return "narration_box"
     if width <= height * 0.72:
@@ -495,6 +1108,34 @@ def _candidate_iou(
 ) -> float:
     left_box = left.bounding_box
     right_box = right.bounding_box
+    intersection_width = _axis_overlap(
+        left_box["x"],
+        left_box["x"] + left_box["width"],
+        right_box["x"],
+        right_box["x"] + right_box["width"],
+    )
+    intersection_height = _axis_overlap(
+        left_box["y"],
+        left_box["y"] + left_box["height"],
+        right_box["y"],
+        right_box["y"] + right_box["height"],
+    )
+    if intersection_width <= 0 or intersection_height <= 0:
+        return 0.0
+
+    intersection_area = intersection_width * intersection_height
+    left_area = left_box["width"] * left_box["height"]
+    right_area = right_box["width"] * right_box["height"]
+    union_area = left_area + right_area - intersection_area
+    if union_area <= 0:
+        return 0.0
+    return intersection_area / union_area
+
+
+def _bounding_box_iou(
+    left_box: dict[str, float],
+    right_box: dict[str, float],
+) -> float:
     intersection_width = _axis_overlap(
         left_box["x"],
         left_box["x"] + left_box["width"],
@@ -730,3 +1371,9 @@ def _overlaps_existing(
         if overlaps_horizontally and overlaps_vertically:
             return True
     return False
+
+
+def _decode_grayscale_image(asset_bytes: bytes) -> np.ndarray | None:
+    if len(asset_bytes) == 0:
+        return None
+    return cv2.imdecode(np.frombuffer(asset_bytes, dtype=np.uint8), cv2.IMREAD_GRAYSCALE)
