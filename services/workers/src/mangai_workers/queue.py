@@ -1166,7 +1166,7 @@ def _group_panel_regions_into_balloon_groups(
         matching_group_indexes = [
             index
             for index, candidate_group in enumerate(balloon_groups)
-            if _should_assign_region_to_balloon_group(region_area, candidate_group["area"])
+            if _should_assign_region_to_balloon_group(region, candidate_group)
         ]
         if len(matching_group_indexes) == 0:
             balloon_groups.append(
@@ -1246,9 +1246,40 @@ def _build_reading_sort_key(
 
 
 def _should_assign_region_to_balloon_group(
-    region_area: dict[str, Any],
-    group_area: dict[str, Any],
+    region: dict[str, Any],
+    candidate_group: dict[str, Any],
 ) -> bool:
+    region_type = str(region.get("type") or "unknown")
+    group_types = {
+        str(candidate_region.get("type") or "unknown")
+        for candidate_region in candidate_group["regions"]
+    }
+    strict_types = {"narration_box", "free_text"}
+
+    return any(
+        _regions_should_share_balloon_group(
+            region,
+            candidate_region,
+            strict_mode=(
+                region_type in strict_types
+                or str(candidate_region.get("type") or "unknown") in strict_types
+                or len(group_types.intersection(strict_types)) > 0
+            ),
+        )
+        for candidate_region in candidate_group["regions"]
+    )
+
+
+def _regions_should_share_balloon_group(
+    left_region: dict[str, Any],
+    right_region: dict[str, Any],
+    *,
+    strict_mode: bool,
+) -> bool:
+    left_type = str(left_region.get("type") or "unknown")
+    right_type = str(right_region.get("type") or "unknown")
+    region_area = _get_region_area(left_region, "context_area")
+    group_area = _get_region_area(right_region, "context_area")
     overlap_x = _axis_overlap(
         float(region_area["x"]),
         float(region_area["x"]) + float(region_area["width"]),
@@ -1275,18 +1306,42 @@ def _should_assign_region_to_balloon_group(
     )
     minimum_width = max(min(float(region_area["width"]), float(group_area["width"])), 1.0)
     minimum_height = max(min(float(region_area["height"]), float(group_area["height"])), 1.0)
+    minimum_area = max(min(
+        float(region_area["width"]) * float(region_area["height"]),
+        float(group_area["width"]) * float(group_area["height"]),
+    ), 1.0)
+    intersection_area = overlap_x * overlap_y
+    intersection_ratio = intersection_area / minimum_area
+
+    if strict_mode:
+        if left_type != right_type:
+            return intersection_ratio >= 0.12
+        return (
+            intersection_ratio >= 0.08
+            or _boxes_intersect(region_area, group_area)
+        )
+
     return (
-        _boxes_intersect(
-            _expand_bounding_box(region_area, padding_x=max(24.0, minimum_width * 0.18), padding_y=max(24.0, minimum_height * 0.18)),
-            _expand_bounding_box(group_area, padding_x=max(24.0, minimum_width * 0.18), padding_y=max(24.0, minimum_height * 0.18)),
+        intersection_ratio >= 0.06
+        or _boxes_intersect(
+            _expand_bounding_box(
+                region_area,
+                padding_x=max(12.0, minimum_width * 0.08),
+                padding_y=max(12.0, minimum_height * 0.08),
+            ),
+            _expand_bounding_box(
+                group_area,
+                padding_x=max(12.0, minimum_width * 0.08),
+                padding_y=max(12.0, minimum_height * 0.08),
+            ),
         )
         or (
-            overlap_x >= minimum_width * 0.14
-            and gap_y <= max(42.0, minimum_height * 0.45)
+            overlap_x >= minimum_width * 0.58
+            and gap_y <= max(20.0, minimum_height * 0.16)
         )
         or (
-            overlap_y >= minimum_height * 0.14
-            and gap_x <= max(42.0, minimum_width * 0.45)
+            overlap_y >= minimum_height * 0.58
+            and gap_x <= max(18.0, minimum_width * 0.14)
         )
     )
 

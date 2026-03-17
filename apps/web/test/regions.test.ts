@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 
 import {
+  buildBalloonGroupOverlays,
   buildDefaultRegionInput,
+  buildPanelOverlays,
+  formatBalloonGroupOverlayLabel,
   formatRegionBounds,
   formatRegionIndexLabel,
+  formatPanelOverlayLabel,
   formatRegionReadingOrderLabel,
   getBoundingBoxOverlayStyle,
   getBoundingBoxAdjustmentStep,
@@ -147,6 +151,30 @@ assert.equal(
   ),
   "R07",
 );
+assert.equal(
+  formatPanelOverlayLabel(
+    {
+      id: "panel-2",
+      bounding_box: { x: 0, y: 0, width: 100, height: 100 },
+      order: 2,
+      region_count: 3,
+    },
+    0,
+  ),
+  "P02",
+);
+assert.equal(
+  formatBalloonGroupOverlayLabel(
+    {
+      id: "group-4",
+      bounding_box: { x: 0, y: 0, width: 100, height: 100 },
+      order: 4,
+      region_count: 2,
+    },
+    0,
+  ),
+  "G04",
+);
 
 const movedBox = moveBoundingBox(
   {
@@ -207,5 +235,61 @@ assert.deepEqual(resizedFromHandle, {
 });
 
 assert.equal(getBoundingBoxAdjustmentStep({ width: 1600, height: 2400 }), 32);
+
+const panelOverlays = buildPanelOverlays([
+  {
+    bounding_box: { x: 100, y: 120, width: 120, height: 180 },
+    context_area: { x: 80, y: 90, width: 180, height: 260 },
+    panel_area: { x: 40, y: 60, width: 420, height: 320 },
+    panel_order: 2,
+  },
+  {
+    bounding_box: { x: 280, y: 160, width: 120, height: 160 },
+    context_area: { x: 250, y: 120, width: 190, height: 230 },
+    panel_area: { x: 40, y: 60, width: 420, height: 320 },
+    panel_order: 2,
+  },
+  {
+    bounding_box: { x: 520, y: 80, width: 120, height: 160 },
+    context_area: { x: 500, y: 60, width: 180, height: 220 },
+    panel_area: { x: 500, y: 40, width: 260, height: 340 },
+    panel_order: 3,
+  },
+]);
+assert.equal(panelOverlays.length, 2);
+assert.equal(panelOverlays[0]?.order, 2);
+assert.deepEqual(panelOverlays[0]?.bounding_box, { x: 40, y: 60, width: 420, height: 320 });
+
+const balloonGroupOverlays = buildBalloonGroupOverlays([
+  {
+    bounding_box: { x: 100, y: 120, width: 120, height: 180 },
+    context_area: { x: 80, y: 90, width: 180, height: 260 },
+    balloon_group_id: "group-a",
+    balloon_group_area: { x: 72, y: 84, width: 192, height: 272 },
+    balloon_group_order: 1,
+  },
+  {
+    bounding_box: { x: 138, y: 142, width: 108, height: 160 },
+    context_area: { x: 118, y: 112, width: 160, height: 220 },
+    balloon_group_id: "group-a",
+    balloon_group_area: { x: 72, y: 84, width: 192, height: 272 },
+    balloon_group_order: 1,
+  },
+  {
+    bounding_box: { x: 420, y: 180, width: 120, height: 180 },
+    context_area: { x: 390, y: 150, width: 180, height: 240 },
+    balloon_group_id: "group-b",
+    balloon_group_area: { x: 382, y: 142, width: 196, height: 256 },
+    balloon_group_order: 2,
+  },
+]);
+assert.equal(balloonGroupOverlays.length, 2);
+assert.equal(balloonGroupOverlays[0]?.order, 1);
+assert.deepEqual(balloonGroupOverlays[0]?.bounding_box, {
+  x: 72,
+  y: 84,
+  width: 192,
+  height: 272,
+});
 
 console.log("WEB_REGION_TESTS_OK");

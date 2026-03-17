@@ -745,6 +745,38 @@ button:hover {
   z-index: 20;
 }
 
+.editor-structure-overlay {
+  position: absolute;
+  display: grid;
+  align-content: space-between;
+  justify-items: start;
+  padding: 10px;
+  border-radius: 18px;
+  border: 2px solid var(--structure-accent, rgba(73, 96, 166, 0.82));
+  background: var(--structure-fill, rgba(73, 96, 166, 0.08));
+  color: var(--text);
+  pointer-events: none;
+}
+
+.editor-structure-overlay-panel {
+  --structure-accent: rgba(73, 96, 166, 0.82);
+  --structure-fill: rgba(73, 96, 166, 0.08);
+  border-style: dashed;
+  z-index: 8;
+}
+
+.editor-structure-overlay-balloon-group {
+  --structure-accent: rgba(165, 111, 31, 0.82);
+  --structure-fill: rgba(165, 111, 31, 0.08);
+  z-index: 14;
+}
+
+.editor-structure-overlay-selected {
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.75),
+    0 14px 28px rgba(78, 49, 25, 0.12);
+}
+
 .editor-region-overlay-selected {
   box-shadow:
     0 0 0 3px rgba(255, 255, 255, 0.8),
@@ -785,12 +817,36 @@ button:hover {
   text-transform: uppercase;
 }
 
+.editor-structure-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(255, 252, 247, 0.92);
+  color: var(--structure-accent, var(--accent-deep));
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .editor-region-caption {
   margin-top: auto;
   padding: 4px 8px;
   border-radius: 12px;
   background: rgba(255, 252, 247, 0.84);
   font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.editor-structure-caption {
+  margin-top: auto;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: rgba(255, 252, 247, 0.9);
+  font-size: 0.76rem;
   font-weight: 700;
   line-height: 1.35;
 }

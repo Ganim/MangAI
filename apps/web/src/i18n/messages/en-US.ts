@@ -225,6 +225,8 @@ export type AppMessages = {
       text_area: string;
       context_area: string;
     };
+    panelAreaLabel: string;
+    balloonGroupLabel: string;
     areaPurposeHints: {
       text_area: string;
       context_area: string;
@@ -273,6 +275,10 @@ export type AppMessages = {
     hideContextAreasAction: string;
     showTextAreasAction: string;
     hideTextAreasAction: string;
+    showPanelAreasAction: string;
+    hidePanelAreasAction: string;
+    showBalloonGroupsAction: string;
+    hideBalloonGroupsAction: string;
     addRegionAction: string;
     creatingRegionAction: string;
     markReviewedAction: string;
@@ -614,6 +620,8 @@ export const enUSMessages: AppMessages = {
       text_area: "Text area",
       context_area: "Context area",
     },
+    panelAreaLabel: "Panel area",
+    balloonGroupLabel: "Balloon group",
     areaPurposeHints: {
       text_area: "Use this tighter box for OCR and cleanup decisions.",
       context_area: "Use this expanded box for balloon fit and text placement.",
@@ -680,6 +688,10 @@ export const enUSMessages: AppMessages = {
     hideContextAreasAction: "Hide context areas",
     showTextAreasAction: "Show text areas",
     hideTextAreasAction: "Hide text areas",
+    showPanelAreasAction: "Show panel areas",
+    hidePanelAreasAction: "Hide panel areas",
+    showBalloonGroupsAction: "Show balloon groups",
+    hideBalloonGroupsAction: "Hide balloon groups",
     addRegionAction: "Add review region",
     creatingRegionAction: "Adding region...",
     markReviewedAction: "Mark reviewed",

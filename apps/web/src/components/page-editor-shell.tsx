@@ -61,9 +61,13 @@ import {
   getPlacementOverlayStyle,
 } from "../features/projects/text.ts";
 import {
+  buildBalloonGroupOverlays,
   buildDefaultRegionInput,
+  buildPanelOverlays,
+  formatBalloonGroupOverlayLabel,
   formatRegionBounds,
   formatRegionReadingOrderLabel,
+  formatPanelOverlayLabel,
   getBoundingBoxOverlayStyle,
   getBoundingBoxAdjustmentStep,
   getPageCanvasSize,
@@ -210,6 +214,8 @@ export function PageEditorShell({
   const [translationDraft, setTranslationDraft] = useState("");
   const [showContextAreas, setShowContextAreas] = useState(true);
   const [showTextAreas, setShowTextAreas] = useState(true);
+  const [showPanelAreas, setShowPanelAreas] = useState(false);
+  const [showBalloonGroups, setShowBalloonGroups] = useState(false);
   const [selectedRegionArea, setSelectedRegionArea] = useState<RegionAreaKind>("context_area");
   const [activeRegionTransform, setActiveRegionTransform] = useState<ActiveRegionTransform | null>(null);
   const [regionAreaDraft, setRegionAreaDraft] = useState<RegionAreaDraft | null>(null);
@@ -719,6 +725,8 @@ export function PageEditorShell({
   const currentCanvasSize = currentPage
     ? getPageCanvasSize({ width: currentPage.width, height: currentPage.height })
     : null;
+  const panelOverlays = buildPanelOverlays(orderedRegions);
+  const balloonGroupOverlays = buildBalloonGroupOverlays(orderedRegions);
   const regionAdjustmentStep = currentPage
     ? getBoundingBoxAdjustmentStep({ width: currentPage.width, height: currentPage.height })
     : 24;
@@ -2244,6 +2252,24 @@ export function PageEditorShell({
                     : messages.editor.showTextAreasAction}
                 </button>
                 <button
+                  className="ghost-button"
+                  onClick={() => setShowBalloonGroups((currentValue) => !currentValue)}
+                  type="button"
+                >
+                  {showBalloonGroups
+                    ? messages.editor.hideBalloonGroupsAction
+                    : messages.editor.showBalloonGroupsAction}
+                </button>
+                <button
+                  className="ghost-button"
+                  onClick={() => setShowPanelAreas((currentValue) => !currentValue)}
+                  type="button"
+                >
+                  {showPanelAreas
+                    ? messages.editor.hidePanelAreasAction
+                    : messages.editor.showPanelAreasAction}
+                </button>
+                <button
                   className="primary-button"
                   disabled={isCreatingRegion}
                   onClick={() => void handleCreateRegion()}
@@ -2315,6 +2341,54 @@ export function PageEditorShell({
                     <span>{messages.editor.canvasEmptyState}</span>
                   </div>
                 ) : null}
+
+                {showPanelAreas
+                  ? panelOverlays.map((overlay, index) => {
+                      const isSelected = selectedRegion?.panel_order === overlay.order;
+                      return (
+                        <div
+                          className={`editor-structure-overlay editor-structure-overlay-panel${
+                            isSelected ? " editor-structure-overlay-selected" : ""
+                          }`}
+                          key={overlay.id}
+                          style={getBoundingBoxOverlayStyle(overlay.bounding_box, currentPage)}
+                        >
+                          <span className="editor-structure-chip">
+                            {formatPanelOverlayLabel(overlay, index)}
+                          </span>
+                          <span className="editor-structure-caption">
+                            {messages.editor.panelAreaLabel}
+                          </span>
+                        </div>
+                      );
+                    })
+                  : null}
+
+                {showBalloonGroups
+                  ? balloonGroupOverlays.map((overlay, index) => {
+                      const isSelected =
+                        selectedRegion?.balloon_group_id !== null
+                        && selectedRegion?.balloon_group_id !== undefined
+                        ? selectedRegion.balloon_group_id === overlay.id
+                        : selectedRegion?.balloon_group_order === overlay.order;
+                      return (
+                        <div
+                          className={`editor-structure-overlay editor-structure-overlay-balloon-group${
+                            isSelected ? " editor-structure-overlay-selected" : ""
+                          }`}
+                          key={overlay.id}
+                          style={getBoundingBoxOverlayStyle(overlay.bounding_box, currentPage)}
+                        >
+                          <span className="editor-structure-chip">
+                            {formatBalloonGroupOverlayLabel(overlay, index)}
+                          </span>
+                          <span className="editor-structure-caption">
+                            {messages.editor.balloonGroupLabel}
+                          </span>
+                        </div>
+                      );
+                    })
+                  : null}
 
                 {showContextAreas
                   ? orderedRegions.map((region, index) => {

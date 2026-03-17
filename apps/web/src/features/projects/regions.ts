@@ -23,12 +23,20 @@ type RegionOverlayInput = {
   text_area?: RegionBoundingBox;
   context_area?: RegionBoundingBox;
   panel_area?: RegionBoundingBox;
+  balloon_group_id?: string | null;
   balloon_group_area?: RegionBoundingBox;
   panel_order?: number | null;
   balloon_group_order?: number | null;
   order_in_balloon_group?: number | null;
   order_in_panel?: number | null;
   global_reading_order?: number | null;
+};
+
+type StructureOverlay = {
+  id: string;
+  bounding_box: RegionBoundingBox;
+  order: number | null;
+  region_count: number;
 };
 
 const MIN_REGION_SIZE = 24;
@@ -89,6 +97,46 @@ export function formatRegionReadingOrderLabel(
 ) {
   const readingOrder = region.global_reading_order ?? fallbackIndex + 1;
   return `R${String(readingOrder).padStart(2, "0")}`;
+}
+
+export function formatPanelOverlayLabel(overlay: StructureOverlay, fallbackIndex: number) {
+  const order = overlay.order ?? fallbackIndex + 1;
+  return `P${String(order).padStart(2, "0")}`;
+}
+
+export function formatBalloonGroupOverlayLabel(
+  overlay: StructureOverlay,
+  fallbackIndex: number,
+) {
+  const order = overlay.order ?? fallbackIndex + 1;
+  return `G${String(order).padStart(2, "0")}`;
+}
+
+export function buildPanelOverlays(regions: RegionOverlayInput[]) {
+  return buildStructureOverlays(
+    regions,
+    (region) =>
+      region.panel_order !== undefined && region.panel_order !== null
+        ? `panel-${region.panel_order}`
+        : `panel-box-${buildBoundingBoxKey(region.panel_area ?? region.context_area ?? region.bounding_box)}`,
+    (region) => region.panel_area ?? region.context_area ?? region.bounding_box,
+    (region) => region.panel_order ?? null,
+  );
+}
+
+export function buildBalloonGroupOverlays(regions: RegionOverlayInput[]) {
+  return buildStructureOverlays(
+    regions,
+    (region) =>
+      region.balloon_group_id
+      ?? (
+        region.balloon_group_order !== undefined && region.balloon_group_order !== null
+          ? `group-${region.panel_order ?? "none"}-${region.balloon_group_order}`
+          : `group-box-${buildBoundingBoxKey(region.balloon_group_area ?? region.context_area ?? region.bounding_box)}`
+      ),
+    (region) => region.balloon_group_area ?? region.context_area ?? region.bounding_box,
+    (region) => region.balloon_group_order ?? null,
+  );
 }
 
 export function moveBoundingBox(
@@ -254,4 +302,68 @@ function formatBoundingBox(boundingBox: RegionBoundingBox) {
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function buildStructureOverlays(
+  regions: RegionOverlayInput[],
+  getKey: (region: RegionOverlayInput) => string,
+  getBoundingBox: (region: RegionOverlayInput) => RegionBoundingBox,
+  getOrder: (region: RegionOverlayInput) => number | null,
+) {
+  const overlays = new Map<string, StructureOverlay>();
+
+  for (const region of regions) {
+    const key = getKey(region);
+    const boundingBox = getBoundingBox(region);
+    const existingOverlay = overlays.get(key);
+    if (existingOverlay === undefined) {
+      overlays.set(key, {
+        id: key,
+        bounding_box: { ...boundingBox },
+        order: getOrder(region),
+        region_count: 1,
+      });
+      continue;
+    }
+
+    overlays.set(key, {
+      ...existingOverlay,
+      bounding_box: mergeBoundingBoxes(existingOverlay.bounding_box, boundingBox),
+      region_count: existingOverlay.region_count + 1,
+    });
+  }
+
+  return Array.from(overlays.values()).sort((left, right) => {
+    const leftOrder = left.order ?? Number.MAX_SAFE_INTEGER;
+    const rightOrder = right.order ?? Number.MAX_SAFE_INTEGER;
+    if (leftOrder !== rightOrder) {
+      return leftOrder - rightOrder;
+    }
+    if (left.bounding_box.y !== right.bounding_box.y) {
+      return left.bounding_box.y - right.bounding_box.y;
+    }
+    return left.bounding_box.x - right.bounding_box.x;
+  });
+}
+
+function mergeBoundingBoxes(left: RegionBoundingBox, right: RegionBoundingBox): RegionBoundingBox {
+  const minX = Math.min(left.x, right.x);
+  const minY = Math.min(left.y, right.y);
+  const maxX = Math.max(left.x + left.width, right.x + right.width);
+  const maxY = Math.max(left.y + left.height, right.y + right.height);
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
+function buildBoundingBoxKey(boundingBox: RegionBoundingBox) {
+  return [
+    Math.round(boundingBox.x),
+    Math.round(boundingBox.y),
+    Math.round(boundingBox.width),
+    Math.round(boundingBox.height),
+  ].join("-");
 }

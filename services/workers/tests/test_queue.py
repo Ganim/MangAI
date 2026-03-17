@@ -736,6 +736,56 @@ def test_apply_region_reading_metadata_supports_manhwa_left_to_right_order() -> 
     assert [region["global_reading_order"] for region in annotated] == [1, 2]
 
 
+def test_apply_region_reading_metadata_keeps_narration_and_margin_text_out_of_balloon_groups() -> None:
+    annotated = _apply_region_reading_metadata(
+        [
+            {
+                "id": "speech-top",
+                "type": "speech_balloon",
+                "bounding_box": {"x": 700, "y": 140, "width": 120, "height": 220},
+                "text_area": {"x": 700, "y": 140, "width": 120, "height": 220},
+                "context_area": {"x": 664, "y": 108, "width": 190, "height": 280},
+            },
+            {
+                "id": "narration-strip",
+                "type": "narration_box",
+                "bounding_box": {"x": 500, "y": 520, "width": 560, "height": 44},
+                "text_area": {"x": 500, "y": 520, "width": 560, "height": 44},
+                "context_area": {"x": 486, "y": 496, "width": 588, "height": 92},
+            },
+            {
+                "id": "margin-text",
+                "type": "free_text",
+                "bounding_box": {"x": 1020, "y": 1180, "width": 84, "height": 320},
+                "text_area": {"x": 1020, "y": 1180, "width": 84, "height": 320},
+                "context_area": {"x": 1008, "y": 1160, "width": 106, "height": 360},
+            },
+            {
+                "id": "speech-bottom",
+                "type": "speech_balloon",
+                "bounding_box": {"x": 830, "y": 1248, "width": 150, "height": 220},
+                "text_area": {"x": 830, "y": 1248, "width": 150, "height": 220},
+                "context_area": {"x": 804, "y": 1218, "width": 202, "height": 280},
+            },
+        ],
+        source_language="ja-JP",
+        reading_profile="manga",
+        panel_boxes=[
+            {"x": 0, "y": 0, "width": 1114, "height": 700},
+            {"x": 0, "y": 700, "width": 1114, "height": 900},
+        ],
+    )
+
+    assert [region["id"] for region in annotated] == [
+        "speech-top",
+        "narration-strip",
+        "margin-text",
+        "speech-bottom",
+    ]
+    assert [region["balloon_group_order"] for region in annotated] == [1, 2, 3, 4]
+    assert len({region["balloon_group_id"] for region in annotated}) == 4
+
+
 def test_process_next_job_returns_none_without_queued_jobs(tmp_path) -> None:
     data_dir = tmp_path / "worker-data"
     seed_state(data_dir, job_status="succeeded")

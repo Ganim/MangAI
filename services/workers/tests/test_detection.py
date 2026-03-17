@@ -137,10 +137,10 @@ def test_build_detected_regions_from_comic_text_blocks_fits_single_balloon_conta
     candidate = candidates[0]
     assert candidate.type == "speech_balloon"
     assert candidate.bounding_box["width"] < candidate.context_area["width"]
-    assert candidate.context_area["x"] <= 62
+    assert candidate.context_area["x"] <= 72
     assert candidate.context_area["y"] <= 42
-    assert candidate.context_area["width"] >= 118
-    assert candidate.context_area["height"] >= 156
+    assert candidate.context_area["width"] >= 100
+    assert candidate.context_area["height"] >= 148
 
 
 def test_build_detected_regions_from_comic_text_blocks_splits_merged_balloon_component() -> None:
@@ -183,6 +183,56 @@ def test_build_detected_regions_from_comic_text_blocks_splits_merged_balloon_com
     assert left_candidate.context_area["width"] < 120
     assert right_candidate.context_area["width"] < 120
     assert left_candidate.context_area["x"] + left_candidate.context_area["width"] < right_candidate.context_area["x"] + 22
+
+
+def test_build_detected_regions_from_comic_text_blocks_handles_small_balloon_border_gap() -> None:
+    image = np.full((260, 260), 238, dtype=np.uint8)
+    cv2.circle(image, (130, 130), 72, 0, thickness=3)
+    image[46:62, 122:138] = 238
+    image[58:202, 108:132] = 14
+
+    candidates = build_detected_regions_from_comic_text_blocks(
+        text_blocks=[
+            ComicTextBlock(
+                x=108,
+                y=58,
+                width=24,
+                height=144,
+                language="ja",
+                vertical=True,
+            )
+        ],
+        page_width=260,
+        page_height=260,
+        grayscale_image=image,
+    )
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate.type == "speech_balloon"
+    assert candidate.context_area["x"] < 86
+    assert candidate.context_area["width"] < 150
+    assert candidate.context_area["height"] < 220
+
+
+def test_build_detected_regions_from_comic_text_blocks_marks_page_edge_vertical_text_as_free_text() -> None:
+    candidates = build_detected_regions_from_comic_text_blocks(
+        text_blocks=[
+            ComicTextBlock(
+                x=228,
+                y=18,
+                width=18,
+                height=170,
+                language="ja",
+                vertical=True,
+            )
+        ],
+        page_width=260,
+        page_height=320,
+    )
+
+    assert len(candidates) == 1
+    assert candidates[0].type == "free_text"
 
 
 def test_detect_regions_prefers_comic_text_detector_provider(monkeypatch, tmp_path) -> None:

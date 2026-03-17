@@ -154,6 +154,8 @@ def build_detected_regions_from_comic_text_blocks(
             block=fit.block,
             bounding_box=fit.bounding_box,
             fitted_from_container=fit.fitted_from_container,
+            page_width=page_width,
+            page_height=page_height,
         )
         confidence = 0.95 if fit.fitted_from_container and fit.block.language != "unknown" else 0.9
         if fit.block.language == "unknown":
@@ -281,8 +283,7 @@ def _resolve_blocks_within_container_crop(
     if crop.size == 0:
         return fallback_fits
 
-    barrier_mask = _build_container_barrier_mask(crop)
-    free_mask = np.logical_not(barrier_mask)
+    free_mask = _build_container_free_mask(crop)
     if np.count_nonzero(free_mask) == 0:
         return fallback_fits
 
@@ -465,7 +466,22 @@ def _build_support_mask_for_block(
 
     if len(component_labels) == 0:
         return np.zeros_like(labels, dtype=bool)
-    return np.isin(labels, list(component_labels))
+
+    boundary_labels = {
+        int(value)
+        for value in np.concatenate(
+            (
+                labels[0, :],
+                labels[-1, :],
+                labels[:, 0],
+                labels[:, -1],
+            )
+        )
+        if int(value) > 0
+    }
+    interior_labels = component_labels.difference(boundary_labels)
+    selected_labels = interior_labels if len(interior_labels) > 0 else component_labels
+    return np.isin(labels, list(selected_labels))
 
 
 def _group_block_support_masks(
@@ -584,17 +600,36 @@ def _compute_container_crop_bounds(
     return x1, y1, x2, y2
 
 
-def _build_container_barrier_mask(grayscale_crop: np.ndarray) -> np.ndarray:
+def _build_container_free_mask(grayscale_crop: np.ndarray) -> np.ndarray:
     blurred = cv2.GaussianBlur(grayscale_crop, (0, 0), sigmaX=1.8, sigmaY=1.8)
-    dark_threshold = _pick_container_dark_threshold(blurred)
-    barrier_mask = blurred <= dark_threshold
+    bright_smooth_mask = _build_bright_smooth_container_mask(blurred)
+    barrier_mask = _build_container_barrier_mask(blurred)
+    free_mask = np.logical_and(bright_smooth_mask, np.logical_not(barrier_mask))
+    if np.count_nonzero(free_mask) >= max(42, int(grayscale_crop.size * 0.002)):
+        return free_mask
+    return np.logical_not(barrier_mask)
+
+
+def _build_container_barrier_mask(blurred_crop: np.ndarray) -> np.ndarray:
+    dark_threshold = _pick_container_dark_threshold(blurred_crop)
+    barrier_mask = blurred_crop <= dark_threshold
     edge_mask = cv2.Canny(
-        blurred,
+        blurred_crop,
         threshold1=max(30, int(dark_threshold * 0.5)),
         threshold2=max(60, int(dark_threshold * 1.1)),
     ) > 0
     barrier_mask = np.logical_or(barrier_mask, edge_mask)
-    barrier_mask = cv2.dilate(barrier_mask.astype(np.uint8), np.ones((3, 3), dtype=np.uint8), iterations=1).astype(bool)
+    barrier_mask = cv2.dilate(
+        barrier_mask.astype(np.uint8),
+        np.ones((3, 3), dtype=np.uint8),
+        iterations=1,
+    ).astype(bool)
+    barrier_mask = cv2.morphologyEx(
+        barrier_mask.astype(np.uint8),
+        cv2.MORPH_CLOSE,
+        np.ones((5, 5), dtype=np.uint8),
+        iterations=1,
+    ).astype(bool)
     barrier_mask[0, :] = True
     barrier_mask[-1, :] = True
     barrier_mask[:, 0] = True
@@ -602,11 +637,78 @@ def _build_container_barrier_mask(grayscale_crop: np.ndarray) -> np.ndarray:
     return barrier_mask
 
 
+def _build_bright_smooth_container_mask(blurred_crop: np.ndarray) -> np.ndarray:
+    float_crop = blurred_crop.astype(np.float32)
+    local_mean = cv2.GaussianBlur(float_crop, (0, 0), sigmaX=5.2, sigmaY=5.2)
+    squared_mean = cv2.GaussianBlur(float_crop * float_crop, (0, 0), sigmaX=5.2, sigmaY=5.2)
+    local_variance = np.maximum(squared_mean - (local_mean * local_mean), 0.0)
+    local_std = np.sqrt(local_variance)
+
+    bright_threshold = _pick_container_bright_threshold(blurred_crop)
+    smooth_threshold = _pick_container_smooth_threshold(local_std)
+    candidate_mask = np.logical_and(blurred_crop >= bright_threshold, local_std <= smooth_threshold)
+    candidate_mask = cv2.morphologyEx(
+        candidate_mask.astype(np.uint8),
+        cv2.MORPH_CLOSE,
+        np.ones((5, 5), dtype=np.uint8),
+        iterations=1,
+    ).astype(bool)
+    candidate_mask = cv2.morphologyEx(
+        candidate_mask.astype(np.uint8),
+        cv2.MORPH_OPEN,
+        np.ones((3, 3), dtype=np.uint8),
+        iterations=1,
+    ).astype(bool)
+    return _drop_small_connected_components(
+        candidate_mask,
+        minimum_pixels=max(48, int(candidate_mask.size * 0.0018)),
+    )
+
+
 def _pick_container_dark_threshold(grayscale_crop: np.ndarray) -> int:
     p10 = float(np.percentile(grayscale_crop, 10))
     p25 = float(np.percentile(grayscale_crop, 25))
     threshold = int(round((p10 * 0.38) + (p25 * 0.62) + 16.0))
     return max(135, min(185, threshold))
+
+
+def _pick_container_bright_threshold(grayscale_crop: np.ndarray) -> int:
+    otsu_threshold, _ = cv2.threshold(
+        grayscale_crop,
+        0,
+        255,
+        cv2.THRESH_BINARY + cv2.THRESH_OTSU,
+    )
+    p70 = float(np.percentile(grayscale_crop, 70))
+    p88 = float(np.percentile(grayscale_crop, 88))
+    threshold = int(round(max(otsu_threshold + 6.0, (p70 * 0.22) + (p88 * 0.78))))
+    return max(184, min(242, threshold))
+
+
+def _pick_container_smooth_threshold(local_std: np.ndarray) -> float:
+    p35 = float(np.percentile(local_std, 35))
+    p55 = float(np.percentile(local_std, 55))
+    return max(8.5, min(24.0, (p35 * 0.58) + (p55 * 0.42) + 2.5))
+
+
+def _drop_small_connected_components(mask: np.ndarray, *, minimum_pixels: int) -> np.ndarray:
+    if np.count_nonzero(mask) == 0:
+        return mask
+
+    label_count, labels, stats, _centroids = cv2.connectedComponentsWithStats(
+        mask.astype(np.uint8),
+        connectivity=8,
+    )
+    if label_count <= 1:
+        return mask
+
+    filtered_mask = np.zeros_like(mask, dtype=bool)
+    for label_index in range(1, label_count):
+        area = int(stats[label_index, cv2.CC_STAT_AREA])
+        if area < minimum_pixels:
+            continue
+        filtered_mask = np.logical_or(filtered_mask, labels == label_index)
+    return filtered_mask
 
 
 def _find_best_seed_point(
@@ -655,6 +757,16 @@ def _build_container_bounding_box_for_block(
         page_width=page_width,
         page_height=page_height,
     )
+    if _mask_touches_crop_boundary(component_mask) or _looks_like_leaked_container(
+        component_box=component_box,
+        block=block,
+    ):
+        return _build_leak_resistant_comic_text_bounding_box(
+            block=block,
+            page_width=page_width,
+            page_height=page_height,
+        )
+
     text_guard_box = _clamp_bounding_box(
         x=block.x - 6.0,
         y=block.y - 6.0,
@@ -664,6 +776,69 @@ def _build_container_bounding_box_for_block(
         page_height=page_height,
     )
     return _merge_bounding_boxes(component_box, text_guard_box, page_width=page_width, page_height=page_height)
+
+
+def _looks_like_leaked_container(
+    *,
+    component_box: dict[str, float],
+    block: ComicTextBlock,
+) -> bool:
+    max_reasonable_width = (
+        max(block.width * 4.8, block.height * 1.36)
+        if block.vertical
+        else max(block.width * 1.28, block.height * 4.2)
+    )
+    max_reasonable_height = (
+        max(block.height * 2.2, block.width * 5.6)
+        if block.vertical
+        else max(block.height * 3.2, block.width * 0.28)
+    )
+    return (
+        component_box["width"] > max_reasonable_width
+        or component_box["height"] > max_reasonable_height
+    )
+
+
+def _mask_touches_crop_boundary(
+    mask: np.ndarray,
+    *,
+    margin: int = 1,
+    minimum_boundary_pixels: int = 8,
+) -> bool:
+    if mask.size == 0:
+        return False
+
+    margin = max(1, margin)
+    boundary_pixel_count = int(
+        np.count_nonzero(mask[:margin, :])
+        + np.count_nonzero(mask[-margin:, :])
+        + np.count_nonzero(mask[:, :margin])
+        + np.count_nonzero(mask[:, -margin:])
+    )
+    return boundary_pixel_count >= minimum_boundary_pixels
+
+
+def _build_leak_resistant_comic_text_bounding_box(
+    *,
+    block: ComicTextBlock,
+    page_width: int,
+    page_height: int,
+) -> dict[str, float]:
+    if block.vertical:
+        padding_x = min(68.0, max(28.0, block.width * 2.1, block.height * 0.42))
+        padding_y = min(42.0, max(16.0, block.height * 0.24, block.width * 1.15))
+    else:
+        padding_x = min(48.0, max(14.0, block.width * 0.24, block.height * 0.5))
+        padding_y = min(40.0, max(14.0, block.height * 0.44, block.width * 0.18))
+
+    return _clamp_bounding_box(
+        x=block.x - padding_x,
+        y=block.y - padding_y,
+        width=block.width + (padding_x * 2.0),
+        height=block.height + (padding_y * 2.0),
+        page_width=page_width,
+        page_height=page_height,
+    )
 
 
 def _mask_to_bounding_box(
@@ -1129,9 +1304,33 @@ def _classify_comic_text_block(
     block: ComicTextBlock,
     bounding_box: dict[str, float],
     fitted_from_container: bool,
+    page_width: int,
+    page_height: int,
 ) -> str:
     width = bounding_box["width"]
     height = bounding_box["height"]
+    text_density = (block.width * block.height) / max(width * height, 1.0)
+    touches_page_edge = _touches_page_edge(
+        bounding_box=bounding_box,
+        page_width=page_width,
+        page_height=page_height,
+    )
+
+    if (
+        block.vertical
+        and touches_page_edge
+        and width <= min(118.0, page_width * 0.1)
+        and height >= max(220.0, page_height * 0.18)
+    ):
+        return "free_text"
+    if (
+        block.vertical
+        and touches_page_edge
+        and text_density >= 0.33
+        and width <= block.width * 2.8
+        and height <= block.height * 1.55
+    ):
+        return "free_text"
     if (
         not fitted_from_container
         and not block.vertical
@@ -1145,6 +1344,21 @@ def _classify_comic_text_block(
     if width <= height * 0.72:
         return "speech_balloon"
     return "speech_balloon"
+
+
+def _touches_page_edge(
+    *,
+    bounding_box: dict[str, float],
+    page_width: int,
+    page_height: int,
+    margin: float = 12.0,
+) -> bool:
+    return (
+        bounding_box["x"] <= margin
+        or bounding_box["y"] <= margin
+        or bounding_box["x"] + bounding_box["width"] >= page_width - margin
+        or bounding_box["y"] + bounding_box["height"] >= page_height - margin
+    )
 
 
 def _deduplicate_candidates(
