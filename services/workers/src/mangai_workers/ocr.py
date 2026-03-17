@@ -23,6 +23,9 @@ class OcrCandidateRegion:
     y: float
     width: float
     height: float
+    panel_order: int | None = None
+    order_in_panel: int | None = None
+    global_reading_order: int | None = None
 
 
 @dataclass(frozen=True)
@@ -375,7 +378,7 @@ def _build_fallback_lines(
     regions: list[OcrCandidateRegion],
 ) -> list[OcrLine]:
     template = OCR_FALLBACK_TEMPLATES.get(source_language.split("-", 1)[0].lower(), "Text line {index}")
-    ordered_regions = sorted(regions, key=lambda candidate: (candidate.y, candidate.x, candidate.id))
+    ordered_regions = _sort_ocr_candidate_regions(regions)
     return [
         OcrLine(
             region_id=region.id,
@@ -392,7 +395,7 @@ def _group_recognized_lines_to_regions(
     regions: list[OcrCandidateRegion],
     recognized_lines: list[RecognizedLine],
 ) -> list[OcrLine]:
-    ordered_regions = sorted(regions, key=lambda candidate: (candidate.y, candidate.x, candidate.id))
+    ordered_regions = _sort_ocr_candidate_regions(regions)
     grouped_lines: dict[str, list[RecognizedLine]] = {region.id: [] for region in ordered_regions}
     for recognized_line in sorted(recognized_lines, key=lambda line: (line.y, line.x, line.text)):
         target_region = _find_best_region_for_line(ordered_regions, recognized_line)
@@ -419,6 +422,22 @@ def _group_recognized_lines_to_regions(
             )
         )
     return extracted_lines
+
+
+def _sort_ocr_candidate_regions(
+    regions: list[OcrCandidateRegion],
+) -> list[OcrCandidateRegion]:
+    return sorted(
+        regions,
+        key=lambda candidate: (
+            candidate.global_reading_order if candidate.global_reading_order is not None else 9999,
+            candidate.panel_order if candidate.panel_order is not None else 9999,
+            candidate.order_in_panel if candidate.order_in_panel is not None else 9999,
+            candidate.y,
+            candidate.x,
+            candidate.id,
+        ),
+    )
 
 
 def _find_best_region_for_line(

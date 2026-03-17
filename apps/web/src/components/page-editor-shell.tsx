@@ -63,7 +63,7 @@ import {
 import {
   buildDefaultRegionInput,
   formatRegionBounds,
-  formatRegionIndexLabel,
+  formatRegionReadingOrderLabel,
   getBoundingBoxOverlayStyle,
   getBoundingBoxAdjustmentStep,
   getPageCanvasSize,
@@ -666,6 +666,30 @@ export function PageEditorShell({
 
   const selectedRegion =
     regions.find((candidate) => candidate.id === selectedRegionId) ?? null;
+  const orderedRegions = [...regions].sort((left, right) => {
+    const leftOrder = left.global_reading_order ?? Number.MAX_SAFE_INTEGER;
+    const rightOrder = right.global_reading_order ?? Number.MAX_SAFE_INTEGER;
+    if (leftOrder !== rightOrder) {
+      return leftOrder - rightOrder;
+    }
+
+    const leftPanelOrder = left.panel_order ?? Number.MAX_SAFE_INTEGER;
+    const rightPanelOrder = right.panel_order ?? Number.MAX_SAFE_INTEGER;
+    if (leftPanelOrder != rightPanelOrder) {
+      return leftPanelOrder - rightPanelOrder;
+    }
+
+    const leftOrderInPanel = left.order_in_panel ?? Number.MAX_SAFE_INTEGER;
+    const rightOrderInPanel = right.order_in_panel ?? Number.MAX_SAFE_INTEGER;
+    if (leftOrderInPanel !== rightOrderInPanel) {
+      return leftOrderInPanel - rightOrderInPanel;
+    }
+
+    if (left.bounding_box.y !== right.bounding_box.y) {
+      return left.bounding_box.y - right.bounding_box.y;
+    }
+    return left.bounding_box.x - right.bounding_box.x;
+  });
   const selectedDialogue =
     dialogues.find((candidate) => candidate.id === selectedDialogueId) ?? null;
   const selectedDialogueAssignment =
@@ -1306,12 +1330,14 @@ export function PageEditorShell({
               <p className="empty-state">{messages.editor.regionsEmpty}</p>
             ) : (
               <div className="editor-region-list">
-                {regions.map((region, index) => {
+                {orderedRegions.map((region, index) => {
                   const isSelected = region.id === selectedRegionId;
                   return (
                     <article className={getRegionCardClassName(region, isSelected)} key={region.id}>
                       <div className="editor-region-card-header">
-                        <span className="card-step">{formatRegionIndexLabel(index)}</span>
+                        <span className="card-step">
+                          {formatRegionReadingOrderLabel(region, index)}
+                        </span>
                         <span className="editor-region-state-pill">
                           {messages.editor.regionStateLabels[region.state]}
                         </span>
@@ -1343,6 +1369,22 @@ export function PageEditorShell({
                 <div className="editor-selection-meta">
                   <span className="status-item-label">{messages.editor.regionTypeLabel}</span>
                   <strong>{messages.editor.regionTypeLabels[selectedRegion.type]}</strong>
+                </div>
+                <div className="editor-selection-meta">
+                  <span className="status-item-label">{messages.editor.regionReadingOrderLabel}</span>
+                  <strong>
+                    {selectedRegion.global_reading_order ?? messages.editor.regionOrderUnknown}
+                  </strong>
+                </div>
+                <div className="editor-selection-meta">
+                  <span className="status-item-label">{messages.editor.regionPanelOrderLabel}</span>
+                  <strong>{selectedRegion.panel_order ?? messages.editor.regionOrderUnknown}</strong>
+                </div>
+                <div className="editor-selection-meta">
+                  <span className="status-item-label">{messages.editor.regionOrderInPanelLabel}</span>
+                  <strong>
+                    {selectedRegion.order_in_panel ?? messages.editor.regionOrderUnknown}
+                  </strong>
                 </div>
                 <div className="editor-selection-meta">
                   <span className="status-item-label">{messages.editor.regionStateLabel}</span>
@@ -2186,7 +2228,7 @@ export function PageEditorShell({
                 ) : null}
 
                 {showContextAreas
-                  ? regions.map((region, index) => {
+                  ? orderedRegions.map((region, index) => {
                       const isSelected = region.id === selectedRegionId;
                       const isActiveArea = isSelected && selectedRegionArea === "context_area";
                       return (
@@ -2209,7 +2251,9 @@ export function PageEditorShell({
                           )}
                           type="button"
                         >
-                          <span className="editor-region-chip">{formatRegionIndexLabel(index)}</span>
+                          <span className="editor-region-chip">
+                            {formatRegionReadingOrderLabel(region, index)}
+                          </span>
                           <span className="editor-region-caption">
                             {messages.editor.regionTypeLabels[region.type]}
                           </span>
@@ -2219,7 +2263,7 @@ export function PageEditorShell({
                   : null}
 
                 {showTextAreas
-                  ? regions.map((region, index) => {
+                  ? orderedRegions.map((region, index) => {
                       const isSelected = region.id === selectedRegionId;
                       const isActiveArea = isSelected && selectedRegionArea === "text_area";
                       return (
@@ -2242,7 +2286,9 @@ export function PageEditorShell({
                           )}
                           type="button"
                         >
-                          <span className="editor-region-chip">{formatRegionIndexLabel(index)}</span>
+                          <span className="editor-region-chip">
+                            {formatRegionReadingOrderLabel(region, index)}
+                          </span>
                           <span className="editor-region-caption">
                             {messages.editor.areaKindLabels.text_area}
                           </span>

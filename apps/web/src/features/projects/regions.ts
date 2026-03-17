@@ -22,6 +22,10 @@ type RegionOverlayInput = {
   bounding_box: RegionBoundingBox;
   text_area?: RegionBoundingBox;
   context_area?: RegionBoundingBox;
+  panel_area?: RegionBoundingBox;
+  panel_order?: number | null;
+  order_in_panel?: number | null;
+  global_reading_order?: number | null;
 };
 
 const MIN_REGION_SIZE = 24;
@@ -74,6 +78,14 @@ export function formatRegionBounds(region: RegionOverlayInput) {
 
 export function formatRegionIndexLabel(index: number) {
   return `R${String(index + 1).padStart(2, "0")}`;
+}
+
+export function formatRegionReadingOrderLabel(
+  region: RegionOverlayInput,
+  fallbackIndex: number,
+) {
+  const readingOrder = region.global_reading_order ?? fallbackIndex + 1;
+  return `R${String(readingOrder).padStart(2, "0")}`;
 }
 
 export function moveBoundingBox(

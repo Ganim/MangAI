@@ -273,6 +273,10 @@ def test_page_regions_can_be_created_listed_and_updated(client: TestClient) -> N
     assert created_region["state"] == "draft"
     assert created_region["text_area"]["width"] == created_region["bounding_box"]["width"]
     assert created_region["context_area"]["width"] == created_region["bounding_box"]["width"]
+    assert created_region["panel_area"]["width"] == created_region["bounding_box"]["width"]
+    assert created_region["panel_order"] is None
+    assert created_region["order_in_panel"] is None
+    assert created_region["global_reading_order"] is None
 
     list_response = client.get(f"/api/v1/projects/{project_id}/pages/{page_id}/regions")
     assert list_response.status_code == 200
@@ -299,6 +303,7 @@ def test_page_regions_can_be_created_listed_and_updated(client: TestClient) -> N
     assert updated_region["bounding_box"]["x"] == 30
     assert updated_region["text_area"]["x"] == 30
     assert updated_region["context_area"]["x"] == 30
+    assert updated_region["panel_area"]["x"] == 30
     assert updated_region["shape"]["points"][1]["x"] == 162
 
     split_update_response = client.patch(
@@ -324,6 +329,7 @@ def test_page_regions_can_be_created_listed_and_updated(client: TestClient) -> N
     assert split_updated_region["bounding_box"]["x"] == 36
     assert split_updated_region["text_area"]["x"] == 36
     assert split_updated_region["context_area"]["x"] == 12
+    assert split_updated_region["panel_area"]["x"] == 12
     assert split_updated_region["shape"]["points"][1]["x"] == 146
 
 

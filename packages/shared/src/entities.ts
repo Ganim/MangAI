@@ -196,6 +196,12 @@ export function parseRegion(value: unknown, path: Array<string | number> = []) {
       (input, inputPath) => parseBoundingBox(input, inputPath),
       atPath(path, "context_area"),
     ) ?? boundingBox;
+  const panelArea =
+    readOptional(
+      objectValue.panel_area,
+      (input, inputPath) => parseBoundingBox(input, inputPath),
+      atPath(path, "panel_area"),
+    ) ?? contextArea;
 
   return {
     id: readUuid(objectValue.id, atPath(path, "id")),
@@ -219,6 +225,25 @@ export function parseRegion(value: unknown, path: Array<string | number> = []) {
     bounding_box: boundingBox,
     text_area: textArea,
     context_area: contextArea,
+    panel_area: panelArea,
+    panel_order:
+      readNullable(
+        objectValue.panel_order,
+        (input, inputPath) => readNumber(input, inputPath, { integer: true, min: 1 }),
+        atPath(path, "panel_order"),
+      ) ?? null,
+    order_in_panel:
+      readNullable(
+        objectValue.order_in_panel,
+        (input, inputPath) => readNumber(input, inputPath, { integer: true, min: 1 }),
+        atPath(path, "order_in_panel"),
+      ) ?? null,
+    global_reading_order:
+      readNullable(
+        objectValue.global_reading_order,
+        (input, inputPath) => readNumber(input, inputPath, { integer: true, min: 1 }),
+        atPath(path, "global_reading_order"),
+      ) ?? null,
     shape: parsePolygonShape(objectValue.shape, atPath(path, "shape")),
     ...parseEntityTimestamps(objectValue, path),
   };

@@ -265,7 +265,14 @@ class LocalProjectStore:
             region.model_copy(deep=True)
             for region in sorted(
                 [candidate for candidate in state.regions if candidate.page_id == page_id],
-                key=lambda region: region.created_at,
+                key=lambda region: (
+                    region.global_reading_order if region.global_reading_order is not None else 9999,
+                    region.panel_order if region.panel_order is not None else 9999,
+                    region.order_in_panel if region.order_in_panel is not None else 9999,
+                    region.bounding_box.y,
+                    region.bounding_box.x,
+                    region.created_at,
+                ),
             )
         ]
 
@@ -718,6 +725,10 @@ class LocalProjectStore:
                 bounding_box=payload.bounding_box,
                 text_area=payload.bounding_box,
                 context_area=payload.bounding_box,
+                panel_area=payload.bounding_box,
+                panel_order=None,
+                order_in_panel=None,
+                global_reading_order=None,
                 shape=self._polygon_shape_from_bounding_box(payload.bounding_box),
                 created_at=now,
                 updated_at=now,
@@ -751,6 +762,15 @@ class LocalProjectStore:
                     payload.context_area or region.context_area or region.bounding_box
                 )
             next_bounding_box = payload.bounding_box or next_text_area
+            next_panel_area = (
+                next_context_area
+                if (
+                    region.panel_area is None
+                    or region.panel_area == region.context_area
+                    or region.panel_area == region.bounding_box
+                )
+                else region.panel_area
+            )
             next_region = region.model_copy(
                 update={
                     "type": payload.type or region.type,
@@ -758,6 +778,7 @@ class LocalProjectStore:
                     "bounding_box": next_bounding_box,
                     "text_area": next_text_area,
                     "context_area": next_context_area,
+                    "panel_area": next_panel_area,
                     "shape": self._polygon_shape_from_bounding_box(next_text_area),
                     "updated_at": _utcnow(),
                 }
@@ -1202,6 +1223,9 @@ class LocalProjectStore:
                     and candidate.type in supported_region_types
                 ],
                 key=lambda candidate: (
+                    candidate.global_reading_order if candidate.global_reading_order is not None else 9999,
+                    candidate.panel_order if candidate.panel_order is not None else 9999,
+                    candidate.order_in_panel if candidate.order_in_panel is not None else 9999,
                     candidate.bounding_box.y,
                     candidate.bounding_box.x,
                     candidate.created_at,

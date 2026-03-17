@@ -170,6 +170,7 @@ def _apply_detect_regions_result(
         page_id=page_id,
         detected_candidates=detected_candidates,
         timestamp=timestamp,
+        source_language=str(project.get("source_language") or "ja-JP"),
     )
 
     preserved_regions = [
@@ -620,6 +621,7 @@ def _build_detected_regions(
     page_id: str,
     detected_candidates: list[Any],
     timestamp: str,
+    source_language: str,
 ) -> list[dict[str, Any]]:
     regions: list[dict[str, Any]] = []
     for candidate in detected_candidates:
@@ -649,12 +651,184 @@ def _build_detected_regions(
                 "bounding_box": text_area,
                 "text_area": text_area,
                 "context_area": context_area,
+                "panel_area": context_area,
+                "panel_order": None,
+                "order_in_panel": None,
+                "global_reading_order": None,
                 "shape": _polygon_shape(text_area),
                 "created_at": timestamp,
                 "updated_at": timestamp,
             }
         )
-    return regions
+    return _apply_region_reading_metadata(regions, source_language=source_language)
+
+
+def _apply_region_reading_metadata(
+    regions: list[dict[str, Any]],
+    *,
+    source_language: str,
+) -> list[dict[str, Any]]:
+    if len(regions) == 0:
+        return regions
+
+    reading_direction = _infer_page_reading_direction(source_language)
+    columns = _group_regions_into_columns(regions)
+    ordered_columns = sorted(
+        columns,
+        key=lambda column: column["bounds"]["x"],
+        reverse=reading_direction == "rtl",
+    )
+
+    panel_order = 1
+    global_order = 1
+    annotated_regions: list[dict[str, Any]] = []
+    for column in ordered_columns:
+        panel_groups = _split_column_into_panel_groups(column["regions"])
+        for panel_group in panel_groups:
+            panel_area = _merge_region_areas(panel_group)
+            ordered_panel_regions = _sort_regions_within_panel(
+                panel_group,
+                reading_direction=reading_direction,
+            )
+            for order_in_panel, region in enumerate(ordered_panel_regions, start=1):
+                region["panel_area"] = panel_area
+                region["panel_order"] = panel_order
+                region["order_in_panel"] = order_in_panel
+                region["global_reading_order"] = global_order
+                annotated_regions.append(region)
+                global_order += 1
+            panel_order += 1
+
+    return annotated_regions
+
+
+def _infer_page_reading_direction(source_language: str) -> str:
+    normalized = source_language.split("-", 1)[0].lower()
+    return "rtl" if normalized in {"ja", "zh"} else "ltr"
+
+
+def _group_regions_into_columns(regions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    ordered_regions = sorted(
+        regions,
+        key=lambda region: (
+            _get_region_area(region, "context_area")["x"],
+            _get_region_area(region, "context_area")["y"],
+        ),
+    )
+    columns: list[dict[str, Any]] = []
+    for region in ordered_regions:
+        area = _get_region_area(region, "context_area")
+        target_column = next(
+            (
+                column
+                for column in columns
+                if _should_assign_region_to_column(area, column["bounds"])
+            ),
+            None,
+        )
+        if target_column is None:
+            columns.append({"regions": [region], "bounds": dict(area)})
+            continue
+
+        target_column["regions"].append(region)
+        target_column["bounds"] = _merge_bounding_boxes(target_column["bounds"], area)
+    return columns
+
+
+def _should_assign_region_to_column(
+    region_area: dict[str, Any],
+    column_area: dict[str, Any],
+) -> bool:
+    region_x1 = float(region_area["x"])
+    region_x2 = region_x1 + float(region_area["width"])
+    column_x1 = float(column_area["x"])
+    column_x2 = column_x1 + float(column_area["width"])
+    horizontal_overlap = _axis_overlap(region_x1, region_x2, column_x1, column_x2)
+    horizontal_gap = _axis_gap(region_x1, region_x2, column_x1, column_x2)
+    minimum_width = max(min(float(region_area["width"]), float(column_area["width"])), 1.0)
+    return (
+        horizontal_overlap >= minimum_width * 0.26
+        or horizontal_gap <= max(54.0, minimum_width * 0.58)
+    )
+
+
+def _split_column_into_panel_groups(column_regions: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
+    if len(column_regions) <= 1:
+        return [column_regions]
+
+    ordered_regions = sorted(
+        column_regions,
+        key=lambda region: (
+            _get_region_area(region, "context_area")["y"],
+            _get_region_area(region, "context_area")["x"],
+        ),
+    )
+    groups: list[list[dict[str, Any]]] = [[ordered_regions[0]]]
+    for region in ordered_regions[1:]:
+        current_area = _get_region_area(region, "context_area")
+        previous_area = _get_region_area(groups[-1][-1], "context_area")
+        vertical_gap = _axis_gap(
+            float(previous_area["y"]),
+            float(previous_area["y"]) + float(previous_area["height"]),
+            float(current_area["y"]),
+            float(current_area["y"]) + float(current_area["height"]),
+        )
+        if vertical_gap > max(96.0, min(float(previous_area["height"]), float(current_area["height"])) * 0.75):
+            groups.append([region])
+            continue
+        groups[-1].append(region)
+    return groups
+
+
+def _sort_regions_within_panel(
+    regions: list[dict[str, Any]],
+    *,
+    reading_direction: str,
+) -> list[dict[str, Any]]:
+    return sorted(
+        regions,
+        key=lambda region: (
+            round(float(_get_region_area(region, "context_area")["y"]) / 24),
+            -float(_get_region_area(region, "context_area")["x"])
+            if reading_direction == "rtl"
+            else float(_get_region_area(region, "context_area")["x"]),
+            float(_get_region_area(region, "context_area")["y"]),
+        ),
+    )
+
+
+def _merge_region_areas(regions: list[dict[str, Any]]) -> dict[str, float]:
+    merged = _get_region_area(regions[0], "context_area")
+    for region in regions[1:]:
+        merged = _merge_bounding_boxes(merged, _get_region_area(region, "context_area"))
+    return merged
+
+
+def _merge_bounding_boxes(
+    left: dict[str, Any],
+    right: dict[str, Any],
+) -> dict[str, float]:
+    x1 = min(float(left["x"]), float(right["x"]))
+    y1 = min(float(left["y"]), float(right["y"]))
+    x2 = max(float(left["x"]) + float(left["width"]), float(right["x"]) + float(right["width"]))
+    y2 = max(float(left["y"]) + float(left["height"]), float(right["y"]) + float(right["height"]))
+    return _bounding_box(x1, y1, x2 - x1, y2 - y1)
+
+
+def _get_region_area(region: dict[str, Any], key: str) -> dict[str, Any]:
+    return _require_dict(region.get(key) or region.get("bounding_box"), key)
+
+
+def _axis_gap(left_start: float, left_end: float, right_start: float, right_end: float) -> float:
+    if left_end < right_start:
+        return right_start - left_end
+    if right_end < left_start:
+        return left_start - right_end
+    return 0.0
+
+
+def _axis_overlap(left_start: float, left_end: float, right_start: float, right_end: float) -> float:
+    return max(0.0, min(left_end, right_end) - max(left_start, right_start))
 
 
 def _build_overlay_asset(
@@ -683,6 +857,10 @@ def _build_overlay_asset(
                 "bounding_box": region["bounding_box"],
                 "text_area": region.get("text_area") or region["bounding_box"],
                 "context_area": region.get("context_area") or region["bounding_box"],
+                "panel_area": region.get("panel_area") or region.get("context_area") or region["bounding_box"],
+                "panel_order": region.get("panel_order"),
+                "order_in_panel": region.get("order_in_panel"),
+                "global_reading_order": region.get("global_reading_order"),
             }
             for region in regions
         ],
@@ -822,6 +1000,21 @@ def _build_ocr_candidate_region(
         y=float(bounding_box.get("y") or 0),
         width=float(bounding_box.get("width") or 1),
         height=float(bounding_box.get("height") or 1),
+        panel_order=(
+            int(region["panel_order"])
+            if region.get("panel_order") is not None
+            else None
+        ),
+        order_in_panel=(
+            int(region["order_in_panel"])
+            if region.get("order_in_panel") is not None
+            else None
+        ),
+        global_reading_order=(
+            int(region["global_reading_order"])
+            if region.get("global_reading_order") is not None
+            else None
+        ),
     )
 
 

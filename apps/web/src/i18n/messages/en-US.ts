@@ -178,11 +178,15 @@ export type AppMessages = {
     selectionCopy: string;
     selectionEmpty: string;
     regionTypeLabel: string;
+    regionReadingOrderLabel: string;
+    regionPanelOrderLabel: string;
+    regionOrderInPanelLabel: string;
     regionStateLabel: string;
     regionOriginLabel: string;
     regionBoundsLabel: string;
     regionConfidenceLabel: string;
     regionConfidenceUnknown: string;
+    regionOrderUnknown: string;
     cleanupStrategyLabel: string;
     cleanupStrategyUnknown: string;
     cleanupStrategyLabels: CleanupStrategyLabels;
@@ -526,11 +530,15 @@ export const enUSMessages: AppMessages = {
       "Keep the review loop lightweight: inspect one region, confirm its state, then move to the next without leaving the page.",
     selectionEmpty: "Select a region from the list or create a new one from the canvas toolbar.",
     regionTypeLabel: "Type",
+    regionReadingOrderLabel: "Reading order",
+    regionPanelOrderLabel: "Panel order",
+    regionOrderInPanelLabel: "Order in panel",
     regionStateLabel: "State",
     regionOriginLabel: "Origin",
     regionBoundsLabel: "Bounds",
     regionConfidenceLabel: "Confidence",
     regionConfidenceUnknown: "Manual",
+    regionOrderUnknown: "Not assigned",
     cleanupStrategyLabel: "Suggested cleanup",
     cleanupStrategyUnknown: "Needs review",
     cleanupStrategyLabels: {

@@ -4,6 +4,7 @@ import {
   buildDefaultRegionInput,
   formatRegionBounds,
   formatRegionIndexLabel,
+  formatRegionReadingOrderLabel,
   getBoundingBoxOverlayStyle,
   getBoundingBoxAdjustmentStep,
   getPageCanvasSize,
@@ -131,6 +132,21 @@ assert.equal(
 );
 assert.equal(formatRegionIndexLabel(0), "R01");
 assert.equal(formatRegionIndexLabel(11), "R12");
+assert.equal(
+  formatRegionReadingOrderLabel(
+    {
+      bounding_box: {
+        x: 160,
+        y: 240,
+        width: 320,
+        height: 480,
+      },
+      global_reading_order: 7,
+    },
+    0,
+  ),
+  "R07",
+);
 
 const movedBox = moveBoundingBox(
   {

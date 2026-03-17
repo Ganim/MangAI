@@ -3,7 +3,11 @@ from pathlib import Path
 
 from mangai_workers.config import WorkerSettings
 import mangai_workers.queue as worker_queue
-from mangai_workers.queue import has_pending_jobs, process_next_job
+from mangai_workers.queue import (
+    _apply_region_reading_metadata,
+    has_pending_jobs,
+    process_next_job,
+)
 
 
 def seed_state(data_dir, *, job_status: str = "queued") -> str:
@@ -634,6 +638,8 @@ def test_process_next_job_generates_detected_regions_and_overlay(tmp_path) -> No
     assert all(region["confidence"] is not None for region in state["regions"])
     assert all("text_area" in region for region in state["regions"])
     assert all("context_area" in region for region in state["regions"])
+    assert all(region["panel_area"] for region in state["regions"])
+    assert all(region["global_reading_order"] >= 1 for region in state["regions"])
     overlay_asset = next(asset for asset in state["assets"] if asset["kind"] == "overlay")
     overlay_path = data_dir / "assets" / overlay_asset["storage_key"]
     assert overlay_path.exists()
@@ -642,6 +648,43 @@ def test_process_next_job_generates_detected_regions_and_overlay(tmp_path) -> No
     assert len(overlay_payload["regions"]) == overlay_payload["regions_created"]
     assert all("text_area" in region for region in overlay_payload["regions"])
     assert all("context_area" in region for region in overlay_payload["regions"])
+    assert all("panel_area" in region for region in overlay_payload["regions"])
+
+
+def test_apply_region_reading_metadata_prioritizes_right_column_for_japanese() -> None:
+    annotated = _apply_region_reading_metadata(
+        [
+            {
+                "id": "left-top",
+                "bounding_box": {"x": 140, "y": 120, "width": 120, "height": 220},
+                "text_area": {"x": 140, "y": 120, "width": 120, "height": 220},
+                "context_area": {"x": 120, "y": 100, "width": 180, "height": 300},
+            },
+            {
+                "id": "right-top",
+                "bounding_box": {"x": 760, "y": 90, "width": 140, "height": 220},
+                "text_area": {"x": 760, "y": 90, "width": 140, "height": 220},
+                "context_area": {"x": 730, "y": 70, "width": 220, "height": 320},
+            },
+            {
+                "id": "right-bottom",
+                "bounding_box": {"x": 700, "y": 520, "width": 180, "height": 260},
+                "text_area": {"x": 700, "y": 520, "width": 180, "height": 260},
+                "context_area": {"x": 660, "y": 470, "width": 260, "height": 360},
+            },
+        ],
+        source_language="ja-JP",
+    )
+
+    assert [region["id"] for region in annotated] == ["right-top", "right-bottom", "left-top"]
+    assert [region["global_reading_order"] for region in annotated] == [1, 2, 3]
+    assert annotated[0]["panel_order"] == 1
+    assert annotated[1]["panel_order"] == 1
+    assert annotated[2]["panel_order"] == 2
+    assert annotated[0]["order_in_panel"] == 1
+    assert annotated[1]["order_in_panel"] == 2
+    assert annotated[2]["order_in_panel"] == 1
+    assert annotated[0]["panel_area"] == annotated[1]["panel_area"]
 
 
 def test_process_next_job_returns_none_without_queued_jobs(tmp_path) -> None:

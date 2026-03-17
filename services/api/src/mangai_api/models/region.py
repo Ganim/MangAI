@@ -44,6 +44,10 @@ class RegionRecord(APIModel):
     bounding_box: BoundingBox
     text_area: BoundingBox | None = None
     context_area: BoundingBox | None = None
+    panel_area: BoundingBox | None = None
+    panel_order: int | None = Field(default=None, ge=1)
+    order_in_panel: int | None = Field(default=None, ge=1)
+    global_reading_order: int | None = Field(default=None, ge=1)
     shape: PolygonShape
     created_at: datetime
     updated_at: datetime
@@ -60,6 +64,8 @@ class RegionRecord(APIModel):
             next_value["text_area"] = bounding_box
         if next_value.get("context_area") is None:
             next_value["context_area"] = bounding_box
+        if next_value.get("panel_area") is None:
+            next_value["panel_area"] = next_value.get("context_area") or bounding_box
         return next_value
 
 
