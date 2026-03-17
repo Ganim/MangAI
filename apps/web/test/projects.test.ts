@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 
-import { resolveApiAssetUrl } from "../src/features/projects/api.ts";
+import {
+  deletePageRegion,
+  resetPageRegions,
+  resolveApiAssetUrl,
+} from "../src/features/projects/api.ts";
 import {
   buildUploadFormData,
   buildRegisterPagesPayload,
@@ -58,6 +62,42 @@ assert.equal(
   resolveApiAssetUrl("http://cdn.example.com/page.jpg"),
   "http://cdn.example.com/page.jpg",
 );
+
+if (previousApiUrl === undefined) {
+  delete process.env.NEXT_PUBLIC_MANGAI_API_URL;
+} else {
+  process.env.NEXT_PUBLIC_MANGAI_API_URL = previousApiUrl;
+}
+
+const originalFetch = globalThis.fetch;
+const requestLog: string[] = [];
+
+globalThis.fetch = async (input, init) => {
+  const requestUrl = input instanceof Request ? input.url : String(input);
+  requestLog.push(`${init?.method ?? "GET"} ${requestUrl}`);
+  return new Response(JSON.stringify({ regions: [] }), {
+    status: 200,
+    headers: {
+      "content-type": "application/json",
+    },
+  });
+};
+
+process.env.NEXT_PUBLIC_MANGAI_API_URL = "http://127.0.0.1:8001/api/v1";
+
+await deletePageRegion("project-1", "page-1", "region-1");
+await resetPageRegions("project-1", "page-1");
+
+assert.deepEqual(requestLog, [
+  "DELETE http://127.0.0.1:8001/api/v1/projects/project-1/pages/page-1/regions/region-1",
+  "POST http://127.0.0.1:8001/api/v1/projects/project-1/pages/page-1/regions/reset",
+]);
+
+if (originalFetch === undefined) {
+  delete globalThis.fetch;
+} else {
+  globalThis.fetch = originalFetch;
+}
 
 if (previousApiUrl === undefined) {
   delete process.env.NEXT_PUBLIC_MANGAI_API_URL;

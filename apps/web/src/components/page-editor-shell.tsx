@@ -11,6 +11,7 @@ import {
   createManualDialogue,
   createPageJob,
   createPageRegion,
+  deletePageRegion,
   getPageAssignments,
   getPageDialogues,
   getPageJobs,
@@ -19,6 +20,7 @@ import {
   getPageRegions,
   getPageTranslations,
   getProjectDetail,
+  resetPageRegions,
   resolveApiAssetUrl,
   updateManualDialogue,
   updateMaskRevision,
@@ -142,11 +144,13 @@ export function PageEditorShell({
   const [isQueueingOcr, setIsQueueingOcr] = useState(false);
   const [isQueueingTranslation, setIsQueueingTranslation] = useState(false);
   const [isQueueingMatching, setIsQueueingMatching] = useState(false);
+  const [isResettingRegions, setIsResettingRegions] = useState(false);
   const [isCreatingMaskRevision, setIsCreatingMaskRevision] = useState(false);
   const [isSavingDialogue, setIsSavingDialogue] = useState(false);
   const [isExportingJpeg, setIsExportingJpeg] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingPsd, setIsExportingPsd] = useState(false);
+  const [deletingRegionId, setDeletingRegionId] = useState<string | null>(null);
   const [updatingRegionId, setUpdatingRegionId] = useState<string | null>(null);
   const [updatingMaskRevisionId, setUpdatingMaskRevisionId] = useState<string | null>(null);
   const [updatingPlacementId, setUpdatingPlacementId] = useState<string | null>(null);
@@ -218,6 +222,82 @@ export function PageEditorShell({
       assignments: assignmentsResponse.assignments,
       placements: placementsResponse.placements,
     };
+  }
+
+  async function fetchPageEditorStateSnapshot(nextPageId: string) {
+    const [
+      projectResponse,
+      jobsResponse,
+      regionsResponse,
+      maskRevisionsResponse,
+      dialoguesResponse,
+      translationsResponse,
+      assignmentsResponse,
+      placementsResponse,
+    ] = await Promise.all([
+      getProjectDetail(projectId),
+      getPageJobs(projectId, nextPageId),
+      getPageRegions(projectId, nextPageId),
+      getPageMaskRevisions(projectId, nextPageId),
+      getPageDialogues(projectId, nextPageId),
+      getPageTranslations(projectId, nextPageId),
+      getPageAssignments(projectId, nextPageId),
+      getPagePlacements(projectId, nextPageId),
+    ]);
+
+    return {
+      projectResponse,
+      jobsResponse,
+      regionsResponse,
+      maskRevisionsResponse,
+      dialoguesResponse,
+      translationsResponse,
+      assignmentsResponse,
+      placementsResponse,
+    };
+  }
+
+  function applyPageEditorStateSnapshot(
+    snapshot: Awaited<ReturnType<typeof fetchPageEditorStateSnapshot>>,
+  ) {
+    const {
+      projectResponse,
+      jobsResponse,
+      regionsResponse,
+      maskRevisionsResponse,
+      dialoguesResponse,
+      translationsResponse,
+      assignmentsResponse,
+      placementsResponse,
+    } = snapshot;
+
+    setProjectDetail(projectResponse);
+    setJobs(jobsResponse.jobs);
+    setRegions(regionsResponse.regions);
+    setMaskRevisions(maskRevisionsResponse.mask_revisions);
+    setDialogues(dialoguesResponse.dialogues);
+    setTranslations(translationsResponse.translations);
+    setAssignments(assignmentsResponse.assignments);
+    setPlacements(placementsResponse.placements);
+    setSelectedRegionId((currentSelectedRegionId) =>
+      regionsResponse.regions.some((region) => region.id === currentSelectedRegionId)
+        ? currentSelectedRegionId
+        : (regionsResponse.regions[0]?.id ?? null),
+    );
+    setSelectedDialogueId((currentSelectedDialogueId) =>
+      dialoguesResponse.dialogues.some((dialogue) => dialogue.id === currentSelectedDialogueId)
+        ? currentSelectedDialogueId
+        : (dialoguesResponse.dialogues[0]?.id ?? null),
+    );
+    setJobLoadError(null);
+    setRegionLoadError(null);
+    setMaskLoadError(null);
+    setTextLoadError(null);
+  }
+
+  async function refreshPageEditorState(nextPageId: string) {
+    const snapshot = await fetchPageEditorStateSnapshot(nextPageId);
+    applyPageEditorStateSnapshot(snapshot);
   }
 
   useEffect(() => {
@@ -400,50 +480,11 @@ export function PageEditorShell({
 
     async function pollPageAutomationState() {
       try {
-        const [
-          projectResponse,
-          jobsResponse,
-          regionsResponse,
-          maskRevisionsResponse,
-          dialoguesResponse,
-          translationsResponse,
-          assignmentsResponse,
-          placementsResponse,
-        ] = await Promise.all([
-          getProjectDetail(projectId),
-          getPageJobs(projectId, nextPage.id),
-          getPageRegions(projectId, nextPage.id),
-          getPageMaskRevisions(projectId, nextPage.id),
-          getPageDialogues(projectId, nextPage.id),
-          getPageTranslations(projectId, nextPage.id),
-          getPageAssignments(projectId, nextPage.id),
-          getPagePlacements(projectId, nextPage.id),
-        ]);
+        const snapshot = await fetchPageEditorStateSnapshot(nextPage.id);
         if (canceled) {
           return;
         }
-        setProjectDetail(projectResponse);
-        setJobs(jobsResponse.jobs);
-        setRegions(regionsResponse.regions);
-        setMaskRevisions(maskRevisionsResponse.mask_revisions);
-        setDialogues(dialoguesResponse.dialogues);
-        setTranslations(translationsResponse.translations);
-        setAssignments(assignmentsResponse.assignments);
-        setPlacements(placementsResponse.placements);
-        setSelectedRegionId((currentSelectedRegionId) =>
-          regionsResponse.regions.some((region) => region.id === currentSelectedRegionId)
-            ? currentSelectedRegionId
-            : (regionsResponse.regions[0]?.id ?? null),
-        );
-        setSelectedDialogueId((currentSelectedDialogueId) =>
-          dialoguesResponse.dialogues.some((dialogue) => dialogue.id === currentSelectedDialogueId)
-            ? currentSelectedDialogueId
-            : (dialoguesResponse.dialogues[0]?.id ?? null),
-        );
-        setJobLoadError(null);
-        setRegionLoadError(null);
-        setMaskLoadError(null);
-        setTextLoadError(null);
+        applyPageEditorStateSnapshot(snapshot);
       } catch (error) {
         if (canceled) {
           return;
@@ -517,6 +558,7 @@ export function PageEditorShell({
     assignments,
     placements,
   });
+  const hasPendingJobsForPage = hasPendingPageJobs(jobs);
 
   async function handleCreateRegion() {
     if (currentPage === null) {
@@ -590,6 +632,42 @@ export function PageEditorShell({
       setRegionActionError(getErrorMessage(error, messages.editor.regionUpdateErrorFallback));
     } finally {
       setUpdatingRegionId(null);
+    }
+  }
+
+  async function handleDeleteSelectedRegion() {
+    if (currentPage === null || selectedRegion === null) {
+      return;
+    }
+
+    setDeletingRegionId(selectedRegion.id);
+    setRegionActionError(null);
+
+    try {
+      await deletePageRegion(projectId, currentPage.id, selectedRegion.id);
+      await refreshPageEditorState(currentPage.id);
+    } catch (error) {
+      setRegionActionError(getErrorMessage(error, messages.editor.regionDeleteErrorFallback));
+    } finally {
+      setDeletingRegionId(null);
+    }
+  }
+
+  async function handleResetRegions() {
+    if (currentPage === null) {
+      return;
+    }
+
+    setIsResettingRegions(true);
+    setRegionActionError(null);
+
+    try {
+      await resetPageRegions(projectId, currentPage.id);
+      await refreshPageEditorState(currentPage.id);
+    } catch (error) {
+      setRegionActionError(getErrorMessage(error, messages.editor.regionResetErrorFallback));
+    } finally {
+      setIsResettingRegions(false);
     }
   }
 
@@ -1071,7 +1149,7 @@ export function PageEditorShell({
                 <div className="editor-selection-actions">
                   <button
                     className="ghost-button"
-                    disabled={updatingRegionId === selectedRegion.id}
+                    disabled={updatingRegionId === selectedRegion.id || hasPendingJobsForPage}
                     onClick={() => void handleUpdateRegionState("reviewed")}
                     type="button"
                   >
@@ -1079,7 +1157,7 @@ export function PageEditorShell({
                   </button>
                   <button
                     className="secondary-button"
-                    disabled={updatingRegionId === selectedRegion.id}
+                    disabled={updatingRegionId === selectedRegion.id || hasPendingJobsForPage}
                     onClick={() => void handleUpdateRegionState("approved")}
                     type="button"
                   >
@@ -1087,11 +1165,21 @@ export function PageEditorShell({
                   </button>
                   <button
                     className="ghost-button"
-                    disabled={updatingRegionId === selectedRegion.id}
+                    disabled={updatingRegionId === selectedRegion.id || hasPendingJobsForPage}
                     onClick={() => void handleUpdateRegionState("draft")}
                     type="button"
                   >
                     {messages.editor.resetRegionAction}
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={deletingRegionId === selectedRegion.id || hasPendingJobsForPage}
+                    onClick={() => void handleDeleteSelectedRegion()}
+                    type="button"
+                  >
+                    {deletingRegionId === selectedRegion.id
+                      ? messages.editor.deletingRegionAction
+                      : messages.editor.deleteRegionAction}
                   </button>
                 </div>
 
@@ -1352,6 +1440,16 @@ export function PageEditorShell({
                 {isQueueingDetection
                   ? messages.editor.queuingDetectionAction
                   : messages.editor.queueDetectionAction}
+              </button>
+              <button
+                className="ghost-button"
+                disabled={isResettingRegions || regions.length === 0 || hasPendingJobsForPage}
+                onClick={() => void handleResetRegions()}
+                type="button"
+              >
+                {isResettingRegions
+                  ? messages.editor.resettingRegionsAction
+                  : messages.editor.resetRegionsAction}
               </button>
               <button
                 className="secondary-button"

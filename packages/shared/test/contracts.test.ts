@@ -52,6 +52,7 @@ import {
 const UUID = "11111111-1111-4111-8111-111111111111";
 const UUID_2 = "22222222-2222-4222-8222-222222222222";
 const UUID_3 = "33333333-3333-4333-8333-333333333333";
+const UUID_4 = "44444444-4444-4444-8444-444444444444";
 
 assert.equal(canonicalizeLanguageTag("pt-br"), "pt-BR");
 assert.deepEqual(SUPPORTED_UI_LOCALES, ["en-US", "pt-BR"]);
@@ -352,6 +353,38 @@ assert.equal(parsedRegionResponse.region.state, "approved");
 assert.equal(parsedRegionResponse.region.cleanup_strategy, "background_reconstruction");
 assert.equal(parsedRegionResponse.region.text_area.width, 100);
 assert.equal(parsedRegionResponse.region.context_area.width, 118);
+
+const parsedRegionWithNullCleanup = parsePageRegionResponse({
+  region: {
+    id: UUID_4,
+    page_id: UUID_2,
+    type: "speech_balloon",
+    origin: "detected",
+    state: "draft",
+    confidence: 0.84,
+    cleanup_strategy: null,
+    cleanup_confidence: null,
+    bounding_box: {
+      x: 24,
+      y: 36,
+      width: 80,
+      height: 120,
+    },
+    shape: {
+      type: "polygon",
+      points: [
+        { x: 24, y: 36 },
+        { x: 104, y: 36 },
+        { x: 104, y: 156 },
+        { x: 24, y: 156 },
+      ],
+    },
+    created_at: "2026-03-15T00:00:00Z",
+    updated_at: "2026-03-15T00:00:00Z",
+  },
+});
+
+assert.equal(parsedRegionWithNullCleanup.region.cleanup_strategy, null);
 
 const parsedCreateMaskRevision = parseCreateMaskRevisionRequest({
   region_id: UUID_3,

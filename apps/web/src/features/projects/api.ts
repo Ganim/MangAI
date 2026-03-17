@@ -324,6 +324,26 @@ export async function updatePageRegion(
   );
 }
 
+export async function deletePageRegion(projectId: string, pageId: string, regionId: string) {
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/regions/${regionId}`,
+    {
+      method: "DELETE",
+    },
+    parseListPageRegionsResponse,
+  );
+}
+
+export async function resetPageRegions(projectId: string, pageId: string) {
+  return requestJson(
+    `/projects/${projectId}/pages/${pageId}/regions/reset`,
+    {
+      method: "POST",
+    },
+    parseListPageRegionsResponse,
+  );
+}
+
 export async function createMaskRevision(
   projectId: string,
   pageId: string,

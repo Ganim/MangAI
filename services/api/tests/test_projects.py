@@ -302,6 +302,39 @@ def test_page_regions_can_be_created_listed_and_updated(client: TestClient) -> N
     assert updated_region["shape"]["points"][1]["x"] == 162
 
 
+def test_reset_page_regions_clears_regions_and_pending_region_jobs(client: TestClient) -> None:
+    project_id = create_project(client)
+    page_payload = upload_single_page(client, project_id)
+    page_id = page_payload["id"]
+
+    create_region(client, project_id, page_id)
+    create_region(client, project_id, page_id)
+
+    job_response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/jobs",
+        json={"type": "detect_regions"},
+    )
+    assert job_response.status_code == 201
+
+    reset_response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/regions/reset"
+    )
+
+    assert reset_response.status_code == 200
+    assert reset_response.json()["regions"] == []
+
+    regions_response = client.get(f"/api/v1/projects/{project_id}/pages/{page_id}/regions")
+    jobs_response = client.get(f"/api/v1/projects/{project_id}/pages/{page_id}/jobs")
+    detail_response = client.get(f"/api/v1/projects/{project_id}")
+
+    assert regions_response.status_code == 200
+    assert jobs_response.status_code == 200
+    assert detail_response.status_code == 200
+    assert regions_response.json()["regions"] == []
+    assert jobs_response.json()["jobs"] == []
+    assert detail_response.json()["pages"][0]["status"] == "uploaded"
+
+
 def test_page_mask_revisions_can_be_created_listed_and_updated(client: TestClient) -> None:
     project_id = create_project(client)
     page_payload = upload_single_page(client, project_id)
@@ -601,6 +634,115 @@ def test_manual_text_flow_persists_dialogues_translations_assignments_and_placem
     assert detail_response.status_code == 200
     detail_page = detail_response.json()["pages"][0]
     assert detail_page["status"] == "typeset_ready"
+
+
+def test_delete_page_region_removes_related_masks_assignments_and_placements(
+    client: TestClient,
+) -> None:
+    project_id = create_project(client)
+    page_payload = upload_single_page(client, project_id)
+    page_id = page_payload["id"]
+    region = create_region(client, project_id, page_id)
+
+    mask_response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/mask-revisions",
+        json={
+            "region_id": region["id"],
+            "shape": region["shape"],
+        },
+    )
+    assert mask_response.status_code == 201
+
+    dialogue_response = client.post(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/dialogues",
+        json={
+            "page_id": page_id,
+            "content": "Manual line",
+            "source_language": "ja-JP",
+            "reading_order": 1,
+        },
+    )
+    assert dialogue_response.status_code == 201
+    dialogue = dialogue_response.json()["dialogue"]
+
+    translation_response = client.put(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/translations",
+        json={
+            "dialogue_id": dialogue["id"],
+            "target_language": "pt-BR",
+            "text_direction": "ltr",
+            "content": "Linha manual",
+            "status": "approved",
+        },
+    )
+    assert translation_response.status_code == 200
+
+    assignment_response = client.put(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/assignments",
+        json={
+            "dialogue_id": dialogue["id"],
+            "region_id": region["id"],
+            "origin": "manual",
+            "approved": True,
+        },
+    )
+    assert assignment_response.status_code == 200
+    assignment = assignment_response.json()["assignment"]
+
+    placement_response = client.put(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/placements",
+        json={
+            "assignment_id": assignment["id"],
+            "text_box": region["bounding_box"],
+            "style": {
+                "font_family": "Komika",
+                "font_fallbacks": ["Arial"],
+                "font_size": 24,
+                "leading": 28,
+                "tracking": 0,
+                "alignment": "center",
+                "direction": "ltr",
+                "rotation": 0,
+                "fill": "#000000",
+            },
+        },
+    )
+    assert placement_response.status_code == 200
+
+    delete_response = client.delete(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/regions/{region['id']}"
+    )
+
+    assert delete_response.status_code == 200
+    assert delete_response.json()["regions"] == []
+
+    mask_revisions_response = client.get(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/mask-revisions"
+    )
+    dialogues_response = client.get(f"/api/v1/projects/{project_id}/pages/{page_id}/dialogues")
+    translations_response = client.get(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/translations"
+    )
+    assignments_response = client.get(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/assignments"
+    )
+    placements_response = client.get(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/placements"
+    )
+    detail_response = client.get(f"/api/v1/projects/{project_id}")
+
+    assert mask_revisions_response.status_code == 200
+    assert dialogues_response.status_code == 200
+    assert translations_response.status_code == 200
+    assert assignments_response.status_code == 200
+    assert placements_response.status_code == 200
+    assert detail_response.status_code == 200
+    assert mask_revisions_response.json()["mask_revisions"] == []
+    assert len(dialogues_response.json()["dialogues"]) == 1
+    assert len(translations_response.json()["translations"]) == 1
+    assert assignments_response.json()["assignments"] == []
+    assert placements_response.json()["placements"] == []
+    assert detail_response.json()["pages"][0]["status"] == "text_ready"
 
 
 def test_generate_translation_job_can_be_queued_for_existing_dialogues(client: TestClient) -> None:

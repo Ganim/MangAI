@@ -205,7 +205,7 @@ export function parseRegion(value: unknown, path: Array<string | number> = []) {
     state: readEnum(objectValue.state, RegionState, atPath(path, "state")),
     confidence,
     cleanup_strategy:
-      readOptional(
+      readNullable(
         objectValue.cleanup_strategy,
         (input, inputPath) => readEnum(input, CleanupStrategy, inputPath),
         atPath(path, "cleanup_strategy"),

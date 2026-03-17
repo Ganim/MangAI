@@ -158,6 +158,8 @@ export type AppMessages = {
     regionLoadErrorFallback: string;
     regionCreateErrorFallback: string;
     regionUpdateErrorFallback: string;
+    regionDeleteErrorFallback: string;
+    regionResetErrorFallback: string;
     maskLoadErrorFallback: string;
     maskCreateErrorFallback: string;
     maskUpdateErrorFallback: string;
@@ -243,6 +245,10 @@ export type AppMessages = {
     markReviewedAction: string;
     approveRegionAction: string;
     resetRegionAction: string;
+    deleteRegionAction: string;
+    deletingRegionAction: string;
+    resetRegionsAction: string;
+    resettingRegionsAction: string;
     textSectionTitle: string;
     textSectionCopy: string;
     textLoading: string;
@@ -483,6 +489,8 @@ export const enUSMessages: AppMessages = {
     regionLoadErrorFallback: "The editor could not load the saved review regions for this page.",
     regionCreateErrorFallback: "The editor could not create a new review region right now.",
     regionUpdateErrorFallback: "The editor could not update the selected region right now.",
+    regionDeleteErrorFallback: "The editor could not delete the selected region right now.",
+    regionResetErrorFallback: "The editor could not reset the saved regions for this page right now.",
     maskLoadErrorFallback: "The editor could not load the saved cleanup masks for this page.",
     maskCreateErrorFallback: "The editor could not create a cleanup mask right now.",
     maskUpdateErrorFallback: "The editor could not update the selected cleanup mask right now.",
@@ -607,6 +615,10 @@ export const enUSMessages: AppMessages = {
     markReviewedAction: "Mark reviewed",
     approveRegionAction: "Approve region",
     resetRegionAction: "Reset to draft",
+    deleteRegionAction: "Delete region",
+    deletingRegionAction: "Deleting region...",
+    resetRegionsAction: "Reset regions",
+    resettingRegionsAction: "Resetting regions...",
     textSectionTitle: "Dialogue workflow",
     textSectionCopy:
       "Manual edits now live beside OCR, automatic translation, and first-pass matching so the human review loop stays in one place.",

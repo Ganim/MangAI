@@ -758,6 +758,59 @@ class LocalProjectStore:
             self._save_state_unlocked(state.model_copy(update={"regions": next_regions}))
             return next_region.model_copy(deep=True)
 
+    def delete_page_region(
+        self,
+        project_id: UUID,
+        page_id: UUID,
+        region_id: UUID,
+    ) -> list[RegionRecord]:
+        with self._lock:
+            state = self._load_state_unlocked()
+            self._require_project(state, project_id)
+            self._require_page(state, project_id, page_id)
+            self._require_region(state, page_id, region_id)
+            next_state = self._remove_page_regions(
+                state=state,
+                page_id=page_id,
+                region_ids={region_id},
+            )
+            self._save_state_unlocked(next_state)
+            return [
+                region.model_copy(deep=True)
+                for region in sorted(
+                    [candidate for candidate in next_state.regions if candidate.page_id == page_id],
+                    key=lambda candidate: candidate.created_at,
+                )
+            ]
+
+    def reset_page_regions(
+        self,
+        project_id: UUID,
+        page_id: UUID,
+    ) -> list[RegionRecord]:
+        with self._lock:
+            state = self._load_state_unlocked()
+            self._require_project(state, project_id)
+            self._require_page(state, project_id, page_id)
+            region_ids = {
+                candidate.id
+                for candidate in state.regions
+                if candidate.page_id == page_id
+            }
+            next_state = self._remove_page_regions(
+                state=state,
+                page_id=page_id,
+                region_ids=region_ids,
+            )
+            self._save_state_unlocked(next_state)
+            return [
+                region.model_copy(deep=True)
+                for region in sorted(
+                    [candidate for candidate in next_state.regions if candidate.page_id == page_id],
+                    key=lambda candidate: candidate.created_at,
+                )
+            ]
+
     def create_project(self, payload: CreateProjectRequest) -> ProjectSummary:
         with self._lock:
             state = self._load_state_unlocked()
@@ -1195,6 +1248,156 @@ class LocalProjectStore:
         updated_page = page.model_copy(
             update={
                 "status": effective_status,
+                "updated_at": _utcnow(),
+            }
+        )
+        return tuple(
+            updated_page if candidate.id == page.id else candidate
+            for candidate in state.pages
+        )
+
+    def _remove_page_regions(
+        self,
+        *,
+        state: StoredProjectState,
+        page_id: UUID,
+        region_ids: set[UUID],
+    ) -> StoredProjectState:
+        if len(region_ids) == 0:
+            return state
+
+        removed_dialogue_ids = {
+            candidate.id
+            for candidate in state.dialogues
+            if candidate.page_id == page_id
+            and candidate.source == "ocr"
+            and candidate.source_region_id in region_ids
+        }
+        removed_assignment_ids = {
+            candidate.id
+            for candidate in state.assignments
+            if candidate.page_id == page_id
+            and (
+                candidate.region_id in region_ids
+                or candidate.dialogue_id in removed_dialogue_ids
+            )
+        }
+        next_regions = tuple(
+            candidate
+            for candidate in state.regions
+            if not (candidate.page_id == page_id and candidate.id in region_ids)
+        )
+        next_mask_revisions = tuple(
+            candidate
+            for candidate in state.mask_revisions
+            if candidate.region_id not in region_ids
+        )
+        next_dialogues = tuple(
+            candidate
+            for candidate in state.dialogues
+            if candidate.id not in removed_dialogue_ids
+        )
+        next_translations = tuple(
+            candidate
+            for candidate in state.translations
+            if candidate.dialogue_id not in removed_dialogue_ids
+        )
+        next_assignments = tuple(
+            candidate
+            for candidate in state.assignments
+            if candidate.id not in removed_assignment_ids
+        )
+        next_placements = tuple(
+            candidate
+            for candidate in state.placements
+            if candidate.assignment_id not in removed_assignment_ids
+        )
+        next_jobs = tuple(
+            candidate
+            for candidate in state.jobs
+            if not (
+                candidate.page_id == page_id
+                and candidate.status == "queued"
+                and candidate.type in {
+                    "detect_regions",
+                    "generate_cleanup",
+                    "run_ocr",
+                    "match_dialogue",
+                }
+            )
+        )
+        next_pages = self._recalculate_page_after_region_change(
+            state=state,
+            page_id=page_id,
+            next_regions=next_regions,
+            next_mask_revisions=next_mask_revisions,
+            next_dialogues=next_dialogues,
+            next_translations=next_translations,
+            next_assignments=next_assignments,
+            next_placements=next_placements,
+        )
+        return state.model_copy(
+            update={
+                "pages": next_pages,
+                "regions": next_regions,
+                "mask_revisions": next_mask_revisions,
+                "dialogues": next_dialogues,
+                "translations": next_translations,
+                "assignments": next_assignments,
+                "placements": next_placements,
+                "jobs": next_jobs,
+            }
+        )
+
+    def _recalculate_page_after_region_change(
+        self,
+        *,
+        state: StoredProjectState,
+        page_id: UUID,
+        next_regions: tuple[RegionRecord, ...],
+        next_mask_revisions: tuple[MaskRevisionRecord, ...],
+        next_dialogues: tuple[DialogueRecord, ...],
+        next_translations: tuple[TranslationRecord, ...],
+        next_assignments: tuple[AssignmentRecord, ...],
+        next_placements: tuple[TextPlacementRecord, ...],
+    ) -> tuple[ProjectPage, ...]:
+        page = next(candidate for candidate in state.pages if candidate.id == page_id)
+        region_ids = {candidate.id for candidate in next_regions if candidate.page_id == page_id}
+        approved_active_mask_exists = any(
+            candidate.region_id in region_ids and candidate.is_active and candidate.approved
+            for candidate in next_mask_revisions
+        )
+        page_dialogue_ids = {
+            candidate.id for candidate in next_dialogues if candidate.page_id == page_id
+        }
+        page_assignment_ids = {
+            candidate.id for candidate in next_assignments if candidate.page_id == page_id
+        }
+        has_placements = any(
+            candidate.assignment_id in page_assignment_ids for candidate in next_placements
+        )
+        has_text = (
+            len(page_dialogue_ids) > 0
+            or any(candidate.dialogue_id in page_dialogue_ids for candidate in next_translations)
+            or len(page_assignment_ids) > 0
+        )
+        has_regions = len(region_ids) > 0
+
+        if has_placements:
+            next_status = "typeset_ready"
+        elif has_text:
+            next_status = "text_ready"
+        elif approved_active_mask_exists:
+            next_status = "cleanup_ready"
+        elif has_regions:
+            next_status = "analyzed"
+        else:
+            next_status = "uploaded"
+
+        updated_page = page.model_copy(
+            update={
+                "status": next_status,
+                "active_cleaned_asset_path": None,
                 "updated_at": _utcnow(),
             }
         )

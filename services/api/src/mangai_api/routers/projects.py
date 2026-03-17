@@ -330,6 +330,39 @@ def update_page_region(
     return RegionResponse(region=region)
 
 
+@router.delete(
+    "/{project_id}/pages/{page_id}/regions/{region_id}",
+    response_model=ListRegionsResponse,
+    summary="Delete a page region",
+)
+def delete_page_region(
+    project_id: UUID,
+    page_id: UUID,
+    region_id: UUID,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> ListRegionsResponse:
+    regions = store.delete_page_region(
+        project_id=project_id,
+        page_id=page_id,
+        region_id=region_id,
+    )
+    return ListRegionsResponse(regions=tuple(regions))
+
+
+@router.post(
+    "/{project_id}/pages/{page_id}/regions/reset",
+    response_model=ListRegionsResponse,
+    summary="Reset page regions",
+)
+def reset_page_regions(
+    project_id: UUID,
+    page_id: UUID,
+    store: LocalProjectStore = Depends(get_project_store),
+) -> ListRegionsResponse:
+    regions = store.reset_page_regions(project_id=project_id, page_id=page_id)
+    return ListRegionsResponse(regions=tuple(regions))
+
+
 @router.patch(
     "/{project_id}/pages/{page_id}/mask-revisions/{mask_revision_id}",
     response_model=MaskRevisionResponse,
