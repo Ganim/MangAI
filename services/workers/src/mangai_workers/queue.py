@@ -174,6 +174,7 @@ def _apply_detect_regions_result(
         detected_candidates=detected_candidates,
         timestamp=timestamp,
         source_language=str(project.get("source_language") or "ja-JP"),
+        reading_profile=str(project.get("reading_profile") or ""),
         asset_path=source_asset_path,
     )
 
@@ -626,6 +627,7 @@ def _build_detected_regions(
     detected_candidates: list[Any],
     timestamp: str,
     source_language: str,
+    reading_profile: str | None,
     asset_path: Path,
 ) -> list[dict[str, Any]]:
     regions: list[dict[str, Any]] = []
@@ -657,7 +659,11 @@ def _build_detected_regions(
                 "text_area": text_area,
                 "context_area": context_area,
                 "panel_area": context_area,
+                "balloon_group_id": None,
+                "balloon_group_area": context_area,
                 "panel_order": None,
+                "balloon_group_order": None,
+                "order_in_balloon_group": None,
                 "order_in_panel": None,
                 "global_reading_order": None,
                 "shape": _polygon_shape(text_area),
@@ -668,6 +674,7 @@ def _build_detected_regions(
     return _apply_region_reading_metadata(
         regions,
         source_language=source_language,
+        reading_profile=reading_profile,
         asset_path=asset_path,
     )
 
@@ -676,30 +683,22 @@ def _apply_region_reading_metadata(
     regions: list[dict[str, Any]],
     *,
     source_language: str,
+    reading_profile: str | None = None,
     asset_path: Path | None = None,
     panel_boxes: list[dict[str, float]] | None = None,
 ) -> list[dict[str, Any]]:
     if len(regions) == 0:
         return regions
-    reading_direction = _infer_page_reading_direction(source_language)
+    resolved_reading_profile = _resolve_reading_profile(reading_profile, source_language)
     detected_panel_boxes = panel_boxes
     if detected_panel_boxes is None and asset_path is not None:
         detected_panel_boxes = _detect_panel_boxes_from_asset(asset_path)
-
-    if not detected_panel_boxes or len(detected_panel_boxes) <= 1:
-        annotated_regions: list[dict[str, Any]] = []
-        for region in regions:
-            next_region = dict(region)
-            next_region["panel_area"] = _get_region_area(region, "context_area")
-            next_region["panel_order"] = None
-            next_region["order_in_panel"] = None
-            next_region["global_reading_order"] = None
-            annotated_regions.append(next_region)
-        return annotated_regions
+    if not detected_panel_boxes:
+        detected_panel_boxes = [_merge_region_areas(regions)]
 
     ordered_panels = _sort_panel_boxes_for_reading(
         detected_panel_boxes,
-        reading_direction=reading_direction,
+        reading_profile=resolved_reading_profile,
     )
     panel_region_groups: list[tuple[dict[str, float], list[dict[str, Any]]]] = [
         (panel_box, [])
@@ -712,21 +711,38 @@ def _apply_region_reading_metadata(
     annotated_regions: list[dict[str, Any]] = []
     global_order = 1
     panel_order = 1
+    balloon_group_order = 1
     for panel_box, panel_regions in panel_region_groups:
         if len(panel_regions) == 0:
             continue
-        ordered_regions = _sort_regions_within_panel(
+        balloon_groups = _group_panel_regions_into_balloon_groups(
             panel_regions,
-            reading_direction=reading_direction,
+            reading_profile=resolved_reading_profile,
         )
-        for order_in_panel, region in enumerate(ordered_regions, start=1):
-            next_region = dict(region)
-            next_region["panel_area"] = panel_box
-            next_region["panel_order"] = panel_order
-            next_region["order_in_panel"] = order_in_panel
-            next_region["global_reading_order"] = global_order
-            annotated_regions.append(next_region)
-            global_order += 1
+        ordered_balloon_groups = _sort_balloon_groups_for_reading(
+            balloon_groups,
+            reading_profile=resolved_reading_profile,
+        )
+        order_in_panel = 1
+        for balloon_group in ordered_balloon_groups:
+            ordered_regions = _sort_regions_within_balloon_group(
+                balloon_group["regions"],
+                reading_profile=resolved_reading_profile,
+            )
+            for order_in_group, region in enumerate(ordered_regions, start=1):
+                next_region = dict(region)
+                next_region["panel_area"] = panel_box
+                next_region["balloon_group_id"] = balloon_group["id"]
+                next_region["balloon_group_area"] = balloon_group["area"]
+                next_region["panel_order"] = panel_order
+                next_region["balloon_group_order"] = balloon_group_order
+                next_region["order_in_balloon_group"] = order_in_group
+                next_region["order_in_panel"] = order_in_panel
+                next_region["global_reading_order"] = global_order
+                annotated_regions.append(next_region)
+                global_order += 1
+                order_in_panel += 1
+            balloon_group_order += 1
         panel_order += 1
     return annotated_regions
 
@@ -947,8 +963,9 @@ def _split_rect_by_candidate(
 def _sort_panel_boxes_for_reading(
     panel_boxes: list[dict[str, float]],
     *,
-    reading_direction: str,
+    reading_profile: str,
 ) -> list[dict[str, float]]:
+    reading_direction = _get_inline_reading_direction(reading_profile)
     ordered_by_y = sorted(panel_boxes, key=lambda panel: panel["y"])
     rows: list[list[dict[str, float]]] = []
     for panel_box in ordered_by_y:
@@ -1048,9 +1065,16 @@ def _assign_region_to_panel(
     return best_index
 
 
-def _infer_page_reading_direction(source_language: str) -> str:
-    normalized = source_language.split("-", 1)[0].lower()
-    return "rtl" if normalized in {"ja", "zh"} else "ltr"
+def _resolve_reading_profile(reading_profile: str | None, source_language: str) -> str:
+    normalized_profile = str(reading_profile or "").strip().lower()
+    if normalized_profile in {"manga", "manhwa"}:
+        return normalized_profile
+    normalized_language = source_language.split("-", 1)[0].lower()
+    return "manhwa" if normalized_language == "ko" else "manga"
+
+
+def _get_inline_reading_direction(reading_profile: str) -> str:
+    return "rtl" if reading_profile == "manga" else "ltr"
 
 
 def _group_regions_into_columns(regions: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1126,20 +1150,144 @@ def _split_column_into_panel_groups(column_regions: list[dict[str, Any]]) -> lis
     return groups
 
 
-def _sort_regions_within_panel(
+def _group_panel_regions_into_balloon_groups(
     regions: list[dict[str, Any]],
     *,
-    reading_direction: str,
+    reading_profile: str,
+) -> list[dict[str, Any]]:
+    ordered_regions = _sort_regions_by_area_for_reading(
+        regions,
+        area_key="context_area",
+        reading_profile=reading_profile,
+    )
+    balloon_groups: list[dict[str, Any]] = []
+    for region in ordered_regions:
+        region_area = _get_region_area(region, "context_area")
+        matching_group_indexes = [
+            index
+            for index, candidate_group in enumerate(balloon_groups)
+            if _should_assign_region_to_balloon_group(region_area, candidate_group["area"])
+        ]
+        if len(matching_group_indexes) == 0:
+            balloon_groups.append(
+                {
+                    "id": str(uuid4()),
+                    "area": dict(region_area),
+                    "regions": [region],
+                }
+            )
+            continue
+
+        primary_group = balloon_groups[matching_group_indexes[0]]
+        primary_group["regions"].append(region)
+        primary_group["area"] = _merge_bounding_boxes(primary_group["area"], region_area)
+
+        for index in reversed(matching_group_indexes[1:]):
+            merged_group = balloon_groups.pop(index)
+            primary_group["regions"].extend(merged_group["regions"])
+            primary_group["area"] = _merge_bounding_boxes(primary_group["area"], merged_group["area"])
+
+    return balloon_groups
+
+
+def _sort_balloon_groups_for_reading(
+    balloon_groups: list[dict[str, Any]],
+    *,
+    reading_profile: str,
+) -> list[dict[str, Any]]:
+    return sorted(
+        balloon_groups,
+        key=lambda balloon_group: _build_reading_sort_key(
+            balloon_group["area"],
+            reading_profile=reading_profile,
+        ),
+    )
+
+
+def _sort_regions_within_balloon_group(
+    regions: list[dict[str, Any]],
+    *,
+    reading_profile: str,
+) -> list[dict[str, Any]]:
+    return _sort_regions_by_area_for_reading(
+        regions,
+        area_key="text_area",
+        reading_profile=reading_profile,
+    )
+
+
+def _sort_regions_by_area_for_reading(
+    regions: list[dict[str, Any]],
+    *,
+    area_key: str,
+    reading_profile: str,
 ) -> list[dict[str, Any]]:
     return sorted(
         regions,
-        key=lambda region: (
-            round(float(_get_region_area(region, "context_area")["y"]) / 24),
-            -float(_get_region_area(region, "context_area")["x"])
-            if reading_direction == "rtl"
-            else float(_get_region_area(region, "context_area")["x"]),
-            float(_get_region_area(region, "context_area")["y"]),
+        key=lambda region: _build_reading_sort_key(
+            _get_region_area(region, area_key),
+            reading_profile=reading_profile,
         ),
+    )
+
+
+def _build_reading_sort_key(
+    bounding_box: dict[str, Any],
+    *,
+    reading_profile: str,
+) -> tuple[float, float, float, float]:
+    inline_direction = _get_inline_reading_direction(reading_profile)
+    return (
+        round(float(bounding_box["y"]) / 24),
+        -float(bounding_box["x"]) if inline_direction == "rtl" else float(bounding_box["x"]),
+        float(bounding_box["y"]),
+        float(bounding_box["x"]),
+    )
+
+
+def _should_assign_region_to_balloon_group(
+    region_area: dict[str, Any],
+    group_area: dict[str, Any],
+) -> bool:
+    overlap_x = _axis_overlap(
+        float(region_area["x"]),
+        float(region_area["x"]) + float(region_area["width"]),
+        float(group_area["x"]),
+        float(group_area["x"]) + float(group_area["width"]),
+    )
+    overlap_y = _axis_overlap(
+        float(region_area["y"]),
+        float(region_area["y"]) + float(region_area["height"]),
+        float(group_area["y"]),
+        float(group_area["y"]) + float(group_area["height"]),
+    )
+    gap_x = _axis_gap(
+        float(region_area["x"]),
+        float(region_area["x"]) + float(region_area["width"]),
+        float(group_area["x"]),
+        float(group_area["x"]) + float(group_area["width"]),
+    )
+    gap_y = _axis_gap(
+        float(region_area["y"]),
+        float(region_area["y"]) + float(region_area["height"]),
+        float(group_area["y"]),
+        float(group_area["y"]) + float(group_area["height"]),
+    )
+    minimum_width = max(min(float(region_area["width"]), float(group_area["width"])), 1.0)
+    minimum_height = max(min(float(region_area["height"]), float(group_area["height"])), 1.0)
+    return (
+        _boxes_intersect(
+            _expand_bounding_box(region_area, padding_x=max(24.0, minimum_width * 0.18), padding_y=max(24.0, minimum_height * 0.18)),
+            _expand_bounding_box(group_area, padding_x=max(24.0, minimum_width * 0.18), padding_y=max(24.0, minimum_height * 0.18)),
+        )
+        or (
+            overlap_x >= minimum_width * 0.14
+            and gap_y <= max(42.0, minimum_height * 0.45)
+        )
+        or (
+            overlap_y >= minimum_height * 0.14
+            and gap_x <= max(42.0, minimum_width * 0.45)
+        )
     )
 
 
@@ -1159,6 +1307,29 @@ def _merge_bounding_boxes(
     x2 = max(float(left["x"]) + float(left["width"]), float(right["x"]) + float(right["width"]))
     y2 = max(float(left["y"]) + float(left["height"]), float(right["y"]) + float(right["height"]))
     return _bounding_box(x1, y1, x2 - x1, y2 - y1)
+
+
+def _expand_bounding_box(
+    bounding_box: dict[str, Any],
+    *,
+    padding_x: float,
+    padding_y: float,
+) -> dict[str, float]:
+    return _bounding_box(
+        float(bounding_box["x"]) - padding_x,
+        float(bounding_box["y"]) - padding_y,
+        float(bounding_box["width"]) + (padding_x * 2),
+        float(bounding_box["height"]) + (padding_y * 2),
+    )
+
+
+def _boxes_intersect(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    return not (
+        float(left["x"]) + float(left["width"]) < float(right["x"])
+        or float(right["x"]) + float(right["width"]) < float(left["x"])
+        or float(left["y"]) + float(left["height"]) < float(right["y"])
+        or float(right["y"]) + float(right["height"]) < float(left["y"])
+    )
 
 
 def _get_region_area(region: dict[str, Any], key: str) -> dict[str, Any]:
@@ -1204,7 +1375,11 @@ def _build_overlay_asset(
                 "text_area": region.get("text_area") or region["bounding_box"],
                 "context_area": region.get("context_area") or region["bounding_box"],
                 "panel_area": region.get("panel_area") or region.get("context_area") or region["bounding_box"],
+                "balloon_group_id": region.get("balloon_group_id"),
+                "balloon_group_area": region.get("balloon_group_area") or region.get("context_area") or region["bounding_box"],
                 "panel_order": region.get("panel_order"),
+                "balloon_group_order": region.get("balloon_group_order"),
+                "order_in_balloon_group": region.get("order_in_balloon_group"),
                 "order_in_panel": region.get("order_in_panel"),
                 "global_reading_order": region.get("global_reading_order"),
             }
@@ -1349,6 +1524,16 @@ def _build_ocr_candidate_region(
         panel_order=(
             int(region["panel_order"])
             if region.get("panel_order") is not None
+            else None
+        ),
+        balloon_group_order=(
+            int(region["balloon_group_order"])
+            if region.get("balloon_group_order") is not None
+            else None
+        ),
+        order_in_balloon_group=(
+            int(region["order_in_balloon_group"])
+            if region.get("order_in_balloon_group") is not None
             else None
         ),
         order_in_panel=(

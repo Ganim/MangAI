@@ -44,6 +44,7 @@ export class ApiClientError extends Error {
 type CreateProjectInput = {
   name: string;
   source_language: string;
+  reading_profile?: "manga" | "manhwa";
   target_language: string;
   target_text_direction?: "ltr" | "rtl" | "ttb";
 };

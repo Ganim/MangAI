@@ -1,4 +1,5 @@
 import {
+  ReadingProfile,
   RTL_LANGUAGE_CODES,
   SUPPORTED_SOURCE_LANGUAGE_CODES,
   SUPPORTED_TARGET_LANGUAGE_CODES,
@@ -81,4 +82,13 @@ export function inferTextDirectionForLanguage(languageTag: unknown): "ltr" | "rt
   return RTL_LANGUAGE_CODES.includes(primaryLanguage as (typeof RTL_LANGUAGE_CODES)[number])
     ? "rtl"
     : "ltr";
+}
+
+export function inferReadingProfileForLanguage(
+  languageTag: unknown,
+  path: Array<string | number> = [],
+): (typeof ReadingProfile)[number] {
+  const normalized = canonicalizeLanguageTag(languageTag, path);
+  const primaryLanguage = normalized.split("-")[0]!.toLowerCase();
+  return primaryLanguage === "ko" ? "manhwa" : "manga";
 }

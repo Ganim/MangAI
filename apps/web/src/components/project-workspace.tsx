@@ -95,6 +95,10 @@ export function ProjectWorkspace({ locale, messages, projectId }: ProjectWorkspa
                 <strong>{projectDetail.project.source_language}</strong>
               </article>
               <article className="workspace-stat-card">
+                <span className="card-step">{messages.workspace.readingProfileLabel}</span>
+                <strong>{messages.common.readingProfileLabels[projectDetail.project.reading_profile]}</strong>
+              </article>
+              <article className="workspace-stat-card">
                 <span className="card-step">{messages.workspace.targetLanguageLabel}</span>
                 <strong>{projectDetail.project.target_language}</strong>
               </article>

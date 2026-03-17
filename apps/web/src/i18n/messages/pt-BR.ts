@@ -5,6 +5,10 @@ export const ptBRMessages: AppMessages = {
     appName: "MangAI",
     brandNote: "Workspace IA-first para localizacao de manga e quadrinhos.",
     localeSwitcherLabel: "Idioma da interface",
+    readingProfileLabels: {
+      manga: "Mangá",
+      manhwa: "Manhwa",
+    },
   },
   home: {
     eyebrow: "Pipeline de localizacao IA-first",
@@ -113,12 +117,19 @@ export const ptBRMessages: AppMessages = {
     projectNameLabel: "Nome do projeto",
     projectNamePlaceholder: "Capitulo 01 - Revisao",
     sourceLanguageLabel: "Idioma de origem",
+    readingProfileLabel: "Perfil de leitura",
+    readingProfileHelp:
+      "Mangá le de cima para baixo e da direita para a esquerda. Manhwa le de cima para baixo e da esquerda para a direita.",
     targetLanguageLabel: "Idioma de destino",
     sourceLanguageOptions: [
       { value: "ja-JP", label: "Japones" },
       { value: "ko-KR", label: "Coreano" },
       { value: "zh-CN", label: "Chines" },
       { value: "en-US", label: "Ingles" },
+    ],
+    readingProfileOptions: [
+      { value: "manga", label: "Mangá" },
+      { value: "manhwa", label: "Manhwa" },
     ],
     targetLanguageOptions: [
       { value: "pt-BR", label: "Portugues" },
@@ -168,6 +179,7 @@ export const ptBRMessages: AppMessages = {
     heroCopy:
       "Este workspace faz a ponte entre a criacao do projeto e o editor visual. Ele nos da um lugar duravel para revisar paginas, acompanhar status e navegar antes das ferramentas mais pesadas entrarem.",
     sourceLanguageLabel: "Idioma de origem",
+    readingProfileLabel: "Perfil de leitura",
     targetLanguageLabel: "Idioma de destino",
     pageCountLabel: "Paginas registradas",
     statusLabel: "Status do projeto",
@@ -234,6 +246,8 @@ export const ptBRMessages: AppMessages = {
     regionTypeLabel: "Tipo",
     regionReadingOrderLabel: "Ordem de leitura",
     regionPanelOrderLabel: "Ordem do painel",
+    regionBalloonGroupOrderLabel: "Ordem do grupo de balao",
+    regionOrderInBalloonGroupLabel: "Ordem dentro do grupo",
     regionOrderInPanelLabel: "Ordem no painel",
     readingOrderHint: "Use estes controles quando a numeracao automatica nao refletir o fluxo real de leitura da pagina.",
     regionStateLabel: "Estado",

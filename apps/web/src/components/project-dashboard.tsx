@@ -34,6 +34,7 @@ type ProjectDashboardProps = {
 type ProjectFormState = {
   name: string;
   source_language: string;
+  reading_profile: "manga" | "manhwa";
   target_language: string;
 };
 
@@ -45,6 +46,12 @@ function getErrorMessage(error: unknown, fallback: string): string {
     return error.message;
   }
   return fallback;
+}
+
+function inferReadingProfileForSourceLanguage(
+  sourceLanguage: string,
+): "manga" | "manhwa" {
+  return sourceLanguage.toLowerCase().startsWith("ko") ? "manhwa" : "manga";
 }
 
 export function ProjectDashboard({ locale, messages }: ProjectDashboardProps) {
@@ -65,6 +72,9 @@ export function ProjectDashboard({ locale, messages }: ProjectDashboardProps) {
   const [formState, setFormState] = useState<ProjectFormState>({
     name: "",
     source_language: messages.dashboard.sourceLanguageOptions[0]?.value ?? "ja-JP",
+    reading_profile: inferReadingProfileForSourceLanguage(
+      messages.dashboard.sourceLanguageOptions[0]?.value ?? "ja-JP",
+    ),
     target_language: locale,
   });
 
@@ -157,6 +167,9 @@ export function ProjectDashboard({ locale, messages }: ProjectDashboardProps) {
         setFormState({
           name: "",
           source_language: messages.dashboard.sourceLanguageOptions[0]?.value ?? "ja-JP",
+          reading_profile: inferReadingProfileForSourceLanguage(
+            messages.dashboard.sourceLanguageOptions[0]?.value ?? "ja-JP",
+          ),
           target_language: locale,
         });
         setApiState("online");
@@ -262,6 +275,7 @@ export function ProjectDashboard({ locale, messages }: ProjectDashboardProps) {
                   setFormState((currentValue) => ({
                     ...currentValue,
                     source_language: event.target.value,
+                    reading_profile: inferReadingProfileForSourceLanguage(event.target.value),
                   }))
                 }
                 required
@@ -272,6 +286,29 @@ export function ProjectDashboard({ locale, messages }: ProjectDashboardProps) {
                   </option>
                 ))}
               </select>
+            </label>
+
+            <label className="field">
+              <span className="field-label">{messages.dashboard.readingProfileLabel}</span>
+              <select
+                className="field-input"
+                name="reading_profile"
+                value={formState.reading_profile}
+                onChange={(event) =>
+                  setFormState((currentValue) => ({
+                    ...currentValue,
+                    reading_profile: event.target.value as "manga" | "manhwa",
+                  }))
+                }
+                required
+              >
+                {messages.dashboard.readingProfileOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <span className="field-hint">{messages.dashboard.readingProfileHelp}</span>
             </label>
 
             <label className="field">
@@ -327,6 +364,9 @@ export function ProjectDashboard({ locale, messages }: ProjectDashboardProps) {
                     {project.source_language}
                     {" -> "}
                     {project.target_language}
+                  </span>
+                  <span className="project-card-meta">
+                    {messages.common.readingProfileLabels[project.reading_profile]}
                   </span>
                   <span className="project-card-meta">
                     {messages.dashboard.pageCountLabel.replace(

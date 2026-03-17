@@ -9,6 +9,7 @@ import {
   JobType,
   PageStatus,
   ProjectStatus,
+  ReadingProfile,
   RegionOrigin,
   RegionState,
   RegionType,
@@ -17,7 +18,7 @@ import {
   TranslationStatus,
 } from "./enums.ts";
 import { ValidationError } from "./errors.ts";
-import { canonicalizeLanguageTag } from "./i18n.ts";
+import { canonicalizeLanguageTag, inferReadingProfileForLanguage } from "./i18n.ts";
 import {
   atPath,
   readArray,
@@ -115,6 +116,12 @@ export function parseProject(value: unknown, path: Array<string | number> = []) 
       objectValue.source_language,
       atPath(path, "source_language"),
     ),
+    reading_profile:
+      readOptional(
+        objectValue.reading_profile,
+        (input, inputPath) => readEnum(input, ReadingProfile, inputPath),
+        atPath(path, "reading_profile"),
+      ) ?? inferReadingProfileForLanguage(objectValue.source_language, atPath(path, "source_language")),
     target_language: canonicalizeLanguageTag(
       objectValue.target_language,
       atPath(path, "target_language"),
@@ -202,6 +209,12 @@ export function parseRegion(value: unknown, path: Array<string | number> = []) {
       (input, inputPath) => parseBoundingBox(input, inputPath),
       atPath(path, "panel_area"),
     ) ?? contextArea;
+  const balloonGroupArea =
+    readOptional(
+      objectValue.balloon_group_area,
+      (input, inputPath) => parseBoundingBox(input, inputPath),
+      atPath(path, "balloon_group_area"),
+    ) ?? contextArea;
 
   return {
     id: readUuid(objectValue.id, atPath(path, "id")),
@@ -226,11 +239,30 @@ export function parseRegion(value: unknown, path: Array<string | number> = []) {
     text_area: textArea,
     context_area: contextArea,
     panel_area: panelArea,
+    balloon_group_id:
+      readNullable(
+        objectValue.balloon_group_id,
+        (input, inputPath) => readUuid(input, inputPath),
+        atPath(path, "balloon_group_id"),
+      ) ?? null,
+    balloon_group_area: balloonGroupArea,
     panel_order:
       readNullable(
         objectValue.panel_order,
         (input, inputPath) => readNumber(input, inputPath, { integer: true, min: 1 }),
         atPath(path, "panel_order"),
+      ) ?? null,
+    balloon_group_order:
+      readNullable(
+        objectValue.balloon_group_order,
+        (input, inputPath) => readNumber(input, inputPath, { integer: true, min: 1 }),
+        atPath(path, "balloon_group_order"),
+      ) ?? null,
+    order_in_balloon_group:
+      readNullable(
+        objectValue.order_in_balloon_group,
+        (input, inputPath) => readNumber(input, inputPath, { integer: true, min: 1 }),
+        atPath(path, "order_in_balloon_group"),
       ) ?? null,
     order_in_panel:
       readNullable(

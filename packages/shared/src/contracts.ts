@@ -3,6 +3,7 @@ import {
   ExportFormat,
   JobType,
   PageStatus,
+  ReadingProfile,
   RegionState,
   RegionType,
   TextDirection,
@@ -11,6 +12,7 @@ import {
 import { ValidationError } from "./errors.ts";
 import {
   canonicalizeLanguageTag,
+  inferReadingProfileForLanguage,
   inferTextDirectionForLanguage,
   normalizeProjectSourceLanguage,
   normalizeProjectTargetLanguage,
@@ -55,6 +57,12 @@ export function parseCreateProjectRequest(value: unknown, path: Array<string | n
       objectValue.source_language,
       atPath(path, "source_language"),
     ),
+    reading_profile:
+      readOptional(
+        objectValue.reading_profile,
+        (input, inputPath) => readEnum(input, ReadingProfile, inputPath),
+        atPath(path, "reading_profile"),
+      ) ?? inferReadingProfileForLanguage(objectValue.source_language),
     target_language: targetLanguage,
     target_text_direction:
       readOptional(
@@ -79,6 +87,12 @@ export function parseProjectSummary(value: unknown, path: Array<string | number>
       objectValue.source_language,
       atPath(path, "source_language"),
     ),
+    reading_profile:
+      readOptional(
+        objectValue.reading_profile,
+        (input, inputPath) => readEnum(input, ReadingProfile, inputPath),
+        atPath(path, "reading_profile"),
+      ) ?? inferReadingProfileForLanguage(objectValue.source_language),
     target_language: canonicalizeLanguageTag(
       objectValue.target_language,
       atPath(path, "target_language"),

@@ -13,6 +13,7 @@ import {
   parseListPagePlacementsResponse,
   ValidationError,
   canonicalizeLanguageTag,
+  inferReadingProfileForLanguage,
   inferTextDirectionForLanguage,
   normalizeProjectSourceLanguage,
   normalizeProjectTargetLanguage,
@@ -68,6 +69,8 @@ assert.throws(() => normalizeProjectTargetLanguage("ja-JP"), ValidationError);
 assert.equal(inferTextDirectionForLanguage("en-US"), "ltr");
 assert.equal(inferTextDirectionForLanguage("pt-BR"), "ltr");
 assert.equal(inferTextDirectionForLanguage("ar"), "rtl");
+assert.equal(inferReadingProfileForLanguage("ja-JP"), "manga");
+assert.equal(inferReadingProfileForLanguage("ko-KR"), "manhwa");
 
 const parsedRequest = parseCreateProjectRequest({
   name: "MangAI test",
@@ -78,9 +81,19 @@ const parsedRequest = parseCreateProjectRequest({
 assert.deepEqual(parsedRequest, {
   name: "MangAI test",
   source_language: "ja-JP",
+  reading_profile: "manga",
   target_language: "pt-BR",
   target_text_direction: "ltr",
 });
+
+const parsedManhwaRequest = parseCreateProjectRequest({
+  name: "MangAI manhwa",
+  source_language: "ko-KR",
+  reading_profile: "manhwa",
+  target_language: "en-US",
+});
+
+assert.equal(parsedManhwaRequest.reading_profile, "manhwa");
 
 const parsedProject = parseProject({
   id: UUID,
@@ -89,6 +102,7 @@ const parsedProject = parseProject({
   owner_id: UUID_2,
   status: "draft",
   source_language: "ja-JP",
+  reading_profile: "manga",
   target_language: "en-US",
   target_text_direction: "ltr",
   default_style_preset_id: null,
@@ -97,6 +111,7 @@ const parsedProject = parseProject({
 });
 
 assert.equal(parsedProject.target_language, "en-US");
+assert.equal(parsedProject.reading_profile, "manga");
 
 const parsedProjectResponse = parseCreateProjectResponse({
   project: {
@@ -105,6 +120,7 @@ const parsedProjectResponse = parseCreateProjectResponse({
     name: "Project",
     status: "draft",
     source_language: "ja-JP",
+    reading_profile: "manga",
     target_language: "pt-BR",
     target_text_direction: "ltr",
     page_count: 0,
@@ -123,6 +139,7 @@ const parsedProjectList = parseListProjectsResponse({
       name: "Project",
       status: "draft",
       source_language: "ja-JP",
+      reading_profile: "manga",
       target_language: "pt-BR",
       target_text_direction: "ltr",
       page_count: 2,
@@ -155,6 +172,7 @@ const parsedRegisterPagesResponse = parseRegisterProjectPagesResponse({
     name: "Project",
     status: "draft",
     source_language: "ja-JP",
+    reading_profile: "manga",
     target_language: "pt-BR",
     target_text_direction: "ltr",
     page_count: 1,
@@ -190,6 +208,7 @@ const parsedProjectDetail = parseProjectDetailResponse({
     name: "Project",
     status: "draft",
     source_language: "ja-JP",
+    reading_profile: "manga",
     target_language: "pt-BR",
     target_text_direction: "ltr",
     page_count: 1,
@@ -224,6 +243,7 @@ const parsedAnalyzedPage = parseProjectDetailResponse({
     name: "Project",
     status: "draft",
     source_language: "ja-JP",
+    reading_profile: "manga",
     target_language: "pt-BR",
     target_text_direction: "ltr",
     page_count: 1,

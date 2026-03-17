@@ -3,5 +3,6 @@ SUPPORTED_UI_LOCALES = ("en-US", "pt-BR")
 SUPPORTED_TEXT_DIRECTIONS = ("ltr", "rtl", "ttb")
 SUPPORTED_SOURCE_LANGUAGE_CODES = ("ja", "ko", "zh", "en")
 SUPPORTED_TARGET_LANGUAGE_CODES = ("pt", "en")
+SUPPORTED_READING_PROFILES = ("manga", "manhwa")
 SUPPORTED_UPLOAD_MIME_TYPES = ("image/jpeg", "image/png", "image/webp")
 MAX_UPLOAD_FILE_SIZE_BYTES = 25 * 1024 * 1024

@@ -12,14 +12,24 @@ PNG_1X1_BYTES = base64.b64decode(
 )
 
 
-def create_project(client: TestClient, *, target_language: str = "pt-BR") -> str:
+def create_project(
+    client: TestClient,
+    *,
+    source_language: str = "ja-JP",
+    target_language: str = "pt-BR",
+    reading_profile: str | None = None,
+) -> str:
+    payload = {
+        "name": "Upload Project",
+        "source_language": source_language,
+        "target_language": target_language,
+    }
+    if reading_profile is not None:
+        payload["reading_profile"] = reading_profile
+
     response = client.post(
         "/api/v1/projects",
-        json={
-            "name": "Upload Project",
-            "source_language": "ja-JP",
-            "target_language": target_language,
-        },
+        json=payload,
     )
     assert response.status_code == 201
     return response.json()["project"]["id"]
@@ -67,10 +77,43 @@ def test_create_project_normalizes_languages_and_defaults_direction(client: Test
     assert payload["schema_version"] == 1
     assert payload["status"] == "draft"
     assert payload["source_language"] == "ja-JP"
+    assert payload["reading_profile"] == "manga"
     assert payload["target_language"] == "pt-BR"
     assert payload["target_text_direction"] == "ltr"
     assert payload["page_count"] == 0
     assert payload["created_at"].endswith("Z")
+
+
+def test_create_project_defaults_manhwa_profile_for_korean_source(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/projects",
+        json={
+            "name": "Korean Project",
+            "source_language": "ko-KR",
+            "target_language": "pt-BR",
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.json()["project"]
+    assert payload["source_language"] == "ko-KR"
+    assert payload["reading_profile"] == "manhwa"
+
+
+def test_create_project_accepts_explicit_reading_profile(client: TestClient) -> None:
+    response = client.post(
+        "/api/v1/projects",
+        json={
+            "name": "Explicit Reading",
+            "source_language": "ja-JP",
+            "reading_profile": "manhwa",
+            "target_language": "pt-BR",
+        },
+    )
+
+    assert response.status_code == 201
+    payload = response.json()["project"]
+    assert payload["reading_profile"] == "manhwa"
 
 
 def test_create_project_rejects_invalid_language_tag(client: TestClient) -> None:
@@ -135,6 +178,7 @@ def test_list_projects_returns_created_projects(client: TestClient) -> None:
     assert len(payload["projects"]) == 1
     assert payload["projects"][0]["name"] == "Project A"
     assert payload["projects"][0]["page_count"] == 0
+    assert payload["projects"][0]["reading_profile"] == "manga"
 
 
 def test_register_project_pages_updates_page_count(client: TestClient) -> None:
@@ -275,6 +319,8 @@ def test_page_regions_can_be_created_listed_and_updated(client: TestClient) -> N
     assert created_region["context_area"]["width"] == created_region["bounding_box"]["width"]
     assert created_region["panel_area"]["width"] == created_region["bounding_box"]["width"]
     assert created_region["panel_order"] is None
+    assert created_region["balloon_group_order"] is None
+    assert created_region["order_in_balloon_group"] is None
     assert created_region["order_in_panel"] is None
     assert created_region["global_reading_order"] is None
 

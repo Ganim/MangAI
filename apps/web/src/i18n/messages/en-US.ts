@@ -42,6 +42,11 @@ type CleanupStrategyLabels = {
   background_reconstruction: string;
 };
 
+type ReadingProfileLabels = {
+  manga: string;
+  manhwa: string;
+};
+
 type JobTypeLabels = {
   detect_regions: string;
   generate_cleanup: string;
@@ -65,6 +70,7 @@ export type AppMessages = {
     appName: string;
     brandNote: string;
     localeSwitcherLabel: string;
+    readingProfileLabels: ReadingProfileLabels;
   };
   home: {
     eyebrow: string;
@@ -98,8 +104,11 @@ export type AppMessages = {
     projectNameLabel: string;
     projectNamePlaceholder: string;
     sourceLanguageLabel: string;
+    readingProfileLabel: string;
+    readingProfileHelp: string;
     targetLanguageLabel: string;
     sourceLanguageOptions: ReadonlyArray<LanguageOption>;
+    readingProfileOptions: ReadonlyArray<LanguageOption>;
     targetLanguageOptions: ReadonlyArray<LanguageOption>;
     createAction: string;
     creatingAction: string;
@@ -139,6 +148,7 @@ export type AppMessages = {
     loadingProjectTitle: string;
     heroCopy: string;
     sourceLanguageLabel: string;
+    readingProfileLabel: string;
     targetLanguageLabel: string;
     pageCountLabel: string;
     statusLabel: string;
@@ -180,6 +190,8 @@ export type AppMessages = {
     regionTypeLabel: string;
     regionReadingOrderLabel: string;
     regionPanelOrderLabel: string;
+    regionBalloonGroupOrderLabel: string;
+    regionOrderInBalloonGroupLabel: string;
     regionOrderInPanelLabel: string;
     readingOrderHint: string;
     regionStateLabel: string;
@@ -318,6 +330,10 @@ export const enUSMessages: AppMessages = {
     appName: "MangAI",
     brandNote: "AI-first localization workspace for manga and comics.",
     localeSwitcherLabel: "Interface language",
+    readingProfileLabels: {
+      manga: "Manga",
+      manhwa: "Manhwa",
+    },
   },
   home: {
     eyebrow: "AI-first localization pipeline",
@@ -419,12 +435,19 @@ export const enUSMessages: AppMessages = {
     projectNameLabel: "Project name",
     projectNamePlaceholder: "Chapter 01 - Review pass",
     sourceLanguageLabel: "Source language",
+    readingProfileLabel: "Reading profile",
+    readingProfileHelp:
+      "Manga reads top-down and right-to-left. Manhwa reads top-down and left-to-right.",
     targetLanguageLabel: "Target language",
     sourceLanguageOptions: [
       { value: "ja-JP", label: "Japanese" },
       { value: "ko-KR", label: "Korean" },
       { value: "zh-CN", label: "Chinese" },
       { value: "en-US", label: "English" },
+    ],
+    readingProfileOptions: [
+      { value: "manga", label: "Manga" },
+      { value: "manhwa", label: "Manhwa" },
     ],
     targetLanguageOptions: [
       { value: "pt-BR", label: "Portuguese" },
@@ -473,6 +496,7 @@ export const enUSMessages: AppMessages = {
     heroCopy:
       "This workspace is the bridge between project setup and the visual editor. It gives us a durable place for page review, job status, and navigation before the heavier tooling lands.",
     sourceLanguageLabel: "Source language",
+    readingProfileLabel: "Reading profile",
     targetLanguageLabel: "Target language",
     pageCountLabel: "Registered pages",
     statusLabel: "Project status",
@@ -535,6 +559,8 @@ export const enUSMessages: AppMessages = {
     regionTypeLabel: "Type",
     regionReadingOrderLabel: "Reading order",
     regionPanelOrderLabel: "Panel order",
+    regionBalloonGroupOrderLabel: "Balloon group order",
+    regionOrderInBalloonGroupLabel: "Order in balloon group",
     regionOrderInPanelLabel: "Order in panel",
     readingOrderHint: "Use these controls when the automatic numbering does not match the real reading flow of the page.",
     regionStateLabel: "State",

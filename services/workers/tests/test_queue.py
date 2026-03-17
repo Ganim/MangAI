@@ -25,6 +25,7 @@ def seed_state(data_dir, *, job_status: str = "queued") -> str:
                 "name": "Worker Test",
                 "status": "draft",
                 "source_language": "ja-JP",
+                "reading_profile": "manga",
                 "target_language": "pt-BR",
                 "target_text_direction": "ltr",
                 "page_count": 1,
@@ -115,6 +116,7 @@ def seed_cleanup_state(data_dir) -> tuple[str, str]:
                 "name": "Cleanup Worker Test",
                 "status": "draft",
                 "source_language": "ja-JP",
+                "reading_profile": "manga",
                 "target_language": "pt-BR",
                 "target_text_direction": "ltr",
                 "page_count": 1,
@@ -255,6 +257,7 @@ def seed_ocr_state(data_dir) -> tuple[str, str]:
                 "name": "OCR Worker Test",
                 "status": "draft",
                 "source_language": "ja-JP",
+                "reading_profile": "manga",
                 "target_language": "pt-BR",
                 "target_text_direction": "ltr",
                 "page_count": 1,
@@ -389,6 +392,7 @@ def seed_translation_state(data_dir) -> tuple[str, str]:
                 "name": "Translation Worker Test",
                 "status": "draft",
                 "source_language": "ja-JP",
+                "reading_profile": "manga",
                 "target_language": "pt-BR",
                 "target_text_direction": "ltr",
                 "page_count": 1,
@@ -495,6 +499,7 @@ def seed_matching_state(data_dir) -> tuple[str, str]:
                 "name": "Matching Worker Test",
                 "status": "draft",
                 "source_language": "ja-JP",
+                "reading_profile": "manga",
                 "target_language": "pt-BR",
                 "target_text_direction": "ltr",
                 "page_count": 1,
@@ -639,7 +644,8 @@ def test_process_next_job_generates_detected_regions_and_overlay(tmp_path) -> No
     assert all("text_area" in region for region in state["regions"])
     assert all("context_area" in region for region in state["regions"])
     assert all(region["panel_area"] for region in state["regions"])
-    assert all(region["global_reading_order"] is None for region in state["regions"])
+    assert all(region["balloon_group_area"] for region in state["regions"])
+    assert all(region["global_reading_order"] is not None for region in state["regions"])
     overlay_asset = next(asset for asset in state["assets"] if asset["kind"] == "overlay")
     overlay_path = data_dir / "assets" / overlay_asset["storage_key"]
     assert overlay_path.exists()
@@ -649,6 +655,7 @@ def test_process_next_job_generates_detected_regions_and_overlay(tmp_path) -> No
     assert all("text_area" in region for region in overlay_payload["regions"])
     assert all("context_area" in region for region in overlay_payload["regions"])
     assert all("panel_area" in region for region in overlay_payload["regions"])
+    assert all("balloon_group_area" in region for region in overlay_payload["regions"])
 
 
 def test_apply_region_reading_metadata_uses_panel_boxes_for_manga_reading_order() -> None:
@@ -695,9 +702,38 @@ def test_apply_region_reading_metadata_uses_panel_boxes_for_manga_reading_order(
     ]
     assert [region["global_reading_order"] for region in annotated] == [1, 2, 3, 4]
     assert [region["panel_order"] for region in annotated] == [1, 2, 2, 3]
+    assert [region["balloon_group_order"] for region in annotated] == [1, 2, 2, 3]
+    assert [region["order_in_balloon_group"] for region in annotated] == [1, 1, 2, 1]
     assert [region["order_in_panel"] for region in annotated] == [1, 1, 2, 1]
     assert annotated[1]["panel_area"]["x"] == 560
     assert annotated[3]["panel_area"]["x"] == 0
+    assert annotated[1]["balloon_group_id"] == annotated[2]["balloon_group_id"]
+    assert annotated[1]["balloon_group_area"]["x"] <= annotated[1]["context_area"]["x"]
+
+
+def test_apply_region_reading_metadata_supports_manhwa_left_to_right_order() -> None:
+    annotated = _apply_region_reading_metadata(
+        [
+            {
+                "id": "left",
+                "bounding_box": {"x": 140, "y": 180, "width": 160, "height": 240},
+                "text_area": {"x": 140, "y": 180, "width": 160, "height": 240},
+                "context_area": {"x": 120, "y": 150, "width": 220, "height": 300},
+            },
+            {
+                "id": "right",
+                "bounding_box": {"x": 520, "y": 180, "width": 160, "height": 240},
+                "text_area": {"x": 520, "y": 180, "width": 160, "height": 240},
+                "context_area": {"x": 500, "y": 150, "width": 220, "height": 300},
+            },
+        ],
+        source_language="ko-KR",
+        reading_profile="manhwa",
+        panel_boxes=[{"x": 0, "y": 0, "width": 800, "height": 1200}],
+    )
+
+    assert [region["id"] for region in annotated] == ["left", "right"]
+    assert [region["global_reading_order"] for region in annotated] == [1, 2]
 
 
 def test_process_next_job_returns_none_without_queued_jobs(tmp_path) -> None:

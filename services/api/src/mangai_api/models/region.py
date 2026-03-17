@@ -45,7 +45,11 @@ class RegionRecord(APIModel):
     text_area: BoundingBox | None = None
     context_area: BoundingBox | None = None
     panel_area: BoundingBox | None = None
+    balloon_group_id: UUID | None = None
+    balloon_group_area: BoundingBox | None = None
     panel_order: int | None = Field(default=None, ge=1)
+    balloon_group_order: int | None = Field(default=None, ge=1)
+    order_in_balloon_group: int | None = Field(default=None, ge=1)
     order_in_panel: int | None = Field(default=None, ge=1)
     global_reading_order: int | None = Field(default=None, ge=1)
     shape: PolygonShape
@@ -66,6 +70,8 @@ class RegionRecord(APIModel):
             next_value["context_area"] = bounding_box
         if next_value.get("panel_area") is None:
             next_value["panel_area"] = next_value.get("context_area") or bounding_box
+        if next_value.get("balloon_group_area") is None:
+            next_value["balloon_group_area"] = next_value.get("context_area") or bounding_box
         return next_value
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 
 from mangai_api.constants import (
+    SUPPORTED_READING_PROFILES,
     SUPPORTED_SOURCE_LANGUAGE_CODES,
     SUPPORTED_TARGET_LANGUAGE_CODES,
     SUPPORTED_TEXT_DIRECTIONS,
@@ -72,3 +73,21 @@ def infer_text_direction(language_tag: str) -> str:
     if direction not in SUPPORTED_TEXT_DIRECTIONS:
         raise LocaleValidationError("Unsupported inferred text direction.")
     return direction
+
+
+def infer_reading_profile(language_tag: str) -> str:
+    normalized = normalize_language_tag(language_tag)
+    primary_language = normalized.split("-")[0]
+    reading_profile = "manhwa" if primary_language == "ko" else "manga"
+    if reading_profile not in SUPPORTED_READING_PROFILES:
+        raise LocaleValidationError("Unsupported inferred reading profile.")
+    return reading_profile
+
+
+def normalize_reading_profile(value: str) -> str:
+    normalized = value.strip().lower()
+    if normalized not in SUPPORTED_READING_PROFILES:
+        raise LocaleValidationError(
+            f"Unsupported reading profile. Expected one of: {', '.join(SUPPORTED_READING_PROFILES)}."
+        )
+    return normalized

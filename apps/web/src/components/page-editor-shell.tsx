@@ -679,6 +679,18 @@ export function PageEditorShell({
       return leftPanelOrder - rightPanelOrder;
     }
 
+    const leftBalloonGroupOrder = left.balloon_group_order ?? Number.MAX_SAFE_INTEGER;
+    const rightBalloonGroupOrder = right.balloon_group_order ?? Number.MAX_SAFE_INTEGER;
+    if (leftBalloonGroupOrder !== rightBalloonGroupOrder) {
+      return leftBalloonGroupOrder - rightBalloonGroupOrder;
+    }
+
+    const leftOrderInBalloonGroup = left.order_in_balloon_group ?? Number.MAX_SAFE_INTEGER;
+    const rightOrderInBalloonGroup = right.order_in_balloon_group ?? Number.MAX_SAFE_INTEGER;
+    if (leftOrderInBalloonGroup !== rightOrderInBalloonGroup) {
+      return leftOrderInBalloonGroup - rightOrderInBalloonGroup;
+    }
+
     const leftOrderInPanel = left.order_in_panel ?? Number.MAX_SAFE_INTEGER;
     const rightOrderInPanel = right.order_in_panel ?? Number.MAX_SAFE_INTEGER;
     if (leftOrderInPanel !== rightOrderInPanel) {
@@ -1419,6 +1431,18 @@ export function PageEditorShell({
                 <div className="editor-selection-meta">
                   <span className="status-item-label">{messages.editor.regionPanelOrderLabel}</span>
                   <strong>{selectedRegion.panel_order ?? messages.editor.regionOrderUnknown}</strong>
+                </div>
+                <div className="editor-selection-meta">
+                  <span className="status-item-label">{messages.editor.regionBalloonGroupOrderLabel}</span>
+                  <strong>
+                    {selectedRegion.balloon_group_order ?? messages.editor.regionOrderUnknown}
+                  </strong>
+                </div>
+                <div className="editor-selection-meta">
+                  <span className="status-item-label">{messages.editor.regionOrderInBalloonGroupLabel}</span>
+                  <strong>
+                    {selectedRegion.order_in_balloon_group ?? messages.editor.regionOrderUnknown}
+                  </strong>
                 </div>
                 <div className="editor-selection-meta">
                   <span className="status-item-label">{messages.editor.regionOrderInPanelLabel}</span>

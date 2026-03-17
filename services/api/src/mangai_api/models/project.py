@@ -9,8 +9,10 @@ from pydantic import Field, field_validator, model_validator
 from mangai_api.constants import SCHEMA_VERSION, SUPPORTED_TEXT_DIRECTIONS
 from mangai_api.i18n import (
     infer_text_direction,
+    infer_reading_profile,
     normalize_project_source_language,
     normalize_project_target_language,
+    normalize_reading_profile,
 )
 from mangai_api.models.common import APIModel
 from mangai_api.models.job import JobRecord
@@ -36,11 +38,13 @@ PageStatus = Literal[
     "error",
 ]
 TextDirection = Literal["ltr", "rtl", "ttb"]
+ReadingProfile = Literal["manga", "manhwa"]
 
 
 class CreateProjectRequest(APIModel):
     name: str = Field(min_length=1, max_length=200)
     source_language: str
+    reading_profile: ReadingProfile | None = None
     target_language: str
     target_text_direction: TextDirection | None = None
 
@@ -59,8 +63,21 @@ class CreateProjectRequest(APIModel):
             return normalize_project_source_language(value)
         return normalize_project_target_language(value)
 
+    @field_validator("reading_profile")
+    @classmethod
+    def validate_reading_profile(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return normalize_reading_profile(value)
+
     @model_validator(mode="after")
     def apply_direction_default(self) -> "CreateProjectRequest":
+        if self.reading_profile is None:
+            object.__setattr__(
+                self,
+                "reading_profile",
+                infer_reading_profile(self.source_language),
+            )
         if self.target_text_direction is None:
             object.__setattr__(
                 self,
@@ -78,11 +95,23 @@ class ProjectSummary(APIModel):
     name: str
     status: ProjectStatus
     source_language: str
+    reading_profile: ReadingProfile = "manga"
     target_language: str
     target_text_direction: TextDirection
     page_count: int = Field(ge=0)
     created_at: datetime
     updated_at: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_reading_profile_default(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+
+        next_value = dict(value)
+        if next_value.get("reading_profile") is None and isinstance(next_value.get("source_language"), str):
+            next_value["reading_profile"] = infer_reading_profile(next_value["source_language"])
+        return next_value
 
 
 class ListProjectsResponse(APIModel):

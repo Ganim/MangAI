@@ -300,6 +300,10 @@ class LocalProjectStore:
             key=lambda region: (
                 region.global_reading_order if region.global_reading_order is not None else 9999,
                 region.panel_order if region.panel_order is not None else 9999,
+                region.balloon_group_order if region.balloon_group_order is not None else 9999,
+                region.order_in_balloon_group
+                if region.order_in_balloon_group is not None
+                else 9999,
                 region.order_in_panel if region.order_in_panel is not None else 9999,
                 region.bounding_box.y,
                 region.bounding_box.x,
@@ -771,7 +775,11 @@ class LocalProjectStore:
                 text_area=payload.bounding_box,
                 context_area=payload.bounding_box,
                 panel_area=payload.bounding_box,
+                balloon_group_id=None,
+                balloon_group_area=payload.bounding_box,
                 panel_order=None,
+                balloon_group_order=None,
+                order_in_balloon_group=None,
                 order_in_panel=None,
                 global_reading_order=None,
                 shape=self._polygon_shape_from_bounding_box(payload.bounding_box),
@@ -816,6 +824,15 @@ class LocalProjectStore:
                 )
                 else region.panel_area
             )
+            next_balloon_group_area = (
+                next_context_area
+                if (
+                    region.balloon_group_area is None
+                    or region.balloon_group_area == region.context_area
+                    or region.balloon_group_area == region.bounding_box
+                )
+                else region.balloon_group_area
+            )
             next_region = region.model_copy(
                 update={
                     "type": payload.type or region.type,
@@ -824,6 +841,7 @@ class LocalProjectStore:
                     "text_area": next_text_area,
                     "context_area": next_context_area,
                     "panel_area": next_panel_area,
+                    "balloon_group_area": next_balloon_group_area,
                     "global_reading_order": (
                         payload.global_reading_order
                         if payload.global_reading_order is not None
@@ -913,6 +931,7 @@ class LocalProjectStore:
                 name=payload.name,
                 status="draft",
                 source_language=payload.source_language,
+                reading_profile=payload.reading_profile,
                 target_language=payload.target_language,
                 target_text_direction=payload.target_text_direction,
                 page_count=0,

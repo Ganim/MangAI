@@ -24,6 +24,8 @@ class OcrCandidateRegion:
     width: float
     height: float
     panel_order: int | None = None
+    balloon_group_order: int | None = None
+    order_in_balloon_group: int | None = None
     order_in_panel: int | None = None
     global_reading_order: int | None = None
 
@@ -432,6 +434,12 @@ def _sort_ocr_candidate_regions(
         key=lambda candidate: (
             candidate.global_reading_order if candidate.global_reading_order is not None else 9999,
             candidate.panel_order if candidate.panel_order is not None else 9999,
+            candidate.balloon_group_order
+            if candidate.balloon_group_order is not None
+            else 9999,
+            candidate.order_in_balloon_group
+            if candidate.order_in_balloon_group is not None
+            else 9999,
             candidate.order_in_panel if candidate.order_in_panel is not None else 9999,
             candidate.y,
             candidate.x,

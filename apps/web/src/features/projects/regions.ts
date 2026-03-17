@@ -23,7 +23,10 @@ type RegionOverlayInput = {
   text_area?: RegionBoundingBox;
   context_area?: RegionBoundingBox;
   panel_area?: RegionBoundingBox;
+  balloon_group_area?: RegionBoundingBox;
   panel_order?: number | null;
+  balloon_group_order?: number | null;
+  order_in_balloon_group?: number | null;
   order_in_panel?: number | null;
   global_reading_order?: number | null;
 };
