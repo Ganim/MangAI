@@ -2,6 +2,10 @@ type PageJobLike = {
   status: "queued" | "running" | "succeeded" | "failed" | "canceled";
 };
 
+type TypedPageJobLike = PageJobLike & {
+  type: string;
+};
+
 const ACTIVE_JOB_STATUSES = new Set<PageJobLike["status"]>(["queued", "running"]);
 const QUEUED_JOB_STATUSES = new Set<PageJobLike["status"]>(["queued"]);
 const RUNNING_JOB_STATUSES = new Set<PageJobLike["status"]>(["running"]);
@@ -16,4 +20,13 @@ export function hasQueuedPageJobs(jobs: ReadonlyArray<PageJobLike>) {
 
 export function hasRunningPageJobs(jobs: ReadonlyArray<PageJobLike>) {
   return jobs.some((job) => RUNNING_JOB_STATUSES.has(job.status));
+}
+
+export function hasPendingPageJobType(
+  jobs: ReadonlyArray<TypedPageJobLike>,
+  jobType: TypedPageJobLike["type"],
+) {
+  return jobs.some(
+    (job) => job.type === jobType && ACTIVE_JOB_STATUSES.has(job.status),
+  );
 }

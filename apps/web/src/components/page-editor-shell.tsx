@@ -35,7 +35,7 @@ import {
   countUnassignedDialogues,
 } from "../features/projects/automation.ts";
 import {
-  hasPendingPageJobs,
+  hasPendingPageJobType,
   hasQueuedPageJobs,
   hasRunningPageJobs,
 } from "../features/projects/jobs.ts";
@@ -473,7 +473,7 @@ export function PageEditorShell({
   }, [currentPage, messages.editor.textLoadErrorFallback, projectId]);
 
   useEffect(() => {
-    if (currentPage === null || !hasPendingPageJobs(jobs)) {
+    if (currentPage === null || !hasRunningPageJobs(jobs)) {
       return;
     }
 
@@ -560,9 +560,13 @@ export function PageEditorShell({
     assignments,
     placements,
   });
-  const hasPendingJobsForPage = hasPendingPageJobs(jobs);
   const hasQueuedJobsForPage = hasQueuedPageJobs(jobs);
   const hasRunningJobsForPage = hasRunningPageJobs(jobs);
+  const hasPendingDetectionJob = hasPendingPageJobType(jobs, "detect_regions");
+  const hasPendingCleanupJob = hasPendingPageJobType(jobs, "generate_cleanup");
+  const hasPendingOcrJob = hasPendingPageJobType(jobs, "run_ocr");
+  const hasPendingTranslationJob = hasPendingPageJobType(jobs, "generate_translation");
+  const hasPendingMatchingJob = hasPendingPageJobType(jobs, "match_dialogue");
 
   async function handleCreateRegion() {
     if (currentPage === null) {
@@ -1443,7 +1447,7 @@ export function PageEditorShell({
             <div className="editor-selection-actions">
               <button
                 className="primary-button"
-                disabled={isQueueingDetection}
+                disabled={isQueueingDetection || hasPendingDetectionJob}
                 onClick={() => void handleQueueRegionDetection()}
                 type="button"
               >
@@ -1463,7 +1467,11 @@ export function PageEditorShell({
               </button>
               <button
                 className="secondary-button"
-                disabled={isQueueingCleanup || !hasApprovedActiveMaskRevisions(maskRevisions)}
+                disabled={
+                  isQueueingCleanup
+                  || hasPendingCleanupJob
+                  || !hasApprovedActiveMaskRevisions(maskRevisions)
+                }
                 onClick={() => void handleQueueCleanup()}
                 type="button"
               >
@@ -1476,7 +1484,7 @@ export function PageEditorShell({
             <div className="editor-selection-actions">
               <button
                 className="secondary-button"
-                disabled={isQueueingOcr || ocrCandidateRegionCount === 0}
+                disabled={isQueueingOcr || hasPendingOcrJob || ocrCandidateRegionCount === 0}
                 onClick={() => void handleQueueOcr()}
                 type="button"
               >
@@ -1486,7 +1494,7 @@ export function PageEditorShell({
               </button>
               <button
                 className="ghost-button"
-                disabled={isQueueingTranslation || dialogues.length === 0}
+                disabled={isQueueingTranslation || hasPendingTranslationJob || dialogues.length === 0}
                 onClick={() => void handleQueueAutomaticTranslation()}
                 type="button"
               >
@@ -1498,6 +1506,7 @@ export function PageEditorShell({
                 className="ghost-button"
                 disabled={
                   isQueueingMatching
+                  || hasPendingMatchingJob
                   || unassignedDialogueCount === 0
                   || availableMatchingRegionCount === 0
                 }

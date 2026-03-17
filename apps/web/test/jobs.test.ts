@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
   hasPendingPageJobs,
+  hasPendingPageJobType,
   hasQueuedPageJobs,
   hasRunningPageJobs,
 } from "../src/features/projects/jobs.ts";
@@ -59,6 +60,22 @@ assert.equal(
     { status: "queued" },
     { status: "failed" },
   ]),
+  false,
+);
+
+assert.equal(
+  hasPendingPageJobType([
+    { type: "detect_regions", status: "queued" },
+    { type: "run_ocr", status: "succeeded" },
+  ], "detect_regions"),
+  true,
+);
+
+assert.equal(
+  hasPendingPageJobType([
+    { type: "detect_regions", status: "succeeded" },
+    { type: "run_ocr", status: "running" },
+  ], "detect_regions"),
   false,
 );
 
