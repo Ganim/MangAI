@@ -36,6 +36,8 @@ import {
 } from "../features/projects/automation.ts";
 import {
   hasPendingPageJobs,
+  hasQueuedPageJobs,
+  hasRunningPageJobs,
 } from "../features/projects/jobs.ts";
 import {
   buildJpegExportFileName,
@@ -559,6 +561,8 @@ export function PageEditorShell({
     placements,
   });
   const hasPendingJobsForPage = hasPendingPageJobs(jobs);
+  const hasQueuedJobsForPage = hasQueuedPageJobs(jobs);
+  const hasRunningJobsForPage = hasRunningPageJobs(jobs);
 
   async function handleCreateRegion() {
     if (currentPage === null) {
@@ -1149,7 +1153,7 @@ export function PageEditorShell({
                 <div className="editor-selection-actions">
                   <button
                     className="ghost-button"
-                    disabled={updatingRegionId === selectedRegion.id || hasPendingJobsForPage}
+                    disabled={updatingRegionId === selectedRegion.id || hasRunningJobsForPage}
                     onClick={() => void handleUpdateRegionState("reviewed")}
                     type="button"
                   >
@@ -1157,7 +1161,7 @@ export function PageEditorShell({
                   </button>
                   <button
                     className="secondary-button"
-                    disabled={updatingRegionId === selectedRegion.id || hasPendingJobsForPage}
+                    disabled={updatingRegionId === selectedRegion.id || hasRunningJobsForPage}
                     onClick={() => void handleUpdateRegionState("approved")}
                     type="button"
                   >
@@ -1165,7 +1169,7 @@ export function PageEditorShell({
                   </button>
                   <button
                     className="ghost-button"
-                    disabled={updatingRegionId === selectedRegion.id || hasPendingJobsForPage}
+                    disabled={updatingRegionId === selectedRegion.id || hasRunningJobsForPage}
                     onClick={() => void handleUpdateRegionState("draft")}
                     type="button"
                   >
@@ -1173,7 +1177,7 @@ export function PageEditorShell({
                   </button>
                   <button
                     className="ghost-button"
-                    disabled={deletingRegionId === selectedRegion.id || hasPendingJobsForPage}
+                    disabled={deletingRegionId === selectedRegion.id || hasRunningJobsForPage}
                     onClick={() => void handleDeleteSelectedRegion()}
                     type="button"
                   >
@@ -1410,6 +1414,12 @@ export function PageEditorShell({
 
             {jobLoadError ? <p className="notice notice-error">{jobLoadError}</p> : null}
             {jobActionError ? <p className="notice notice-error">{jobActionError}</p> : null}
+            {hasRunningJobsForPage ? (
+              <p className="notice notice-warning">{messages.editor.runningJobsNotice}</p>
+            ) : null}
+            {!hasRunningJobsForPage && hasQueuedJobsForPage ? (
+              <p className="notice notice-warning">{messages.editor.queuedJobsNotice}</p>
+            ) : null}
 
             <p className="card-description">
               {messages.editor.approvedMasksSummary.replace(
@@ -1443,7 +1453,7 @@ export function PageEditorShell({
               </button>
               <button
                 className="ghost-button"
-                disabled={isResettingRegions || regions.length === 0 || hasPendingJobsForPage}
+                disabled={isResettingRegions || regions.length === 0 || hasRunningJobsForPage}
                 onClick={() => void handleResetRegions()}
                 type="button"
               >

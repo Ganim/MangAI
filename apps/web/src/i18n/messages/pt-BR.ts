@@ -294,6 +294,10 @@ export const ptBRMessages: AppMessages = {
     jobsEmpty: "Nenhum job foi enfileirado para esta pagina ainda.",
     jobLoadErrorFallback: "O editor nao conseguiu carregar o historico de jobs da pagina.",
     jobCreateErrorFallback: "O editor nao conseguiu enfileirar a automacao selecionada agora.",
+    queuedJobsNotice:
+      "Existem jobs na fila para esta pagina. Voce ainda pode resetar ou excluir regioes; os jobs pendentes de regiao serao limpos automaticamente.",
+    runningJobsNotice:
+      "Existe um job em execucao nesta pagina. Aguarde a conclusao antes de editar ou remover regioes.",
     textLoadErrorFallback: "O editor nao conseguiu carregar o fluxo de dialogos salvo desta pagina.",
     textSaveErrorFallback: "O editor nao conseguiu salvar o fluxo de dialogo selecionado agora.",
     approvedMasksSummary: "{count} mascaras de limpeza ativas e aprovadas prontas",

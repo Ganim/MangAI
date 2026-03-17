@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 
-import { hasPendingPageJobs } from "../src/features/projects/jobs.ts";
+import {
+  hasPendingPageJobs,
+  hasQueuedPageJobs,
+  hasRunningPageJobs,
+} from "../src/features/projects/jobs.ts";
 
 assert.equal(
   hasPendingPageJobs([
@@ -22,6 +26,38 @@ assert.equal(
     { status: "failed" },
     { status: "canceled" },
     { status: "succeeded" },
+  ]),
+  false,
+);
+
+assert.equal(
+  hasQueuedPageJobs([
+    { status: "queued" },
+    { status: "succeeded" },
+  ]),
+  true,
+);
+
+assert.equal(
+  hasQueuedPageJobs([
+    { status: "running" },
+    { status: "failed" },
+  ]),
+  false,
+);
+
+assert.equal(
+  hasRunningPageJobs([
+    { status: "running" },
+    { status: "queued" },
+  ]),
+  true,
+);
+
+assert.equal(
+  hasRunningPageJobs([
+    { status: "queued" },
+    { status: "failed" },
   ]),
   false,
 );

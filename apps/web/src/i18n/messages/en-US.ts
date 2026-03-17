@@ -219,6 +219,8 @@ export type AppMessages = {
     jobsEmpty: string;
     jobLoadErrorFallback: string;
     jobCreateErrorFallback: string;
+    queuedJobsNotice: string;
+    runningJobsNotice: string;
     textLoadErrorFallback: string;
     textSaveErrorFallback: string;
     approvedMasksSummary: string;
@@ -574,6 +576,10 @@ export const enUSMessages: AppMessages = {
     jobsEmpty: "No jobs have been queued for this page yet.",
     jobLoadErrorFallback: "The editor could not load the page job history.",
     jobCreateErrorFallback: "The editor could not queue the selected automation right now.",
+    queuedJobsNotice:
+      "There are queued jobs on this page. You can still reset or delete regions; queued region jobs will be cleared automatically.",
+    runningJobsNotice:
+      "There is a running job on this page. Wait for it to finish before editing or removing regions.",
     textLoadErrorFallback: "The editor could not load the saved dialogue workflow for this page.",
     textSaveErrorFallback: "The editor could not save the selected dialogue workflow right now.",
     approvedMasksSummary: "{count} approved active cleanup masks ready",
