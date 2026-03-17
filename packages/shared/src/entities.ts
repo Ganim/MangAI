@@ -1,6 +1,7 @@
 import {
   AssetKind,
   AssignmentOrigin,
+  CleanupStrategy,
   DialogueSource,
   DialogueStatus,
   ExportFormat,
@@ -189,6 +190,18 @@ export function parseRegion(value: unknown, path: Array<string | number> = []) {
     origin,
     state: readEnum(objectValue.state, RegionState, atPath(path, "state")),
     confidence,
+    cleanup_strategy:
+      readOptional(
+        objectValue.cleanup_strategy,
+        (input, inputPath) => readEnum(input, CleanupStrategy, inputPath),
+        atPath(path, "cleanup_strategy"),
+      ) ?? null,
+    cleanup_confidence:
+      readNullable(
+        objectValue.cleanup_confidence,
+        (input, inputPath) => readNumber(input, inputPath, { min: 0, max: 1 }),
+        atPath(path, "cleanup_confidence"),
+      ) ?? null,
     bounding_box: parseBoundingBox(objectValue.bounding_box, atPath(path, "bounding_box")),
     shape: parsePolygonShape(objectValue.shape, atPath(path, "shape")),
     ...parseEntityTimestamps(objectValue, path),

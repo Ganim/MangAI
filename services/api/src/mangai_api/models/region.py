@@ -12,6 +12,7 @@ from mangai_api.models.common import APIModel
 RegionType = Literal["speech_balloon", "narration_box", "free_text", "sfx", "unknown"]
 RegionOrigin = Literal["detected", "user_created", "user_split", "user_merged"]
 RegionState = Literal["draft", "reviewed", "approved", "rejected"]
+CleanupStrategy = Literal["solid_fill", "background_reconstruction"]
 
 
 class BoundingBox(APIModel):
@@ -38,6 +39,8 @@ class RegionRecord(APIModel):
     origin: RegionOrigin
     state: RegionState
     confidence: float | None = Field(default=None, ge=0, le=1)
+    cleanup_strategy: CleanupStrategy | None = None
+    cleanup_confidence: float | None = Field(default=None, ge=0, le=1)
     bounding_box: BoundingBox
     shape: PolygonShape
     created_at: datetime

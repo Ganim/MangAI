@@ -235,6 +235,12 @@ export const ptBRMessages: AppMessages = {
     regionBoundsLabel: "Limites",
     regionConfidenceLabel: "Confianca",
     regionConfidenceUnknown: "Manual",
+    cleanupStrategyLabel: "Limpeza sugerida",
+    cleanupStrategyUnknown: "Precisa revisao",
+    cleanupStrategyLabels: {
+      solid_fill: "Preenchimento simples",
+      background_reconstruction: "Reconstruir fundo",
+    },
     maskSectionTitle: "Mascara de limpeza",
     maskSectionCopy:
       "Cada revisao ativa de mascara vira a fonte de verdade da limpeza desta regiao. Crie uma nova versao a partir da regiao revisada e aprove antes de enfileirar a limpeza.",

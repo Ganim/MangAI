@@ -280,6 +280,8 @@ const parsedRegionsResponse = parseListPageRegionsResponse({
       origin: "user_created",
       state: "draft",
       confidence: null,
+      cleanup_strategy: "solid_fill",
+      cleanup_confidence: 0.81,
       bounding_box: {
         x: 10,
         y: 20,
@@ -302,6 +304,7 @@ const parsedRegionsResponse = parseListPageRegionsResponse({
 });
 
 assert.equal(parsedRegionsResponse.regions[0]?.type, "speech_balloon");
+assert.equal(parsedRegionsResponse.regions[0]?.cleanup_strategy, "solid_fill");
 
 const parsedRegionResponse = parsePageRegionResponse({
   region: {
@@ -311,6 +314,8 @@ const parsedRegionResponse = parsePageRegionResponse({
     origin: "user_created",
     state: "approved",
     confidence: null,
+    cleanup_strategy: "background_reconstruction",
+    cleanup_confidence: 0.72,
     bounding_box: {
       x: 10,
       y: 20,
@@ -332,6 +337,7 @@ const parsedRegionResponse = parsePageRegionResponse({
 });
 
 assert.equal(parsedRegionResponse.region.state, "approved");
+assert.equal(parsedRegionResponse.region.cleanup_strategy, "background_reconstruction");
 
 const parsedCreateMaskRevision = parseCreateMaskRevisionRequest({
   region_id: UUID_3,

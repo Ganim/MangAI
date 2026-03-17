@@ -18,6 +18,7 @@ export const PageStatus = [
 export const RegionType = ["speech_balloon", "narration_box", "free_text", "sfx", "unknown"] as const;
 export const RegionOrigin = ["detected", "user_created", "user_split", "user_merged"] as const;
 export const RegionState = ["draft", "reviewed", "approved", "rejected"] as const;
+export const CleanupStrategy = ["solid_fill", "background_reconstruction"] as const;
 export const DialogueSource = ["ocr", "manual", "imported_script"] as const;
 export const DialogueStatus = ["draft", "reviewed", "approved", "rejected"] as const;
 export const TranslationStatus = ["draft", "reviewed", "approved"] as const;

@@ -1056,6 +1056,16 @@ export function PageEditorShell({
                       : `${Math.round(selectedRegion.confidence * 100)}%`}
                   </strong>
                 </div>
+                <div className="editor-selection-meta">
+                  <span className="status-item-label">{messages.editor.cleanupStrategyLabel}</span>
+                  <strong>
+                    {selectedRegion.cleanup_strategy === null
+                      ? messages.editor.cleanupStrategyUnknown
+                      : selectedRegion.cleanup_confidence === null
+                        ? messages.editor.cleanupStrategyLabels[selectedRegion.cleanup_strategy]
+                        : `${messages.editor.cleanupStrategyLabels[selectedRegion.cleanup_strategy]} (${Math.round(selectedRegion.cleanup_confidence * 100)}%)`}
+                  </strong>
+                </div>
 
                 <div className="editor-selection-actions">
                   <button

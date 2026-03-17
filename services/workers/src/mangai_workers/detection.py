@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from statistics import median
 from typing import TYPE_CHECKING
+
+import cv2
+import numpy as np
 
 from mangai_workers.comic_text_detector import (
     ComicTextBlock,
@@ -24,6 +27,8 @@ class DetectedRegionCandidate:
     type: str
     confidence: float
     bounding_box: dict[str, float]
+    cleanup_strategy: str | None = None
+    cleanup_confidence: float | None = None
 
 
 @dataclass(frozen=True)
@@ -64,7 +69,7 @@ def detect_regions_from_asset(
                     page_height=page_height,
                 )
                 if len(candidates) > 0:
-                    return candidates
+                    return _annotate_cleanup_candidates(asset_path=asset_path, candidates=candidates)
             except Exception:  # noqa: BLE001 - detection should degrade gracefully
                 pass
 
@@ -80,14 +85,17 @@ def detect_regions_from_asset(
                 page_height=page_height,
             )
             if len(candidates) > 0:
-                return candidates
+                return _annotate_cleanup_candidates(asset_path=asset_path, candidates=candidates)
         except Exception:  # noqa: BLE001 - region detection must degrade gracefully to fallback
             pass
 
-    return _detect_regions_from_fallback_bytes(
-        asset_bytes=asset_bytes,
-        page_width=page_width,
-        page_height=page_height,
+    return _annotate_cleanup_candidates(
+        asset_path=asset_path,
+        candidates=_detect_regions_from_fallback_bytes(
+            asset_bytes=asset_bytes,
+            page_width=page_width,
+            page_height=page_height,
+        ),
     )
 
 
@@ -604,6 +612,84 @@ def _detect_regions_from_fallback_bytes(
         )
 
     return candidates
+
+
+def _annotate_cleanup_candidates(
+    *,
+    asset_path: Path,
+    candidates: list[DetectedRegionCandidate],
+) -> list[DetectedRegionCandidate]:
+    if len(candidates) == 0:
+        return []
+
+    grayscale = cv2.imdecode(np.fromfile(str(asset_path), dtype=np.uint8), cv2.IMREAD_GRAYSCALE)
+    if grayscale is None:
+        return candidates
+
+    annotated: list[DetectedRegionCandidate] = []
+    for candidate in candidates:
+        cleanup_strategy, cleanup_confidence = _classify_cleanup_strategy(
+            grayscale_image=grayscale,
+            candidate=candidate,
+        )
+        annotated.append(
+            replace(
+                candidate,
+                cleanup_strategy=cleanup_strategy,
+                cleanup_confidence=cleanup_confidence,
+            )
+        )
+    return annotated
+
+
+def _classify_cleanup_strategy(
+    *,
+    grayscale_image: np.ndarray,
+    candidate: DetectedRegionCandidate,
+) -> tuple[str, float]:
+    if candidate.type == "free_text":
+        return "background_reconstruction", 0.91
+
+    box = candidate.bounding_box
+    x1 = max(int(round(box["x"])), 0)
+    y1 = max(int(round(box["y"])), 0)
+    x2 = min(int(round(box["x"] + box["width"])), grayscale_image.shape[1])
+    y2 = min(int(round(box["y"] + box["height"])), grayscale_image.shape[0])
+    if x2 <= x1 or y2 <= y1:
+        return "background_reconstruction", 0.5
+
+    crop = grayscale_image[y1:y2, x1:x2]
+    blurred = cv2.GaussianBlur(crop, (0, 0), sigmaX=3.0, sigmaY=3.0)
+    std_deviation = float(np.std(blurred))
+    bright_ratio = float(np.mean(blurred >= 210))
+    dark_ratio = float(np.mean(blurred <= 90))
+    edge_density = float(np.mean(cv2.Canny(blurred, 80, 160) > 0))
+
+    solid_fill_score = 0.0
+    solid_fill_score += _normalize_metric(bright_ratio, low=0.34, high=0.78) * 0.46
+    solid_fill_score += _normalize_metric(38.0 - std_deviation, low=0.0, high=26.0) * 0.28
+    solid_fill_score += _normalize_metric(0.12 - edge_density, low=0.0, high=0.09) * 0.18
+    solid_fill_score += _normalize_metric(0.18 - dark_ratio, low=0.0, high=0.14) * 0.08
+    if candidate.type in {"speech_balloon", "narration_box"}:
+        solid_fill_score = min(solid_fill_score + 0.06, 1.0)
+    solid_fill_score = max(0.0, min(solid_fill_score, 1.0))
+
+    if solid_fill_score >= 0.56:
+        confidence = round(max(0.55, min(0.98, 0.52 + (solid_fill_score * 0.46))), 2)
+        return "solid_fill", confidence
+
+    reconstruct_confidence = round(max(0.55, min(0.98, 0.52 + ((1.0 - solid_fill_score) * 0.46))), 2)
+    return "background_reconstruction", reconstruct_confidence
+
+
+def _normalize_metric(value: float, *, low: float, high: float) -> float:
+    if high <= low:
+        return 0.0
+    if value <= low:
+        return 0.0
+    if value >= high:
+        return 1.0
+    return (value - low) / (high - low)
 
 
 def _pick_region_type(rng: random.Random, portrait_bias: bool) -> str:

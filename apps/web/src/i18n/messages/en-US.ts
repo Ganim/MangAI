@@ -37,6 +37,11 @@ type RegionOriginLabels = {
   user_merged: string;
 };
 
+type CleanupStrategyLabels = {
+  solid_fill: string;
+  background_reconstruction: string;
+};
+
 type JobTypeLabels = {
   detect_regions: string;
   generate_cleanup: string;
@@ -176,6 +181,9 @@ export type AppMessages = {
     regionBoundsLabel: string;
     regionConfidenceLabel: string;
     regionConfidenceUnknown: string;
+    cleanupStrategyLabel: string;
+    cleanupStrategyUnknown: string;
+    cleanupStrategyLabels: CleanupStrategyLabels;
     maskSectionTitle: string;
     maskSectionCopy: string;
     masksLoading: string;
@@ -501,6 +509,12 @@ export const enUSMessages: AppMessages = {
     regionBoundsLabel: "Bounds",
     regionConfidenceLabel: "Confidence",
     regionConfidenceUnknown: "Manual",
+    cleanupStrategyLabel: "Suggested cleanup",
+    cleanupStrategyUnknown: "Needs review",
+    cleanupStrategyLabels: {
+      solid_fill: "Simple fill",
+      background_reconstruction: "Reconstruct background",
+    },
     maskSectionTitle: "Cleanup mask",
     maskSectionCopy:
       "Each active mask revision becomes the cleanup source of truth for this region. Create a new version from the reviewed region and approve it before queuing cleanup.",

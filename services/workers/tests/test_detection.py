@@ -1,11 +1,14 @@
 from mangai_workers.config import WorkerSettings
 from mangai_workers.comic_text_detector import ComicTextBlock
 from mangai_workers.detection import (
+    DetectedRegionCandidate,
+    _classify_cleanup_strategy,
     build_detected_regions_from_comic_text_blocks,
     build_detected_regions_from_recognized_lines,
     detect_regions_from_asset,
 )
 from mangai_workers.ocr import RecognizedLine
+import numpy as np
 
 
 def test_detect_regions_from_asset_falls_back_deterministically_when_ocr_fails(
@@ -149,3 +152,39 @@ def test_detect_regions_prefers_comic_text_detector_provider(monkeypatch, tmp_pa
     assert len(candidates) == 2
     assert candidates[0].type == "speech_balloon"
     assert candidates[1].type == "narration_box"
+
+
+def test_classify_cleanup_strategy_prefers_solid_fill_for_clean_balloon_crop() -> None:
+    image = np.full((220, 220), 245, dtype=np.uint8)
+    image[70:150, 95:125] = 20
+    candidate = DetectedRegionCandidate(
+        type="speech_balloon",
+        confidence=0.92,
+        bounding_box={"x": 40, "y": 40, "width": 140, "height": 140},
+    )
+
+    strategy, confidence = _classify_cleanup_strategy(
+        grayscale_image=image,
+        candidate=candidate,
+    )
+
+    assert strategy == "solid_fill"
+    assert confidence >= 0.55
+
+
+def test_classify_cleanup_strategy_prefers_reconstruction_for_textured_crop() -> None:
+    y, x = np.indices((220, 220))
+    image = ((x * 7 + y * 11) % 255).astype(np.uint8)
+    candidate = DetectedRegionCandidate(
+        type="free_text",
+        confidence=0.78,
+        bounding_box={"x": 30, "y": 30, "width": 150, "height": 150},
+    )
+
+    strategy, confidence = _classify_cleanup_strategy(
+        grayscale_image=image,
+        candidate=candidate,
+    )
+
+    assert strategy == "background_reconstruction"
+    assert confidence >= 0.55

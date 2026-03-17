@@ -633,6 +633,8 @@ def _build_detected_regions(
                 "origin": "detected",
                 "state": "draft",
                 "confidence": candidate.confidence,
+                "cleanup_strategy": candidate.cleanup_strategy,
+                "cleanup_confidence": candidate.cleanup_confidence,
                 "bounding_box": bounding_box,
                 "shape": _polygon_shape(bounding_box),
                 "created_at": timestamp,
@@ -663,6 +665,8 @@ def _build_overlay_asset(
                 "id": region["id"],
                 "type": region["type"],
                 "confidence": region["confidence"],
+                "cleanup_strategy": region.get("cleanup_strategy"),
+                "cleanup_confidence": region.get("cleanup_confidence"),
                 "bounding_box": region["bounding_box"],
             }
             for region in regions
