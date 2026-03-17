@@ -729,11 +729,16 @@ def _apply_region_reading_metadata(
                 balloon_group["regions"],
                 reading_profile=resolved_reading_profile,
             )
+            ordered_regions, refined_group_area = _refine_regions_within_balloon_group(
+                ordered_regions,
+                balloon_group_area=balloon_group["area"],
+            )
+            balloon_group["area"] = refined_group_area
             for order_in_group, region in enumerate(ordered_regions, start=1):
                 next_region = dict(region)
                 next_region["panel_area"] = panel_box
                 next_region["balloon_group_id"] = balloon_group["id"]
-                next_region["balloon_group_area"] = balloon_group["area"]
+                next_region["balloon_group_area"] = refined_group_area
                 next_region["panel_order"] = panel_order
                 next_region["balloon_group_order"] = balloon_group_order
                 next_region["order_in_balloon_group"] = order_in_group
@@ -1204,6 +1209,75 @@ def _sort_balloon_groups_for_reading(
     )
 
 
+def _refine_regions_within_balloon_group(
+    regions: list[dict[str, Any]],
+    *,
+    balloon_group_area: dict[str, Any],
+) -> tuple[list[dict[str, Any]], dict[str, float]]:
+    if len(regions) <= 1:
+        return regions, _bounding_box(
+            float(balloon_group_area["x"]),
+            float(balloon_group_area["y"]),
+            float(balloon_group_area["width"]),
+            float(balloon_group_area["height"]),
+        )
+
+    speech_indexes = [
+        index
+        for index, region in enumerate(regions)
+        if str(region.get("type") or "unknown") == "speech_balloon"
+    ]
+    if len(speech_indexes) < 2:
+        return regions, _merge_region_areas(regions)
+
+    refined_regions = [dict(region) for region in regions]
+    if len(speech_indexes) == 2:
+        first_index, second_index = speech_indexes
+        next_first_area, next_second_area = _refine_balloon_group_pair_context_areas(
+            refined_regions[first_index],
+            refined_regions[second_index],
+        )
+        refined_regions[first_index]["context_area"] = next_first_area
+        refined_regions[second_index]["context_area"] = next_second_area
+        return refined_regions, _merge_region_areas(refined_regions)
+
+    for left_position in range(len(speech_indexes) - 1):
+        first_index = speech_indexes[left_position]
+        second_index = speech_indexes[left_position + 1]
+        next_first_area, next_second_area = _refine_balloon_group_pair_context_areas(
+            refined_regions[first_index],
+            refined_regions[second_index],
+        )
+        refined_regions[first_index]["context_area"] = next_first_area
+        refined_regions[second_index]["context_area"] = next_second_area
+
+    return refined_regions, _merge_region_areas(refined_regions)
+
+
+def _refine_balloon_group_pair_context_areas(
+    first_region: dict[str, Any],
+    second_region: dict[str, Any],
+) -> tuple[dict[str, float], dict[str, float]]:
+    first_text = _get_region_area(first_region, "text_area")
+    second_text = _get_region_area(second_region, "text_area")
+    first_context = _get_region_area(first_region, "context_area")
+    second_context = _get_region_area(second_region, "context_area")
+
+    if _should_split_balloon_group_pair_on_x(first_text, second_text):
+        return _split_balloon_group_pair_along_x(
+            first_text=first_text,
+            first_context=first_context,
+            second_text=second_text,
+            second_context=second_context,
+        )
+    return _split_balloon_group_pair_along_y(
+        first_text=first_text,
+        first_context=first_context,
+        second_text=second_text,
+        second_context=second_context,
+    )
+
+
 def _sort_regions_within_balloon_group(
     regions: list[dict[str, Any]],
     *,
@@ -1229,6 +1303,143 @@ def _sort_regions_by_area_for_reading(
             reading_profile=reading_profile,
         ),
     )
+
+
+def _should_split_balloon_group_pair_on_x(
+    first_text: dict[str, Any],
+    second_text: dict[str, Any],
+) -> bool:
+    center_dx = abs(_bounding_box_center_x(first_text) - _bounding_box_center_x(second_text))
+    center_dy = abs(_bounding_box_center_y(first_text) - _bounding_box_center_y(second_text))
+    min_width = max(min(float(first_text["width"]), float(second_text["width"])), 1.0)
+    min_height = max(min(float(first_text["height"]), float(second_text["height"])), 1.0)
+    normalized_dx = center_dx / min_width
+    normalized_dy = center_dy / min_height
+    return normalized_dx >= normalized_dy
+
+
+def _split_balloon_group_pair_along_x(
+    *,
+    first_text: dict[str, Any],
+    first_context: dict[str, Any],
+    second_text: dict[str, Any],
+    second_context: dict[str, Any],
+) -> tuple[dict[str, float], dict[str, float]]:
+    if _bounding_box_center_x(first_text) > _bounding_box_center_x(second_text):
+        next_second, next_first = _split_balloon_group_pair_along_x(
+            first_text=second_text,
+            first_context=second_context,
+            second_text=first_text,
+            second_context=first_context,
+        )
+        return next_first, next_second
+
+    cut_x = (_bounding_box_center_x(first_text) + _bounding_box_center_x(second_text)) / 2.0
+    text_guard = min(
+        10.0,
+        max(
+            4.0,
+            min(float(first_text["width"]), float(second_text["width"])) * 0.08,
+            min(float(first_text["height"]), float(second_text["height"])) * 0.024,
+        ),
+    )
+    cut_guard = min(
+        12.0,
+        max(
+            5.0,
+            min(float(first_text["width"]), float(second_text["width"])) * 0.1,
+            min(float(first_text["height"]), float(second_text["height"])) * 0.03,
+        ),
+    )
+
+    first_x2 = max(
+        min(float(first_context["x"]) + float(first_context["width"]), cut_x + cut_guard),
+        float(first_text["x"]) + float(first_text["width"]) + text_guard,
+    )
+    second_x1 = min(
+        max(float(second_context["x"]), cut_x - cut_guard),
+        float(second_text["x"]) - text_guard,
+    )
+
+    next_first = _bounding_box(
+        float(first_context["x"]),
+        float(first_context["y"]),
+        max(first_x2 - float(first_context["x"]), 1.0),
+        float(first_context["height"]),
+    )
+    next_second = _bounding_box(
+        second_x1,
+        float(second_context["y"]),
+        max((float(second_context["x"]) + float(second_context["width"])) - second_x1, 1.0),
+        float(second_context["height"]),
+    )
+    return next_first, next_second
+
+
+def _split_balloon_group_pair_along_y(
+    *,
+    first_text: dict[str, Any],
+    first_context: dict[str, Any],
+    second_text: dict[str, Any],
+    second_context: dict[str, Any],
+) -> tuple[dict[str, float], dict[str, float]]:
+    if _bounding_box_center_y(first_text) > _bounding_box_center_y(second_text):
+        next_second, next_first = _split_balloon_group_pair_along_y(
+            first_text=second_text,
+            first_context=second_context,
+            second_text=first_text,
+            second_context=first_context,
+        )
+        return next_first, next_second
+
+    cut_y = (_bounding_box_center_y(first_text) + _bounding_box_center_y(second_text)) / 2.0
+    text_guard = min(
+        10.0,
+        max(
+            4.0,
+            min(float(first_text["height"]), float(second_text["height"])) * 0.06,
+            min(float(first_text["width"]), float(second_text["width"])) * 0.08,
+        ),
+    )
+    cut_guard = min(
+        12.0,
+        max(
+            5.0,
+            min(float(first_text["height"]), float(second_text["height"])) * 0.08,
+            min(float(first_text["width"]), float(second_text["width"])) * 0.1,
+        ),
+    )
+
+    first_y2 = max(
+        min(float(first_context["y"]) + float(first_context["height"]), cut_y + cut_guard),
+        float(first_text["y"]) + float(first_text["height"]) + text_guard,
+    )
+    second_y1 = min(
+        max(float(second_context["y"]), cut_y - cut_guard),
+        float(second_text["y"]) - text_guard,
+    )
+
+    next_first = _bounding_box(
+        float(first_context["x"]),
+        float(first_context["y"]),
+        float(first_context["width"]),
+        max(first_y2 - float(first_context["y"]), 1.0),
+    )
+    next_second = _bounding_box(
+        float(second_context["x"]),
+        second_y1,
+        float(second_context["width"]),
+        max((float(second_context["y"]) + float(second_context["height"])) - second_y1, 1.0),
+    )
+    return next_first, next_second
+
+
+def _bounding_box_center_x(bounding_box: dict[str, Any]) -> float:
+    return float(bounding_box["x"]) + (float(bounding_box["width"]) / 2.0)
+
+
+def _bounding_box_center_y(bounding_box: dict[str, Any]) -> float:
+    return float(bounding_box["y"]) + (float(bounding_box["height"]) / 2.0)
 
 
 def _build_reading_sort_key(

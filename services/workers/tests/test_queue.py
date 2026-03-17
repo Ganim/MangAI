@@ -832,6 +832,83 @@ def test_apply_region_reading_metadata_prioritizes_right_group_within_same_manga
     assert annotated[2]["balloon_group_id"] == annotated[3]["balloon_group_id"]
 
 
+def test_apply_region_reading_metadata_tightens_side_by_side_group_members() -> None:
+    annotated = _apply_region_reading_metadata(
+        [
+            {
+                "id": "right-bubble",
+                "type": "speech_balloon",
+                "bounding_box": {"x": 673.48, "y": 67.52, "width": 68.04, "height": 147.96},
+                "text_area": {"x": 673.48, "y": 67.52, "width": 68.04, "height": 147.96},
+                "context_area": {"x": 623.71, "y": 45.0, "width": 143.29, "height": 188.24},
+            },
+            {
+                "id": "left-bubble",
+                "type": "speech_balloon",
+                "bounding_box": {"x": 478.08, "y": 111.8, "width": 159.84, "height": 167.4},
+                "text_area": {"x": 478.08, "y": 111.8, "width": 159.84, "height": 167.4},
+                "context_area": {"x": 462.0, "y": 94.04, "width": 189.53, "height": 225.58},
+            },
+        ],
+        source_language="ja-JP",
+        reading_profile="manga",
+        panel_boxes=[{"x": 410.0, "y": 0.0, "width": 704.0, "height": 666.0}],
+    )
+
+    right_bubble = next(region for region in annotated if region["id"] == "right-bubble")
+    left_bubble = next(region for region in annotated if region["id"] == "left-bubble")
+
+    assert right_bubble["balloon_group_id"] == left_bubble["balloon_group_id"]
+    assert right_bubble["context_area"]["x"] > 623.71
+    assert left_bubble["context_area"]["width"] <= 189.53
+
+
+def test_apply_region_reading_metadata_tightens_stacked_group_members() -> None:
+    original_upper = {"x": 901.9, "y": 701.0, "width": 163.1, "height": 243.25}
+    original_lower = {"x": 812.0, "y": 901.0, "width": 153.3, "height": 227.0}
+    annotated = _apply_region_reading_metadata(
+        [
+            {
+                "id": "upper-bubble",
+                "type": "speech_balloon",
+                "bounding_box": {"x": 921.56, "y": 712.56, "width": 119.88, "height": 200.88},
+                "text_area": {"x": 921.56, "y": 712.56, "width": 119.88, "height": 200.88},
+                "context_area": {"x": 901.9, "y": 701.0, "width": 163.1, "height": 243.25},
+            },
+            {
+                "id": "lower-bubble",
+                "type": "speech_balloon",
+                "bounding_box": {"x": 847.36, "y": 901.0, "width": 98.28, "height": 217.0},
+                "text_area": {"x": 847.36, "y": 901.0, "width": 98.28, "height": 217.0},
+                "context_area": {"x": 812.0, "y": 901.0, "width": 153.3, "height": 227.0},
+            },
+        ],
+        source_language="ja-JP",
+        reading_profile="manga",
+        panel_boxes=[{"x": 691.0, "y": 670.0, "width": 423.0, "height": 513.0}],
+    )
+
+    upper_bubble = next(region for region in annotated if region["id"] == "upper-bubble")
+    lower_bubble = next(region for region in annotated if region["id"] == "lower-bubble")
+
+    assert upper_bubble["balloon_group_id"] == lower_bubble["balloon_group_id"]
+    assert upper_bubble["context_area"]["height"] <= 243.25
+    original_overlap = worker_queue._axis_overlap(
+        original_upper["y"],
+        original_upper["y"] + original_upper["height"],
+        original_lower["y"],
+        original_lower["y"] + original_lower["height"],
+    )
+    next_overlap = worker_queue._axis_overlap(
+        upper_bubble["context_area"]["y"],
+        upper_bubble["context_area"]["y"] + upper_bubble["context_area"]["height"],
+        lower_bubble["context_area"]["y"],
+        lower_bubble["context_area"]["y"] + lower_bubble["context_area"]["height"],
+    )
+    assert next_overlap <= original_overlap
+    assert lower_bubble["context_area"]["y"] <= lower_bubble["text_area"]["y"]
+
+
 def test_apply_region_reading_metadata_keeps_same_band_left_to_right_for_manhwa() -> None:
     annotated = _apply_region_reading_metadata(
         [
