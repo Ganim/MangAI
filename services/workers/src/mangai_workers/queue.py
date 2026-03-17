@@ -1322,27 +1322,8 @@ def _regions_should_share_balloon_group(
         )
 
     return (
-        intersection_ratio >= 0.06
-        or _boxes_intersect(
-            _expand_bounding_box(
-                region_area,
-                padding_x=max(12.0, minimum_width * 0.08),
-                padding_y=max(12.0, minimum_height * 0.08),
-            ),
-            _expand_bounding_box(
-                group_area,
-                padding_x=max(12.0, minimum_width * 0.08),
-                padding_y=max(12.0, minimum_height * 0.08),
-            ),
-        )
-        or (
-            overlap_x >= minimum_width * 0.58
-            and gap_y <= max(20.0, minimum_height * 0.16)
-        )
-        or (
-            overlap_y >= minimum_height * 0.58
-            and gap_x <= max(18.0, minimum_width * 0.14)
-        )
+        intersection_ratio >= 0.04
+        or _boxes_intersect(region_area, group_area)
     )
 
 
