@@ -366,6 +366,33 @@ def test_reset_page_regions_clears_regions_and_pending_region_jobs(client: TestC
     assert detail_response.json()["pages"][0]["status"] == "uploaded"
 
 
+def test_page_regions_can_override_reading_order_manually(client: TestClient) -> None:
+    project_id = create_project(client)
+    page_payload = upload_single_page(client, project_id)
+    page_id = page_payload["id"]
+
+    first_region = create_region(client, project_id, page_id)
+    second_region = create_region(client, project_id, page_id)
+
+    reorder_response = client.patch(
+        f"/api/v1/projects/{project_id}/pages/{page_id}/regions/{second_region['id']}",
+        json={
+            "global_reading_order": 1,
+        },
+    )
+
+    assert reorder_response.status_code == 200
+    reordered_region = reorder_response.json()["region"]
+    assert reordered_region["id"] == second_region["id"]
+    assert reordered_region["global_reading_order"] == 1
+
+    list_response = client.get(f"/api/v1/projects/{project_id}/pages/{page_id}/regions")
+    assert list_response.status_code == 200
+    listed_regions = list_response.json()["regions"]
+    assert [region["id"] for region in listed_regions] == [second_region["id"], first_region["id"]]
+    assert [region["global_reading_order"] for region in listed_regions] == [1, 2]
+
+
 def test_page_mask_revisions_can_be_created_listed_and_updated(client: TestClient) -> None:
     project_id = create_project(client)
     page_payload = upload_single_page(client, project_id)

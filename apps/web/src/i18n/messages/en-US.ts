@@ -181,6 +181,7 @@ export type AppMessages = {
     regionReadingOrderLabel: string;
     regionPanelOrderLabel: string;
     regionOrderInPanelLabel: string;
+    readingOrderHint: string;
     regionStateLabel: string;
     regionOriginLabel: string;
     regionBoundsLabel: string;
@@ -219,6 +220,8 @@ export type AppMessages = {
     editingAreaLabel: string;
     adjustBoundsLabel: string;
     dragResizeHint: string;
+    moveEarlierAction: string;
+    moveLaterAction: string;
     moveLeftAction: string;
     moveUpAction: string;
     moveDownAction: string;
@@ -533,6 +536,7 @@ export const enUSMessages: AppMessages = {
     regionReadingOrderLabel: "Reading order",
     regionPanelOrderLabel: "Panel order",
     regionOrderInPanelLabel: "Order in panel",
+    readingOrderHint: "Use these controls when the automatic numbering does not match the real reading flow of the page.",
     regionStateLabel: "State",
     regionOriginLabel: "Origin",
     regionBoundsLabel: "Bounds",
@@ -591,6 +595,8 @@ export const enUSMessages: AppMessages = {
     editingAreaLabel: "Editing area",
     adjustBoundsLabel: "Bounding box controls",
     dragResizeHint: "Tip: drag the selected area on the canvas or use the corner handles to resize it.",
+    moveEarlierAction: "Read earlier",
+    moveLaterAction: "Read later",
     moveLeftAction: "Move left",
     moveUpAction: "Move up",
     moveDownAction: "Move down",

@@ -83,6 +83,7 @@ type UpdatePageRegionInput = {
     width: number;
     height: number;
   };
+  global_reading_order?: number;
 };
 
 type PolygonPointInput = {

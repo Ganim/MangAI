@@ -80,6 +80,7 @@ class UpdateRegionRequest(APIModel):
     bounding_box: BoundingBox | None = None
     text_area: BoundingBox | None = None
     context_area: BoundingBox | None = None
+    global_reading_order: int | None = Field(default=None, ge=1)
 
     @model_validator(mode="after")
     def validate_has_one_field(self) -> "UpdateRegionRequest":
@@ -89,6 +90,7 @@ class UpdateRegionRequest(APIModel):
             and self.bounding_box is None
             and self.text_area is None
             and self.context_area is None
+            and self.global_reading_order is None
         ):
             raise ValueError("At least one region field must be updated.")
         return self

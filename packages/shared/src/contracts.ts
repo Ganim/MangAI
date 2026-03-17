@@ -243,6 +243,11 @@ export function parseUpdatePageRegionRequest(value: unknown, path: Array<string 
       (input, inputPath) => parseBoundingBox(input, inputPath),
       atPath(path, "context_area"),
     ),
+    global_reading_order: readOptional(
+      objectValue.global_reading_order,
+      (input, inputPath) => readNumber(input, inputPath, { integer: true, min: 1 }),
+      atPath(path, "global_reading_order"),
+    ),
   };
 
   if (
@@ -250,7 +255,8 @@ export function parseUpdatePageRegionRequest(value: unknown, path: Array<string 
     parsedValue.state === undefined &&
     parsedValue.bounding_box === undefined &&
     parsedValue.text_area === undefined &&
-    parsedValue.context_area === undefined
+    parsedValue.context_area === undefined &&
+    parsedValue.global_reading_order === undefined
   ) {
     throw new ValidationError("At least one region field must be updated", path);
   }

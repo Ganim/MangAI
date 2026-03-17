@@ -639,7 +639,7 @@ def test_process_next_job_generates_detected_regions_and_overlay(tmp_path) -> No
     assert all("text_area" in region for region in state["regions"])
     assert all("context_area" in region for region in state["regions"])
     assert all(region["panel_area"] for region in state["regions"])
-    assert all(region["global_reading_order"] >= 1 for region in state["regions"])
+    assert all(region["global_reading_order"] is None for region in state["regions"])
     overlay_asset = next(asset for asset in state["assets"] if asset["kind"] == "overlay")
     overlay_path = data_dir / "assets" / overlay_asset["storage_key"]
     assert overlay_path.exists()
@@ -651,7 +651,7 @@ def test_process_next_job_generates_detected_regions_and_overlay(tmp_path) -> No
     assert all("panel_area" in region for region in overlay_payload["regions"])
 
 
-def test_apply_region_reading_metadata_prioritizes_right_column_for_japanese() -> None:
+def test_apply_region_reading_metadata_keeps_detection_order_and_resets_auto_ordering() -> None:
     annotated = _apply_region_reading_metadata(
         [
             {
@@ -676,15 +676,12 @@ def test_apply_region_reading_metadata_prioritizes_right_column_for_japanese() -
         source_language="ja-JP",
     )
 
-    assert [region["id"] for region in annotated] == ["right-top", "right-bottom", "left-top"]
-    assert [region["global_reading_order"] for region in annotated] == [1, 2, 3]
-    assert annotated[0]["panel_order"] == 1
-    assert annotated[1]["panel_order"] == 1
-    assert annotated[2]["panel_order"] == 2
-    assert annotated[0]["order_in_panel"] == 1
-    assert annotated[1]["order_in_panel"] == 2
-    assert annotated[2]["order_in_panel"] == 1
-    assert annotated[0]["panel_area"] == annotated[1]["panel_area"]
+    assert [region["id"] for region in annotated] == ["left-top", "right-top", "right-bottom"]
+    assert [region["global_reading_order"] for region in annotated] == [None, None, None]
+    assert [region["panel_order"] for region in annotated] == [None, None, None]
+    assert [region["order_in_panel"] for region in annotated] == [None, None, None]
+    assert annotated[0]["panel_area"] == annotated[0]["context_area"]
+    assert annotated[1]["panel_area"] == annotated[1]["context_area"]
 
 
 def test_process_next_job_returns_none_without_queued_jobs(tmp_path) -> None:

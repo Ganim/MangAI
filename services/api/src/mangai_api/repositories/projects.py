@@ -263,16 +263,8 @@ class LocalProjectStore:
         self._require_page(state, project_id, page_id)
         return [
             region.model_copy(deep=True)
-            for region in sorted(
-                [candidate for candidate in state.regions if candidate.page_id == page_id],
-                key=lambda region: (
-                    region.global_reading_order if region.global_reading_order is not None else 9999,
-                    region.panel_order if region.panel_order is not None else 9999,
-                    region.order_in_panel if region.order_in_panel is not None else 9999,
-                    region.bounding_box.y,
-                    region.bounding_box.x,
-                    region.created_at,
-                ),
+            for region in self._sort_regions_by_reading_order(
+                [candidate for candidate in state.regions if candidate.page_id == page_id]
             )
         ]
 
@@ -298,6 +290,59 @@ class LocalProjectStore:
                 key=lambda candidate: (candidate.created_at, candidate.version),
             )
         ]
+
+    def _sort_regions_by_reading_order(
+        self,
+        regions: list[RegionRecord] | tuple[RegionRecord, ...],
+    ) -> list[RegionRecord]:
+        return sorted(
+            list(regions),
+            key=lambda region: (
+                region.global_reading_order if region.global_reading_order is not None else 9999,
+                region.panel_order if region.panel_order is not None else 9999,
+                region.order_in_panel if region.order_in_panel is not None else 9999,
+                region.bounding_box.y,
+                region.bounding_box.x,
+                region.created_at,
+            ),
+        )
+
+    def _reassign_page_region_reading_order(
+        self,
+        regions: tuple[RegionRecord, ...],
+        *,
+        page_id: UUID,
+        target_region_id: UUID,
+        target_position: int,
+    ) -> tuple[RegionRecord, ...]:
+        page_regions = [
+            candidate
+            for candidate in self._sort_regions_by_reading_order(regions)
+            if candidate.page_id == page_id
+        ]
+        target_region = next(
+            candidate for candidate in page_regions if candidate.id == target_region_id
+        )
+        page_regions = [
+            candidate for candidate in page_regions if candidate.id != target_region_id
+        ]
+        insert_index = max(0, min(target_position - 1, len(page_regions)))
+        page_regions.insert(insert_index, target_region)
+
+        timestamp = _utcnow()
+        reordered_by_id = {
+            candidate.id: candidate.model_copy(
+                update={
+                    "global_reading_order": index,
+                    "updated_at": timestamp,
+                }
+            )
+            for index, candidate in enumerate(page_regions, start=1)
+        }
+        return tuple(
+            reordered_by_id.get(candidate.id, candidate)
+            for candidate in regions
+        )
 
     def create_mask_revision(
         self,
@@ -779,15 +824,31 @@ class LocalProjectStore:
                     "text_area": next_text_area,
                     "context_area": next_context_area,
                     "panel_area": next_panel_area,
+                    "global_reading_order": (
+                        payload.global_reading_order
+                        if payload.global_reading_order is not None
+                        else region.global_reading_order
+                    ),
                     "shape": self._polygon_shape_from_bounding_box(next_text_area),
                     "updated_at": _utcnow(),
                 }
             )
             next_regions = tuple(
-                next_region if candidate.id == region_id else candidate for candidate in state.regions
+                next_region if candidate.id == region_id else candidate
+                for candidate in state.regions
             )
+            if payload.global_reading_order is not None:
+                next_regions = self._reassign_page_region_reading_order(
+                    next_regions,
+                    page_id=page_id,
+                    target_region_id=region_id,
+                    target_position=payload.global_reading_order,
+                )
             self._save_state_unlocked(state.model_copy(update={"regions": next_regions}))
-            return next_region.model_copy(deep=True)
+            updated_region = next(
+                candidate for candidate in next_regions if candidate.id == region_id
+            )
+            return updated_region.model_copy(deep=True)
 
     def delete_page_region(
         self,
@@ -1214,22 +1275,14 @@ class LocalProjectStore:
     ) -> tuple[RegionRecord, ...]:
         supported_region_types = {"speech_balloon", "narration_box", "free_text", "unknown"}
         return tuple(
-            sorted(
+            self._sort_regions_by_reading_order(
                 [
                     candidate
                     for candidate in state.regions
                     if candidate.page_id == page_id
                     and candidate.state != "rejected"
                     and candidate.type in supported_region_types
-                ],
-                key=lambda candidate: (
-                    candidate.global_reading_order if candidate.global_reading_order is not None else 9999,
-                    candidate.panel_order if candidate.panel_order is not None else 9999,
-                    candidate.order_in_panel if candidate.order_in_panel is not None else 9999,
-                    candidate.bounding_box.y,
-                    candidate.bounding_box.x,
-                    candidate.created_at,
-                ),
+                ]
             )
         )
 

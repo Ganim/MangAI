@@ -670,35 +670,14 @@ def _apply_region_reading_metadata(
 ) -> list[dict[str, Any]]:
     if len(regions) == 0:
         return regions
-
-    reading_direction = _infer_page_reading_direction(source_language)
-    columns = _group_regions_into_columns(regions)
-    ordered_columns = sorted(
-        columns,
-        key=lambda column: column["bounds"]["x"],
-        reverse=reading_direction == "rtl",
-    )
-
-    panel_order = 1
-    global_order = 1
     annotated_regions: list[dict[str, Any]] = []
-    for column in ordered_columns:
-        panel_groups = _split_column_into_panel_groups(column["regions"])
-        for panel_group in panel_groups:
-            panel_area = _merge_region_areas(panel_group)
-            ordered_panel_regions = _sort_regions_within_panel(
-                panel_group,
-                reading_direction=reading_direction,
-            )
-            for order_in_panel, region in enumerate(ordered_panel_regions, start=1):
-                region["panel_area"] = panel_area
-                region["panel_order"] = panel_order
-                region["order_in_panel"] = order_in_panel
-                region["global_reading_order"] = global_order
-                annotated_regions.append(region)
-                global_order += 1
-            panel_order += 1
-
+    for region in regions:
+        next_region = dict(region)
+        next_region["panel_area"] = _get_region_area(region, "context_area")
+        next_region["panel_order"] = None
+        next_region["order_in_panel"] = None
+        next_region["global_reading_order"] = None
+        annotated_regions.append(next_region)
     return annotated_regions
 
 

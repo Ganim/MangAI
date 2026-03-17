@@ -690,6 +690,10 @@ export function PageEditorShell({
     }
     return left.bounding_box.x - right.bounding_box.x;
   });
+  const selectedRegionOrderIndex =
+    selectedRegion === null
+      ? -1
+      : orderedRegions.findIndex((candidate) => candidate.id === selectedRegion.id);
   const selectedDialogue =
     dialogues.find((candidate) => candidate.id === selectedDialogueId) ?? null;
   const selectedDialogueAssignment =
@@ -777,6 +781,41 @@ export function PageEditorShell({
           region.id === response.region.id ? response.region : region,
         ),
       );
+    } catch (error) {
+      setRegionActionError(getErrorMessage(error, messages.editor.regionUpdateErrorFallback));
+    } finally {
+      setUpdatingRegionId(null);
+    }
+  }
+
+  async function handleMoveSelectedRegionReadingOrder(offset: -1 | 1) {
+    if (currentPage === null || selectedRegion === null) {
+      return;
+    }
+
+    const currentIndex = orderedRegions.findIndex((region) => region.id === selectedRegion.id);
+    if (currentIndex === -1) {
+      return;
+    }
+
+    const nextPosition = Math.max(
+      1,
+      Math.min(orderedRegions.length, currentIndex + 1 + offset),
+    );
+    if (nextPosition === currentIndex + 1) {
+      return;
+    }
+
+    setUpdatingRegionId(selectedRegion.id);
+    setRegionActionError(null);
+
+    try {
+      await updatePageRegion(projectId, currentPage.id, selectedRegion.id, {
+        global_reading_order: nextPosition,
+      });
+      const refreshedRegions = await getPageRegions(projectId, currentPage.id);
+      setRegions(refreshedRegions.regions);
+      handleSelectRegion(selectedRegion.id, selectedRegionArea);
     } catch (error) {
       setRegionActionError(getErrorMessage(error, messages.editor.regionUpdateErrorFallback));
     } finally {
@@ -1376,6 +1415,7 @@ export function PageEditorShell({
                     {selectedRegion.global_reading_order ?? messages.editor.regionOrderUnknown}
                   </strong>
                 </div>
+                <p className="card-description">{messages.editor.readingOrderHint}</p>
                 <div className="editor-selection-meta">
                   <span className="status-item-label">{messages.editor.regionPanelOrderLabel}</span>
                   <strong>{selectedRegion.panel_order ?? messages.editor.regionOrderUnknown}</strong>
@@ -1425,6 +1465,31 @@ export function PageEditorShell({
                 </p>
 
                 <div className="editor-selection-actions">
+                  <button
+                    className="ghost-button"
+                    disabled={
+                      updatingRegionId === selectedRegion.id
+                      || hasRunningJobsForPage
+                      || selectedRegionOrderIndex <= 0
+                    }
+                    onClick={() => void handleMoveSelectedRegionReadingOrder(-1)}
+                    type="button"
+                  >
+                    {messages.editor.moveEarlierAction}
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={
+                      updatingRegionId === selectedRegion.id
+                      || hasRunningJobsForPage
+                      || selectedRegionOrderIndex === -1
+                      || selectedRegionOrderIndex >= orderedRegions.length - 1
+                    }
+                    onClick={() => void handleMoveSelectedRegionReadingOrder(1)}
+                    type="button"
+                  >
+                    {messages.editor.moveLaterAction}
+                  </button>
                   <button
                     className={
                       selectedRegionArea === "context_area" ? "secondary-button" : "ghost-button"
