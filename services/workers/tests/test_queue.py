@@ -651,37 +651,53 @@ def test_process_next_job_generates_detected_regions_and_overlay(tmp_path) -> No
     assert all("panel_area" in region for region in overlay_payload["regions"])
 
 
-def test_apply_region_reading_metadata_keeps_detection_order_and_resets_auto_ordering() -> None:
+def test_apply_region_reading_metadata_uses_panel_boxes_for_manga_reading_order() -> None:
     annotated = _apply_region_reading_metadata(
         [
             {
-                "id": "left-top",
-                "bounding_box": {"x": 140, "y": 120, "width": 120, "height": 220},
-                "text_area": {"x": 140, "y": 120, "width": 120, "height": 220},
-                "context_area": {"x": 120, "y": 100, "width": 180, "height": 300},
+                "id": "top-panel",
+                "bounding_box": {"x": 420, "y": 420, "width": 420, "height": 110},
+                "text_area": {"x": 420, "y": 420, "width": 420, "height": 110},
+                "context_area": {"x": 390, "y": 390, "width": 520, "height": 180},
             },
             {
-                "id": "right-top",
-                "bounding_box": {"x": 760, "y": 90, "width": 140, "height": 220},
-                "text_area": {"x": 760, "y": 90, "width": 140, "height": 220},
-                "context_area": {"x": 730, "y": 70, "width": 220, "height": 320},
+                "id": "bottom-left-panel",
+                "bounding_box": {"x": 440, "y": 860, "width": 110, "height": 260},
+                "text_area": {"x": 440, "y": 860, "width": 110, "height": 260},
+                "context_area": {"x": 400, "y": 820, "width": 180, "height": 320},
             },
             {
-                "id": "right-bottom",
-                "bounding_box": {"x": 700, "y": 520, "width": 180, "height": 260},
-                "text_area": {"x": 700, "y": 520, "width": 180, "height": 260},
-                "context_area": {"x": 660, "y": 470, "width": 260, "height": 360},
+                "id": "bottom-right-top",
+                "bounding_box": {"x": 760, "y": 760, "width": 180, "height": 260},
+                "text_area": {"x": 760, "y": 760, "width": 180, "height": 260},
+                "context_area": {"x": 720, "y": 720, "width": 260, "height": 320},
+            },
+            {
+                "id": "bottom-right-bottom",
+                "bounding_box": {"x": 680, "y": 980, "width": 180, "height": 220},
+                "text_area": {"x": 680, "y": 980, "width": 180, "height": 220},
+                "context_area": {"x": 650, "y": 950, "width": 240, "height": 300},
             },
         ],
         source_language="ja-JP",
+        panel_boxes=[
+            {"x": 0, "y": 0, "width": 1000, "height": 600},
+            {"x": 560, "y": 600, "width": 440, "height": 800},
+            {"x": 0, "y": 600, "width": 560, "height": 800},
+        ],
     )
 
-    assert [region["id"] for region in annotated] == ["left-top", "right-top", "right-bottom"]
-    assert [region["global_reading_order"] for region in annotated] == [None, None, None]
-    assert [region["panel_order"] for region in annotated] == [None, None, None]
-    assert [region["order_in_panel"] for region in annotated] == [None, None, None]
-    assert annotated[0]["panel_area"] == annotated[0]["context_area"]
-    assert annotated[1]["panel_area"] == annotated[1]["context_area"]
+    assert [region["id"] for region in annotated] == [
+        "top-panel",
+        "bottom-right-top",
+        "bottom-right-bottom",
+        "bottom-left-panel",
+    ]
+    assert [region["global_reading_order"] for region in annotated] == [1, 2, 3, 4]
+    assert [region["panel_order"] for region in annotated] == [1, 2, 2, 3]
+    assert [region["order_in_panel"] for region in annotated] == [1, 1, 2, 1]
+    assert annotated[1]["panel_area"]["x"] == 560
+    assert annotated[3]["panel_area"]["x"] == 0
 
 
 def test_process_next_job_returns_none_without_queued_jobs(tmp_path) -> None:

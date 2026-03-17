@@ -8,6 +8,9 @@ from time import sleep
 from typing import Any
 from uuid import uuid4
 
+import cv2
+import numpy as np
+
 from mangai_workers.config import WorkerSettings
 from mangai_workers.detection import detect_regions_from_asset
 from mangai_workers.ocr import OcrCandidateRegion, extract_ocr_lines_from_asset
@@ -171,6 +174,7 @@ def _apply_detect_regions_result(
         detected_candidates=detected_candidates,
         timestamp=timestamp,
         source_language=str(project.get("source_language") or "ja-JP"),
+        asset_path=source_asset_path,
     )
 
     preserved_regions = [
@@ -622,6 +626,7 @@ def _build_detected_regions(
     detected_candidates: list[Any],
     timestamp: str,
     source_language: str,
+    asset_path: Path,
 ) -> list[dict[str, Any]]:
     regions: list[dict[str, Any]] = []
     for candidate in detected_candidates:
@@ -660,25 +665,387 @@ def _build_detected_regions(
                 "updated_at": timestamp,
             }
         )
-    return _apply_region_reading_metadata(regions, source_language=source_language)
+    return _apply_region_reading_metadata(
+        regions,
+        source_language=source_language,
+        asset_path=asset_path,
+    )
 
 
 def _apply_region_reading_metadata(
     regions: list[dict[str, Any]],
     *,
     source_language: str,
+    asset_path: Path | None = None,
+    panel_boxes: list[dict[str, float]] | None = None,
 ) -> list[dict[str, Any]]:
     if len(regions) == 0:
         return regions
-    annotated_regions: list[dict[str, Any]] = []
+    reading_direction = _infer_page_reading_direction(source_language)
+    detected_panel_boxes = panel_boxes
+    if detected_panel_boxes is None and asset_path is not None:
+        detected_panel_boxes = _detect_panel_boxes_from_asset(asset_path)
+
+    if not detected_panel_boxes or len(detected_panel_boxes) <= 1:
+        annotated_regions: list[dict[str, Any]] = []
+        for region in regions:
+            next_region = dict(region)
+            next_region["panel_area"] = _get_region_area(region, "context_area")
+            next_region["panel_order"] = None
+            next_region["order_in_panel"] = None
+            next_region["global_reading_order"] = None
+            annotated_regions.append(next_region)
+        return annotated_regions
+
+    ordered_panels = _sort_panel_boxes_for_reading(
+        detected_panel_boxes,
+        reading_direction=reading_direction,
+    )
+    panel_region_groups: list[tuple[dict[str, float], list[dict[str, Any]]]] = [
+        (panel_box, [])
+        for panel_box in ordered_panels
+    ]
     for region in regions:
-        next_region = dict(region)
-        next_region["panel_area"] = _get_region_area(region, "context_area")
-        next_region["panel_order"] = None
-        next_region["order_in_panel"] = None
-        next_region["global_reading_order"] = None
-        annotated_regions.append(next_region)
+        assigned_index = _assign_region_to_panel(region, ordered_panels)
+        panel_region_groups[assigned_index][1].append(region)
+
+    annotated_regions: list[dict[str, Any]] = []
+    global_order = 1
+    panel_order = 1
+    for panel_box, panel_regions in panel_region_groups:
+        if len(panel_regions) == 0:
+            continue
+        ordered_regions = _sort_regions_within_panel(
+            panel_regions,
+            reading_direction=reading_direction,
+        )
+        for order_in_panel, region in enumerate(ordered_regions, start=1):
+            next_region = dict(region)
+            next_region["panel_area"] = panel_box
+            next_region["panel_order"] = panel_order
+            next_region["order_in_panel"] = order_in_panel
+            next_region["global_reading_order"] = global_order
+            annotated_regions.append(next_region)
+            global_order += 1
+        panel_order += 1
     return annotated_regions
+
+
+def _detect_panel_boxes_from_asset(asset_path: Path) -> list[dict[str, float]]:
+    try:
+        asset_bytes = asset_path.read_bytes()
+    except OSError:
+        return []
+    if len(asset_bytes) == 0:
+        return []
+
+    image = cv2.imdecode(np.frombuffer(asset_bytes, dtype=np.uint8), cv2.IMREAD_GRAYSCALE)
+    if image is None or image.size == 0:
+        return []
+    return _detect_panel_boxes_from_grayscale(image)
+
+
+def _detect_panel_boxes_from_grayscale(grayscale_image: np.ndarray) -> list[dict[str, float]]:
+    height, width = grayscale_image.shape[:2]
+    if width < 180 or height < 180:
+        return []
+
+    threshold_value, threshold_image = cv2.threshold(
+        grayscale_image,
+        0,
+        255,
+        cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU,
+    )
+    if threshold_value <= 0:
+        return []
+    dark_mask = threshold_image > 0
+    dark_mask = cv2.morphologyEx(
+        dark_mask.astype(np.uint8),
+        cv2.MORPH_CLOSE,
+        np.ones((3, 3), dtype=np.uint8),
+    ).astype(bool)
+    return _split_panel_rect_recursively(
+        dark_mask,
+        _bounding_box(0, 0, width, height),
+        depth=0,
+    )
+
+
+def _split_panel_rect_recursively(
+    dark_mask: np.ndarray,
+    rect: dict[str, float],
+    *,
+    depth: int,
+) -> list[dict[str, float]]:
+    if depth >= 4 or rect["width"] < 180 or rect["height"] < 180:
+        return [rect]
+
+    horizontal_candidate = _find_panel_split_candidate(
+        dark_mask,
+        rect,
+        axis="horizontal",
+    )
+    vertical_candidate = _find_panel_split_candidate(
+        dark_mask,
+        rect,
+        axis="vertical",
+    )
+
+    best_candidate = None
+    if horizontal_candidate is not None and vertical_candidate is not None:
+        best_candidate = (
+            horizontal_candidate
+            if horizontal_candidate["score"] >= vertical_candidate["score"]
+            else vertical_candidate
+        )
+    else:
+        best_candidate = horizontal_candidate or vertical_candidate
+
+    if best_candidate is None:
+        return [rect]
+
+    child_rects = _split_rect_by_candidate(rect, best_candidate)
+    if child_rects is None:
+        return [rect]
+
+    leaf_rects: list[dict[str, float]] = []
+    for child_rect in child_rects:
+        leaf_rects.extend(
+            _split_panel_rect_recursively(
+                dark_mask,
+                child_rect,
+                depth=depth + 1,
+            )
+        )
+    return leaf_rects
+
+
+def _find_panel_split_candidate(
+    dark_mask: np.ndarray,
+    rect: dict[str, float],
+    *,
+    axis: str,
+) -> dict[str, float] | None:
+    x1 = int(round(rect["x"]))
+    y1 = int(round(rect["y"]))
+    x2 = x1 + int(round(rect["width"]))
+    y2 = y1 + int(round(rect["height"]))
+    crop = dark_mask[y1:y2, x1:x2]
+    if crop.size == 0:
+        return None
+
+    coverage = (
+        crop.mean(axis=1).astype(np.float32)
+        if axis == "horizontal"
+        else crop.mean(axis=0).astype(np.float32)
+    )
+    if coverage.size == 0:
+        return None
+    smoothed = np.convolve(coverage, np.ones(5, dtype=np.float32) / 5, mode="same")
+    extent = crop.shape[0] if axis == "vertical" else crop.shape[1]
+    length = smoothed.shape[0]
+    margin = max(24, int(length * 0.08))
+    threshold = 0.52
+
+    best_candidate: dict[str, float] | None = None
+    run_start: int | None = None
+    for index in range(margin, max(length - margin, margin)):
+        if smoothed[index] >= threshold:
+            if run_start is None:
+                run_start = index
+            continue
+        if run_start is None:
+            continue
+        candidate = _finalize_panel_split_candidate(
+            run_start=run_start,
+            run_end=index,
+            smoothed=smoothed,
+            rect=rect,
+            axis=axis,
+            extent=extent,
+        )
+        if candidate is not None and (
+            best_candidate is None or candidate["score"] > best_candidate["score"]
+        ):
+            best_candidate = candidate
+        run_start = None
+
+    if run_start is not None:
+        candidate = _finalize_panel_split_candidate(
+            run_start=run_start,
+            run_end=length - margin,
+            smoothed=smoothed,
+            rect=rect,
+            axis=axis,
+            extent=extent,
+        )
+        if candidate is not None and (
+            best_candidate is None or candidate["score"] > best_candidate["score"]
+        ):
+            best_candidate = candidate
+
+    return best_candidate
+
+
+def _finalize_panel_split_candidate(
+    *,
+    run_start: int,
+    run_end: int,
+    smoothed: np.ndarray,
+    rect: dict[str, float],
+    axis: str,
+    extent: int,
+) -> dict[str, float] | None:
+    band_width = run_end - run_start
+    if band_width < 2:
+        return None
+
+    split_start = run_start + 1
+    split_end = run_end - 1
+    before_size = split_start
+    after_size = len(smoothed) - split_end
+    minimum_child_size = max(120, int(len(smoothed) * 0.18))
+    if before_size < minimum_child_size or after_size < minimum_child_size:
+        return None
+
+    mean_coverage = float(smoothed[run_start:run_end].mean())
+    score = mean_coverage * band_width * max(extent, 1)
+    return {
+        "axis": axis,
+        "start": float(split_start),
+        "end": float(split_end),
+        "score": score,
+    }
+
+
+def _split_rect_by_candidate(
+    rect: dict[str, float],
+    candidate: dict[str, float],
+) -> tuple[dict[str, float], dict[str, float]] | None:
+    if candidate["axis"] == "horizontal":
+        top_height = candidate["start"]
+        bottom_y = rect["y"] + candidate["end"]
+        bottom_height = rect["height"] - candidate["end"]
+        if top_height <= 0 or bottom_height <= 0:
+            return None
+        return (
+            _bounding_box(rect["x"], rect["y"], rect["width"], top_height),
+            _bounding_box(rect["x"], bottom_y, rect["width"], bottom_height),
+        )
+
+    left_width = candidate["start"]
+    right_x = rect["x"] + candidate["end"]
+    right_width = rect["width"] - candidate["end"]
+    if left_width <= 0 or right_width <= 0:
+        return None
+    return (
+        _bounding_box(rect["x"], rect["y"], left_width, rect["height"]),
+        _bounding_box(right_x, rect["y"], right_width, rect["height"]),
+    )
+
+
+def _sort_panel_boxes_for_reading(
+    panel_boxes: list[dict[str, float]],
+    *,
+    reading_direction: str,
+) -> list[dict[str, float]]:
+    ordered_by_y = sorted(panel_boxes, key=lambda panel: panel["y"])
+    rows: list[list[dict[str, float]]] = []
+    for panel_box in ordered_by_y:
+        target_row = next(
+            (
+                row
+                for row in rows
+                if _panel_box_belongs_to_row(panel_box, row)
+            ),
+            None,
+        )
+        if target_row is None:
+            rows.append([panel_box])
+            continue
+        target_row.append(panel_box)
+
+    ordered_panels: list[dict[str, float]] = []
+    for row in rows:
+        ordered_panels.extend(
+            sorted(
+                row,
+                key=lambda panel: panel["x"],
+                reverse=reading_direction == "rtl",
+            )
+        )
+    return ordered_panels
+
+
+def _panel_box_belongs_to_row(
+    panel_box: dict[str, float],
+    row: list[dict[str, float]],
+) -> bool:
+    row_bounds = _merge_bounding_boxes(row[0], row[-1] if len(row) > 1 else row[0])
+    for candidate in row[1:-1]:
+        row_bounds = _merge_bounding_boxes(row_bounds, candidate)
+    overlap = _axis_overlap(
+        panel_box["y"],
+        panel_box["y"] + panel_box["height"],
+        row_bounds["y"],
+        row_bounds["y"] + row_bounds["height"],
+    )
+    min_height = min(panel_box["height"], row_bounds["height"])
+    if overlap >= min_height * 0.18:
+        return True
+    panel_center_y = panel_box["y"] + panel_box["height"] / 2
+    row_center_y = row_bounds["y"] + row_bounds["height"] / 2
+    return abs(panel_center_y - row_center_y) <= min_height * 0.35
+
+
+def _assign_region_to_panel(
+    region: dict[str, Any],
+    panel_boxes: list[dict[str, float]],
+) -> int:
+    region_area = _get_region_area(region, "context_area")
+    center_x = region_area["x"] + region_area["width"] / 2
+    center_y = region_area["y"] + region_area["height"] / 2
+    containing_index = next(
+        (
+            index
+            for index, panel_box in enumerate(panel_boxes)
+            if (
+                panel_box["x"] <= center_x <= panel_box["x"] + panel_box["width"]
+                and panel_box["y"] <= center_y <= panel_box["y"] + panel_box["height"]
+            )
+        ),
+        None,
+    )
+    if containing_index is not None:
+        return containing_index
+
+    best_index = 0
+    best_overlap = -1.0
+    best_distance = float("inf")
+    for index, panel_box in enumerate(panel_boxes):
+        overlap_x = _axis_overlap(
+            region_area["x"],
+            region_area["x"] + region_area["width"],
+            panel_box["x"],
+            panel_box["x"] + panel_box["width"],
+        )
+        overlap_y = _axis_overlap(
+            region_area["y"],
+            region_area["y"] + region_area["height"],
+            panel_box["y"],
+            panel_box["y"] + panel_box["height"],
+        )
+        overlap_area = overlap_x * overlap_y
+        panel_center_x = panel_box["x"] + panel_box["width"] / 2
+        panel_center_y = panel_box["y"] + panel_box["height"] / 2
+        center_distance = abs(panel_center_x - center_x) + abs(panel_center_y - center_y)
+        if overlap_area > best_overlap or (
+            overlap_area == best_overlap and center_distance < best_distance
+        ):
+            best_index = index
+            best_overlap = overlap_area
+            best_distance = center_distance
+    return best_index
 
 
 def _infer_page_reading_direction(source_language: str) -> str:
