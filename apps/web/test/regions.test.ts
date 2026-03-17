@@ -34,15 +34,28 @@ const overlayStyle = getRegionOverlayStyle(
       width: 320,
       height: 480,
     },
+    context_area: {
+      x: 120,
+      y: 180,
+      width: 400,
+      height: 540,
+    },
   },
   { width: 1600, height: 2400 },
 );
 
-assert.equal(overlayStyle.left, "10%");
-assert.equal(overlayStyle.top, "10%");
-assert.equal(overlayStyle.width, "20%");
-assert.equal(overlayStyle.height, "20%");
+assert.equal(overlayStyle.left, "7.5%");
+assert.equal(overlayStyle.top, "7.5%");
+assert.equal(overlayStyle.width, "25%");
+assert.equal(overlayStyle.height, "22.5%");
 assert.equal(formatRegionBounds({ bounding_box: defaultRegion.bounding_box }), "256, 384 - 544 x 384");
+assert.equal(
+  formatRegionBounds({
+    bounding_box: { x: 160, y: 240, width: 320, height: 480 },
+    context_area: { x: 120, y: 180, width: 400, height: 540 },
+  }),
+  "Text 160, 240 - 320 x 480 | Context 120, 180 - 400 x 540",
+);
 assert.equal(formatRegionIndexLabel(0), "R01");
 assert.equal(formatRegionIndexLabel(11), "R12");
 

@@ -17,6 +17,7 @@ type RegionBoundingBox = {
 
 type RegionOverlayInput = {
   bounding_box: RegionBoundingBox;
+  context_area?: RegionBoundingBox;
 };
 
 const MIN_REGION_SIZE = 24;
@@ -47,17 +48,30 @@ export function getRegionOverlayStyle(
   page: PageCanvasInput,
 ): CSSProperties {
   const { width, height } = getPageCanvasSize(page);
+  const box = getEditableRegionBoundingBox(region);
   return {
-    left: `${(region.bounding_box.x / width) * 100}%`,
-    top: `${(region.bounding_box.y / height) * 100}%`,
-    width: `${(region.bounding_box.width / width) * 100}%`,
-    height: `${(region.bounding_box.height / height) * 100}%`,
+    left: `${(box.x / width) * 100}%`,
+    top: `${(box.y / height) * 100}%`,
+    width: `${(box.width / width) * 100}%`,
+    height: `${(box.height / height) * 100}%`,
   };
 }
 
 export function formatRegionBounds(region: RegionOverlayInput) {
-  const { x, y, width, height } = region.bounding_box;
-  return `${Math.round(x)}, ${Math.round(y)} - ${Math.round(width)} x ${Math.round(height)}`;
+  const textAreaLabel = formatBoundingBox(region.bounding_box);
+  const contextArea = region.context_area;
+  if (
+    contextArea === undefined
+    || (
+      contextArea.x === region.bounding_box.x
+      && contextArea.y === region.bounding_box.y
+      && contextArea.width === region.bounding_box.width
+      && contextArea.height === region.bounding_box.height
+    )
+  ) {
+    return textAreaLabel;
+  }
+  return `Text ${textAreaLabel} | Context ${formatBoundingBox(contextArea)}`;
 }
 
 export function formatRegionIndexLabel(index: number) {
@@ -107,6 +121,15 @@ export function resizeBoundingBox(
 export function getBoundingBoxAdjustmentStep(page: PageCanvasInput) {
   const { width, height } = getPageCanvasSize(page);
   return Math.max(12, Math.round(Math.min(width, height) * 0.02));
+}
+
+export function getEditableRegionBoundingBox(region: RegionOverlayInput) {
+  return region.context_area ?? region.bounding_box;
+}
+
+function formatBoundingBox(boundingBox: RegionBoundingBox) {
+  const { x, y, width, height } = boundingBox;
+  return `${Math.round(x)}, ${Math.round(y)} - ${Math.round(width)} x ${Math.round(height)}`;
 }
 
 function clampNumber(value: number, min: number, max: number) {

@@ -136,10 +136,11 @@ def test_build_detected_regions_from_comic_text_blocks_fits_single_balloon_conta
     assert len(candidates) == 1
     candidate = candidates[0]
     assert candidate.type == "speech_balloon"
-    assert candidate.bounding_box["x"] <= 62
-    assert candidate.bounding_box["y"] <= 42
-    assert candidate.bounding_box["width"] >= 118
-    assert candidate.bounding_box["height"] >= 156
+    assert candidate.bounding_box["width"] < candidate.context_area["width"]
+    assert candidate.context_area["x"] <= 62
+    assert candidate.context_area["y"] <= 42
+    assert candidate.context_area["width"] >= 118
+    assert candidate.context_area["height"] >= 156
 
 
 def test_build_detected_regions_from_comic_text_blocks_splits_merged_balloon_component() -> None:
@@ -176,12 +177,12 @@ def test_build_detected_regions_from_comic_text_blocks_splits_merged_balloon_com
     )
 
     assert len(candidates) == 2
-    left_candidate, right_candidate = sorted(candidates, key=lambda candidate: candidate.bounding_box["x"])
-    assert left_candidate.bounding_box["x"] < 96
-    assert right_candidate.bounding_box["x"] > 154
-    assert left_candidate.bounding_box["width"] < 120
-    assert right_candidate.bounding_box["width"] < 120
-    assert left_candidate.bounding_box["x"] + left_candidate.bounding_box["width"] < right_candidate.bounding_box["x"] + 22
+    left_candidate, right_candidate = sorted(candidates, key=lambda candidate: candidate.context_area["x"])
+    assert left_candidate.context_area["x"] < 96
+    assert right_candidate.context_area["x"] > 154
+    assert left_candidate.context_area["width"] < 120
+    assert right_candidate.context_area["width"] < 120
+    assert left_candidate.context_area["x"] + left_candidate.context_area["width"] < right_candidate.context_area["x"] + 22
 
 
 def test_detect_regions_prefers_comic_text_detector_provider(monkeypatch, tmp_path) -> None:

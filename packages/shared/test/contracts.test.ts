@@ -322,6 +322,18 @@ const parsedRegionResponse = parsePageRegionResponse({
       width: 100,
       height: 60,
     },
+    text_area: {
+      x: 10,
+      y: 20,
+      width: 100,
+      height: 60,
+    },
+    context_area: {
+      x: 4,
+      y: 12,
+      width: 118,
+      height: 82,
+    },
     shape: {
       type: "polygon",
       points: [
@@ -338,6 +350,8 @@ const parsedRegionResponse = parsePageRegionResponse({
 
 assert.equal(parsedRegionResponse.region.state, "approved");
 assert.equal(parsedRegionResponse.region.cleanup_strategy, "background_reconstruction");
+assert.equal(parsedRegionResponse.region.text_area.width, 100);
+assert.equal(parsedRegionResponse.region.context_area.width, 118);
 
 const parsedCreateMaskRevision = parseCreateMaskRevisionRequest({
   region_id: UUID_3,

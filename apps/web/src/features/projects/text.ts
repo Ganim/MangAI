@@ -13,6 +13,7 @@ type PageDimensions = {
 type RegionLike = {
   id: string;
   bounding_box: BoundingBox;
+  context_area?: BoundingBox;
 };
 
 type DialogueLike = {
@@ -62,7 +63,8 @@ export function buildDefaultPlacementInput(args: {
   targetLanguage: string;
   textDirection: "ltr" | "rtl" | "ttb";
 }) {
-  const regionHeight = args.region.bounding_box.height;
+  const placementArea = args.region.context_area ?? args.region.bounding_box;
+  const regionHeight = placementArea.height;
   const fontSize = Math.max(18, Math.round(regionHeight * 0.22));
   const leading = Math.max(fontSize + 4, Math.round(fontSize * 1.2));
   const fontFamily =
@@ -70,7 +72,7 @@ export function buildDefaultPlacementInput(args: {
 
   return {
     assignment_id: args.assignmentId,
-    text_box: { ...args.region.bounding_box },
+    text_box: { ...placementArea },
     style: {
       font_family: fontFamily,
       font_fallbacks: ["Arial", "sans-serif"],

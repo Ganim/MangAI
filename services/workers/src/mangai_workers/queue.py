@@ -574,8 +574,12 @@ def _apply_match_dialogue_result(
             None,
         )
         if existing_placement is None:
+            placement_area = _require_dict(
+                region.get("context_area") or region.get("bounding_box"),
+                "region context_area",
+            )
             default_style = _build_default_text_style(
-                region=_require_dict(region.get("bounding_box"), "region bounding_box"),
+                region=placement_area,
                 target_language=str(project.get("target_language") or "pt-BR"),
                 text_direction=str(project.get("target_text_direction") or "ltr"),
             )
@@ -583,7 +587,7 @@ def _apply_match_dialogue_result(
                 "id": str(uuid4()),
                 "assignment_id": str(assignment_record["id"]),
                 "is_active": True,
-                "text_box": region["bounding_box"],
+                "text_box": placement_area,
                 "style": default_style,
                 "layout_metrics": {
                     "mode": "automatic",
@@ -619,11 +623,18 @@ def _build_detected_regions(
 ) -> list[dict[str, Any]]:
     regions: list[dict[str, Any]] = []
     for candidate in detected_candidates:
-        bounding_box = _bounding_box(
+        text_area = _bounding_box(
             candidate.bounding_box["x"],
             candidate.bounding_box["y"],
             candidate.bounding_box["width"],
             candidate.bounding_box["height"],
+        )
+        context_source = candidate.context_area or candidate.bounding_box
+        context_area = _bounding_box(
+            context_source["x"],
+            context_source["y"],
+            context_source["width"],
+            context_source["height"],
         )
         regions.append(
             {
@@ -635,8 +646,10 @@ def _build_detected_regions(
                 "confidence": candidate.confidence,
                 "cleanup_strategy": candidate.cleanup_strategy,
                 "cleanup_confidence": candidate.cleanup_confidence,
-                "bounding_box": bounding_box,
-                "shape": _polygon_shape(bounding_box),
+                "bounding_box": text_area,
+                "text_area": text_area,
+                "context_area": context_area,
+                "shape": _polygon_shape(text_area),
                 "created_at": timestamp,
                 "updated_at": timestamp,
             }
@@ -668,6 +681,8 @@ def _build_overlay_asset(
                 "cleanup_strategy": region.get("cleanup_strategy"),
                 "cleanup_confidence": region.get("cleanup_confidence"),
                 "bounding_box": region["bounding_box"],
+                "text_area": region.get("text_area") or region["bounding_box"],
+                "context_area": region.get("context_area") or region["bounding_box"],
             }
             for region in regions
         ],
@@ -791,7 +806,10 @@ def _build_ocr_candidate_region(
     region = region_lookup.get(region_id)
     if region is None:
         raise WorkerExecutionError(f"Could not find OCR region '{region_id}'.")
-    bounding_box = _require_dict(region.get("bounding_box"), "region bounding_box")
+    bounding_box = _require_dict(
+        region.get("text_area") or region.get("bounding_box"),
+        "region text_area",
+    )
     return OcrCandidateRegion(
         id=region_id,
         type=str(region.get("type") or "unknown"),

@@ -183,6 +183,20 @@ export function parseRegion(value: unknown, path: Array<string | number> = []) {
     throw new ValidationError("Detected regions must include confidence", path);
   }
 
+  const boundingBox = parseBoundingBox(objectValue.bounding_box, atPath(path, "bounding_box"));
+  const textArea =
+    readOptional(
+      objectValue.text_area,
+      (input, inputPath) => parseBoundingBox(input, inputPath),
+      atPath(path, "text_area"),
+    ) ?? boundingBox;
+  const contextArea =
+    readOptional(
+      objectValue.context_area,
+      (input, inputPath) => parseBoundingBox(input, inputPath),
+      atPath(path, "context_area"),
+    ) ?? boundingBox;
+
   return {
     id: readUuid(objectValue.id, atPath(path, "id")),
     page_id: readUuid(objectValue.page_id, atPath(path, "page_id")),
@@ -202,7 +216,9 @@ export function parseRegion(value: unknown, path: Array<string | number> = []) {
         (input, inputPath) => readNumber(input, inputPath, { min: 0, max: 1 }),
         atPath(path, "cleanup_confidence"),
       ) ?? null,
-    bounding_box: parseBoundingBox(objectValue.bounding_box, atPath(path, "bounding_box")),
+    bounding_box: boundingBox,
+    text_area: textArea,
+    context_area: contextArea,
     shape: parsePolygonShape(objectValue.shape, atPath(path, "shape")),
     ...parseEntityTimestamps(objectValue, path),
   };

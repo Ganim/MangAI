@@ -42,9 +42,25 @@ class RegionRecord(APIModel):
     cleanup_strategy: CleanupStrategy | None = None
     cleanup_confidence: float | None = Field(default=None, ge=0, le=1)
     bounding_box: BoundingBox
+    text_area: BoundingBox | None = None
+    context_area: BoundingBox | None = None
     shape: PolygonShape
     created_at: datetime
     updated_at: datetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_area_defaults(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+
+        next_value = dict(value)
+        bounding_box = next_value.get("bounding_box")
+        if next_value.get("text_area") is None:
+            next_value["text_area"] = bounding_box
+        if next_value.get("context_area") is None:
+            next_value["context_area"] = bounding_box
+        return next_value
 
 
 class CreateRegionRequest(APIModel):

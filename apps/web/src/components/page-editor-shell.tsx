@@ -61,6 +61,7 @@ import {
   formatRegionBounds,
   formatRegionIndexLabel,
   getBoundingBoxAdjustmentStep,
+  getEditableRegionBoundingBox,
   getPageCanvasSize,
   getRegionOverlayStyle,
   moveBoundingBox,
@@ -1103,7 +1104,7 @@ export function PageEditorShell({
                       onClick={() =>
                         void handleUpdateRegionBoundingBox(
                           moveBoundingBox(
-                            selectedRegion.bounding_box,
+                            getEditableRegionBoundingBox(selectedRegion),
                             currentPage,
                             -regionAdjustmentStep,
                             0,
@@ -1120,7 +1121,7 @@ export function PageEditorShell({
                       onClick={() =>
                         void handleUpdateRegionBoundingBox(
                           moveBoundingBox(
-                            selectedRegion.bounding_box,
+                            getEditableRegionBoundingBox(selectedRegion),
                             currentPage,
                             0,
                             -regionAdjustmentStep,
@@ -1137,7 +1138,7 @@ export function PageEditorShell({
                       onClick={() =>
                         void handleUpdateRegionBoundingBox(
                           moveBoundingBox(
-                            selectedRegion.bounding_box,
+                            getEditableRegionBoundingBox(selectedRegion),
                             currentPage,
                             0,
                             regionAdjustmentStep,
@@ -1154,7 +1155,7 @@ export function PageEditorShell({
                       onClick={() =>
                         void handleUpdateRegionBoundingBox(
                           moveBoundingBox(
-                            selectedRegion.bounding_box,
+                            getEditableRegionBoundingBox(selectedRegion),
                             currentPage,
                             regionAdjustmentStep,
                             0,
@@ -1173,7 +1174,7 @@ export function PageEditorShell({
                       onClick={() =>
                         void handleUpdateRegionBoundingBox(
                           resizeBoundingBox(
-                            selectedRegion.bounding_box,
+                            getEditableRegionBoundingBox(selectedRegion),
                             currentPage,
                             -regionAdjustmentStep,
                             0,
@@ -1190,7 +1191,7 @@ export function PageEditorShell({
                       onClick={() =>
                         void handleUpdateRegionBoundingBox(
                           resizeBoundingBox(
-                            selectedRegion.bounding_box,
+                            getEditableRegionBoundingBox(selectedRegion),
                             currentPage,
                             regionAdjustmentStep,
                             0,
@@ -1207,7 +1208,7 @@ export function PageEditorShell({
                       onClick={() =>
                         void handleUpdateRegionBoundingBox(
                           resizeBoundingBox(
-                            selectedRegion.bounding_box,
+                            getEditableRegionBoundingBox(selectedRegion),
                             currentPage,
                             0,
                             -regionAdjustmentStep,
@@ -1224,7 +1225,7 @@ export function PageEditorShell({
                       onClick={() =>
                         void handleUpdateRegionBoundingBox(
                           resizeBoundingBox(
-                            selectedRegion.bounding_box,
+                            getEditableRegionBoundingBox(selectedRegion),
                             currentPage,
                             0,
                             regionAdjustmentStep,

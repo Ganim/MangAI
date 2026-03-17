@@ -15,6 +15,12 @@ const region = {
     width: 320,
     height: 180,
   },
+  context_area: {
+    x: 84,
+    y: 132,
+    width: 392,
+    height: 264,
+  },
 };
 
 assert.equal(getNextReadingOrder([]), 1);
@@ -30,6 +36,8 @@ const placementInput = buildDefaultPlacementInput({
 assert.equal(placementInput.assignment_id, "22222222-2222-4222-8222-222222222222");
 assert.equal(placementInput.style.direction, "ltr");
 assert.equal(placementInput.style.font_family, "CC Meanwhile");
+assert.equal(placementInput.text_box.x, 84);
+assert.equal(placementInput.text_box.height, 264);
 
 const overlayStyle = getPlacementOverlayStyle(
   {
@@ -41,8 +49,8 @@ const overlayStyle = getPlacementOverlayStyle(
   { width: 960, height: 1440 },
 );
 
-assert.equal(overlayStyle.left, "12.5%");
-assert.equal(overlayStyle.width, "33.33333333333333%");
+assert.equal(overlayStyle.left, "8.75%");
+assert.equal(overlayStyle.width, "40.833333333333336%");
 
 const previewEntries = buildTextPreviewEntries({
   dialogues: [

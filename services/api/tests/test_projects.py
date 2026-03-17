@@ -271,6 +271,8 @@ def test_page_regions_can_be_created_listed_and_updated(client: TestClient) -> N
     created_region = create_region(client, project_id, page_id)
     assert created_region["origin"] == "user_created"
     assert created_region["state"] == "draft"
+    assert created_region["text_area"]["width"] == created_region["bounding_box"]["width"]
+    assert created_region["context_area"]["width"] == created_region["bounding_box"]["width"]
 
     list_response = client.get(f"/api/v1/projects/{project_id}/pages/{page_id}/regions")
     assert list_response.status_code == 200
@@ -295,6 +297,8 @@ def test_page_regions_can_be_created_listed_and_updated(client: TestClient) -> N
     updated_region = update_response.json()["region"]
     assert updated_region["state"] == "approved"
     assert updated_region["bounding_box"]["x"] == 30
+    assert updated_region["text_area"]["x"] == 30
+    assert updated_region["context_area"]["x"] == 30
     assert updated_region["shape"]["points"][1]["x"] == 162
 
 

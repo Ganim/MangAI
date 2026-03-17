@@ -716,6 +716,8 @@ class LocalProjectStore:
                 state="draft",
                 confidence=None,
                 bounding_box=payload.bounding_box,
+                text_area=payload.bounding_box,
+                context_area=payload.bounding_box,
                 shape=self._polygon_shape_from_bounding_box(payload.bounding_box),
                 created_at=now,
                 updated_at=now,
@@ -737,12 +739,16 @@ class LocalProjectStore:
             self._require_page(state, project_id, page_id)
             region = self._require_region(state, page_id, region_id)
             next_bounding_box = payload.bounding_box or region.bounding_box
+            next_text_area = payload.bounding_box or region.text_area or next_bounding_box
+            next_context_area = payload.bounding_box or region.context_area or next_bounding_box
             next_region = region.model_copy(
                 update={
                     "type": payload.type or region.type,
                     "state": payload.state or region.state,
                     "bounding_box": next_bounding_box,
-                    "shape": self._polygon_shape_from_bounding_box(next_bounding_box),
+                    "text_area": next_text_area,
+                    "context_area": next_context_area,
+                    "shape": self._polygon_shape_from_bounding_box(next_text_area),
                     "updated_at": _utcnow(),
                 }
             )

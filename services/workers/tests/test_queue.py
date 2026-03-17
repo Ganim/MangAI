@@ -632,12 +632,16 @@ def test_process_next_job_generates_detected_regions_and_overlay(tmp_path) -> No
     assert len(state["regions"]) in {2, 3}
     assert all(region["origin"] == "detected" for region in state["regions"])
     assert all(region["confidence"] is not None for region in state["regions"])
+    assert all("text_area" in region for region in state["regions"])
+    assert all("context_area" in region for region in state["regions"])
     overlay_asset = next(asset for asset in state["assets"] if asset["kind"] == "overlay")
     overlay_path = data_dir / "assets" / overlay_asset["storage_key"]
     assert overlay_path.exists()
     overlay_payload = json.loads(overlay_path.read_text(encoding="utf-8"))
     assert overlay_payload["regions_created"] in {2, 3}
     assert len(overlay_payload["regions"]) == overlay_payload["regions_created"]
+    assert all("text_area" in region for region in overlay_payload["regions"])
+    assert all("context_area" in region for region in overlay_payload["regions"])
 
 
 def test_process_next_job_returns_none_without_queued_jobs(tmp_path) -> None:

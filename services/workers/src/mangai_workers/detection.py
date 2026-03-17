@@ -27,8 +27,16 @@ class DetectedRegionCandidate:
     type: str
     confidence: float
     bounding_box: dict[str, float]
+    text_area: dict[str, float] | None = None
+    context_area: dict[str, float] | None = None
     cleanup_strategy: str | None = None
     cleanup_confidence: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.text_area is None:
+            object.__setattr__(self, "text_area", dict(self.bounding_box))
+        if self.context_area is None:
+            object.__setattr__(self, "context_area", dict(self.bounding_box))
 
 
 @dataclass(frozen=True)
@@ -137,6 +145,11 @@ def build_detected_regions_from_comic_text_blocks(
 
     candidates: list[DetectedRegionCandidate] = []
     for fit in fits:
+        text_area = _build_text_area_from_comic_text_block(
+            block=fit.block,
+            page_width=page_width,
+            page_height=page_height,
+        )
         region_type = _classify_comic_text_block(
             block=fit.block,
             bounding_box=fit.bounding_box,
@@ -149,7 +162,9 @@ def build_detected_regions_from_comic_text_blocks(
             DetectedRegionCandidate(
                 type=region_type,
                 confidence=confidence,
-                bounding_box=fit.bounding_box,
+                bounding_box=text_area,
+                text_area=text_area,
+                context_area=fit.bounding_box,
             )
         )
 
@@ -744,6 +759,24 @@ def _build_simple_comic_text_bounding_box(
     )
 
 
+def _build_text_area_from_comic_text_block(
+    *,
+    block: ComicTextBlock,
+    page_width: int,
+    page_height: int,
+) -> dict[str, float]:
+    padding_x = min(8.0, max(2.0, block.width * 0.04))
+    padding_y = min(8.0, max(2.0, block.height * 0.04))
+    return _clamp_bounding_box(
+        x=block.x - padding_x,
+        y=block.y - padding_y,
+        width=block.width + (padding_x * 2.0),
+        height=block.height + (padding_y * 2.0),
+        page_width=page_width,
+        page_height=page_height,
+    )
+
+
 def build_detected_regions_from_recognized_lines(
     *,
     recognized_lines: list[RecognizedLine],
@@ -1013,9 +1046,14 @@ def _build_cluster_candidate(
 
     median_width = median(text_box.width for text_box in cluster)
     median_height = median(text_box.height for text_box in cluster)
+    text_area = _build_text_area_from_cluster(
+        cluster=cluster,
+        page_width=page_width,
+        page_height=page_height,
+    )
     padding_x = min(48.0, max(14.0, median_width * 1.15))
     padding_y = min(56.0, max(14.0, median_height * 0.8))
-    bounding_box = _clamp_bounding_box(
+    context_area = _clamp_bounding_box(
         x=min_x - padding_x,
         y=min_y - padding_y,
         width=cluster_width + (padding_x * 2),
@@ -1024,7 +1062,7 @@ def _build_cluster_candidate(
         page_height=page_height,
     )
 
-    box_area = bounding_box["width"] * bounding_box["height"]
+    box_area = context_area["width"] * context_area["height"]
     if box_area < 1200:
         return None
     if box_area > page_width * page_height * 0.22:
@@ -1032,13 +1070,39 @@ def _build_cluster_candidate(
     if box_count == 1 and box_area < 2600:
         return None
 
-    region_type = _classify_cluster(cluster, bounding_box)
+    region_type = _classify_cluster(cluster, context_area)
     average_confidence = sum(text_box.confidence for text_box in cluster) / box_count
     confidence = min(0.98, round((average_confidence * 0.92) + 0.06, 2))
     return DetectedRegionCandidate(
         type=region_type,
         confidence=confidence,
-        bounding_box=bounding_box,
+        bounding_box=text_area,
+        text_area=text_area,
+        context_area=context_area,
+    )
+
+
+def _build_text_area_from_cluster(
+    *,
+    cluster: list[RecognizedTextBox],
+    page_width: int,
+    page_height: int,
+) -> dict[str, float]:
+    min_x = min(text_box.x for text_box in cluster)
+    min_y = min(text_box.y for text_box in cluster)
+    max_x = max(text_box.x + text_box.width for text_box in cluster)
+    max_y = max(text_box.y + text_box.height for text_box in cluster)
+    median_width = median(text_box.width for text_box in cluster)
+    median_height = median(text_box.height for text_box in cluster)
+    padding_x = min(12.0, max(3.0, median_width * 0.18))
+    padding_y = min(12.0, max(3.0, median_height * 0.14))
+    return _clamp_bounding_box(
+        x=min_x - padding_x,
+        y=min_y - padding_y,
+        width=(max_x - min_x) + (padding_x * 2),
+        height=(max_y - min_y) + (padding_y * 2),
+        page_width=page_width,
+        page_height=page_height,
     )
 
 
