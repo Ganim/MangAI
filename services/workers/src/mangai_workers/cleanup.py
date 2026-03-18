@@ -112,18 +112,101 @@ def _expand_mask(mask: np.ndarray, *, radius: int) -> np.ndarray:
 
 def _estimate_fill_color(image: np.ndarray, polygon_mask: np.ndarray) -> np.ndarray:
     sample_ring = _build_sample_ring(polygon_mask)
-    samples = image[sample_ring > 0]
-    if samples.size == 0:
-        samples = image[polygon_mask > 0]
-    if samples.size == 0:
-        return np.array([248, 247, 241], dtype=np.uint8)
+    ring_samples = image[sample_ring > 0]
+    inner_samples = image[polygon_mask > 0]
+    if ring_samples.size == 0 and inner_samples.size == 0:
+        return np.array([255, 255, 255], dtype=np.uint8)
 
-    if samples.ndim == 1:
-        fill_value = int(np.percentile(samples, 88))
-        return np.array([fill_value, fill_value, fill_value], dtype=np.uint8)
+    if image.ndim == 2:
+        return _estimate_grayscale_fill_color(
+            ring_samples=ring_samples,
+            inner_samples=inner_samples,
+        )
 
-    channel_values = np.percentile(samples, 88, axis=0)
+    channel_values = _estimate_rgb_fill_color(
+        ring_samples=ring_samples,
+        inner_samples=inner_samples,
+    )
     return np.clip(channel_values, 0, 255).astype(np.uint8)
+
+
+def _estimate_grayscale_fill_color(
+    *,
+    ring_samples: np.ndarray,
+    inner_samples: np.ndarray,
+) -> np.ndarray:
+    if ring_samples.size == 0:
+        dominant_value = int(np.percentile(inner_samples, 98))
+    elif inner_samples.size == 0:
+        dominant_value = int(np.percentile(ring_samples, 96))
+    else:
+        dominant_value = int(
+            max(
+                np.percentile(ring_samples, 96),
+                np.percentile(inner_samples, 98),
+            )
+        )
+
+    if dominant_value >= 236:
+        dominant_value = 255
+    return np.array([dominant_value, dominant_value, dominant_value], dtype=np.uint8)
+
+
+def _estimate_rgb_fill_color(
+    *,
+    ring_samples: np.ndarray,
+    inner_samples: np.ndarray,
+) -> np.ndarray:
+    if ring_samples.size == 0:
+        channel_values = np.percentile(inner_samples, 98, axis=0)
+    elif inner_samples.size == 0:
+        channel_values = np.percentile(ring_samples, 96, axis=0)
+    else:
+        channel_values = np.maximum(
+            np.percentile(ring_samples, 96, axis=0),
+            np.percentile(inner_samples, 98, axis=0),
+        )
+
+    mean_brightness = float(np.mean(channel_values))
+    color_spread = float(np.max(channel_values) - np.min(channel_values))
+
+    if inner_samples.size > 0:
+        white_candidate = np.percentile(inner_samples, 99, axis=0)
+    else:
+        white_candidate = np.percentile(ring_samples, 98, axis=0)
+    white_brightness = float(np.mean(white_candidate))
+    white_spread = float(np.max(white_candidate) - np.min(white_candidate))
+
+    brightness_samples = []
+    if ring_samples.size > 0:
+        brightness_samples.append(np.mean(ring_samples, axis=1))
+    if inner_samples.size > 0:
+        brightness_samples.append(np.mean(inner_samples, axis=1))
+    combined_brightness = (
+        np.concatenate(brightness_samples)
+        if len(brightness_samples) > 0
+        else np.array([], dtype=np.float32)
+    )
+    bright_ratio = (
+        float(np.mean(combined_brightness >= 238))
+        if combined_brightness.size > 0
+        else 0.0
+    )
+
+    if white_brightness >= 240 and white_spread <= 18:
+        return np.array([255, 255, 255], dtype=np.uint8)
+
+    if mean_brightness >= 236 and color_spread <= 14:
+        return np.array([255, 255, 255], dtype=np.uint8)
+
+    if bright_ratio >= 0.35 and white_brightness >= 234 and white_spread <= 22:
+        return np.array([255, 255, 255], dtype=np.uint8)
+
+    if mean_brightness >= 232 and color_spread <= 12:
+        snapped_value = int(min(255, round(mean_brightness + 10)))
+        return np.array([snapped_value, snapped_value, snapped_value], dtype=np.uint8)
+
+    return channel_values
 
 
 def _build_sample_ring(mask: np.ndarray) -> np.ndarray:

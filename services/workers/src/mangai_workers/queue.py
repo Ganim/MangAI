@@ -1915,7 +1915,7 @@ def _render_cleanup_svg(
 ) -> str:
     encoded_source = base64.b64encode(source_bytes).decode("ascii")
     polygons_markup = "\n".join(
-        f'<polygon fill="#f8f7f1" points="{_serialize_polygon_points(mask["shape"]["points"])}" />'
+        f'<polygon fill="#ffffff" points="{_serialize_polygon_points(mask["shape"]["points"])}" />'
         for mask in approved_masks
     )
     return (

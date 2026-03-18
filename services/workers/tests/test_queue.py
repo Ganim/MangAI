@@ -1011,6 +1011,7 @@ def test_process_next_job_generates_cleaned_asset_preview(tmp_path) -> None:
     assert svg_markup.startswith("<svg")
     assert "data:image/png;base64," in svg_markup
     assert "<polygon" in svg_markup
+    assert '#ffffff' in svg_markup
 
 
 def test_process_next_job_generates_png_cleanup_asset_for_real_image(tmp_path) -> None:
@@ -1041,10 +1042,10 @@ def test_process_next_job_generates_png_cleanup_asset_for_real_image(tmp_path) -
         cv2.IMREAD_COLOR,
     )
     assert cleaned_image is not None
-    center_pixel = cleaned_image[120, 160]
-    assert int(center_pixel[0]) >= 235
-    assert int(center_pixel[1]) >= 235
-    assert int(center_pixel[2]) >= 235
+    center_pixel = cleaned_image[215, 260]
+    assert int(center_pixel[0]) >= 254
+    assert int(center_pixel[1]) >= 254
+    assert int(center_pixel[2]) >= 254
 
 
 def test_process_next_job_runs_ocr_and_persists_preview_dialogues(tmp_path) -> None:

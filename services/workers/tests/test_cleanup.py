@@ -38,9 +38,9 @@ def test_render_cleaned_png_replaces_solid_fill_text() -> None:
     cleaned_image = cv2.imdecode(np.frombuffer(cleaned_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
     assert cleaned_image is not None
     center_pixel = cleaned_image[58, 58]
-    assert int(center_pixel[0]) >= 235
-    assert int(center_pixel[1]) >= 235
-    assert int(center_pixel[2]) >= 235
+    assert int(center_pixel[0]) >= 254
+    assert int(center_pixel[1]) >= 254
+    assert int(center_pixel[2]) >= 254
 
 
 def test_render_cleaned_png_uses_inpaint_for_background_reconstruction() -> None:
