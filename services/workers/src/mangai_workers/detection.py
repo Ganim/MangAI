@@ -150,6 +150,15 @@ def build_detected_regions_from_comic_text_blocks(
             page_width=page_width,
             page_height=page_height,
         )
+        if grayscale_image is not None:
+            text_area = _refine_text_area_within_context_crop(
+                block=fit.block,
+                fallback_text_area=text_area,
+                context_area=fit.bounding_box,
+                grayscale_image=grayscale_image,
+                page_width=page_width,
+                page_height=page_height,
+            )
         region_type = _classify_comic_text_block(
             block=fit.block,
             bounding_box=fit.bounding_box,
@@ -900,6 +909,30 @@ def _merge_bounding_boxes(
     )
 
 
+def _intersect_bounding_boxes(
+    left: dict[str, float],
+    right: dict[str, float],
+    *,
+    page_width: int,
+    page_height: int,
+) -> dict[str, float]:
+    x1 = max(left["x"], right["x"])
+    y1 = max(left["y"], right["y"])
+    x2 = min(left["x"] + left["width"], right["x"] + right["width"])
+    y2 = min(left["y"] + left["height"], right["y"] + right["height"])
+    if x2 <= x1 or y2 <= y1:
+        return right
+
+    return _clamp_bounding_box(
+        x=x1,
+        y=y1,
+        width=x2 - x1,
+        height=y2 - y1,
+        page_width=page_width,
+        page_height=page_height,
+    )
+
+
 def _build_simple_comic_text_fit(
     *,
     block: ComicTextBlock,
@@ -954,6 +987,325 @@ def _build_text_area_from_comic_text_block(
         height=block.height + (padding_y * 2.0),
         page_width=page_width,
         page_height=page_height,
+    )
+
+
+def _refine_text_area_within_context_crop(
+    *,
+    block: ComicTextBlock,
+    fallback_text_area: dict[str, float],
+    context_area: dict[str, float],
+    grayscale_image: np.ndarray,
+    page_width: int,
+    page_height: int,
+) -> dict[str, float]:
+    x1 = max(int(np.floor(context_area["x"])), 0)
+    y1 = max(int(np.floor(context_area["y"])), 0)
+    x2 = min(int(np.ceil(context_area["x"] + context_area["width"])), grayscale_image.shape[1])
+    y2 = min(int(np.ceil(context_area["y"] + context_area["height"])), grayscale_image.shape[0])
+    if x2 <= x1 or y2 <= y1:
+        return fallback_text_area
+
+    crop = grayscale_image[y1:y2, x1:x2]
+    if crop.size == 0:
+        return fallback_text_area
+
+    blurred = cv2.GaussianBlur(crop, (3, 3), 0)
+    threshold_value, thresholded = cv2.threshold(
+        blurred,
+        0,
+        255,
+        cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU,
+    )
+
+    # Otsu can drift too bright on clean balloons; cap the text threshold to stay selective.
+    effective_threshold = int(min(max(threshold_value, 72), 188))
+    dark_mask = (blurred <= effective_threshold).astype(np.uint8) * 255
+    dark_mask = cv2.medianBlur(dark_mask, 3)
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+    dark_mask = cv2.morphologyEx(dark_mask, cv2.MORPH_OPEN, kernel)
+
+    anchor_box = _compute_text_refinement_anchor_box(
+        block=block,
+        crop_origin=(x1, y1),
+        crop_shape=crop.shape,
+    )
+    anchor_x1 = int(np.floor(anchor_box["x"]))
+    anchor_y1 = int(np.floor(anchor_box["y"]))
+    anchor_x2 = int(np.ceil(anchor_box["x"] + anchor_box["width"]))
+    anchor_y2 = int(np.ceil(anchor_box["y"] + anchor_box["height"]))
+    anchor_mask = dark_mask[anchor_y1:anchor_y2, anchor_x1:anchor_x2]
+    anchor_mask = _remove_anchor_boundary_artifacts(anchor_mask)
+    if anchor_mask.size == 0 or np.count_nonzero(anchor_mask) == 0:
+        return fallback_text_area
+
+    valid_columns = _dense_axis_mask(
+        np.count_nonzero(anchor_mask, axis=0),
+        min_pixels=max(2, int(round(anchor_mask.shape[0] * (0.045 if block.vertical else 0.085)))),
+    )
+    valid_rows = _dense_axis_mask(
+        np.count_nonzero(anchor_mask, axis=1),
+        min_pixels=max(2, int(round(anchor_mask.shape[1] * (0.03 if block.vertical else 0.07)))),
+    )
+    if not valid_columns.any() or not valid_rows.any():
+        return fallback_text_area
+
+    seed_x1 = max(int(np.floor(block.x - x1)) - anchor_x1, 0)
+    seed_y1 = max(int(np.floor(block.y - y1)) - anchor_y1, 0)
+    seed_x2 = min(int(np.ceil(block.x + block.width - x1)) - anchor_x1, anchor_mask.shape[1])
+    seed_y2 = min(int(np.ceil(block.y + block.height - y1)) - anchor_y1, anchor_mask.shape[0])
+
+    selected_column_range = _expand_dense_axis_range(
+        valid_mask=valid_columns,
+        seed_start=seed_x1,
+        seed_end=max(seed_x2, seed_x1 + 1),
+    )
+    selected_row_range = _expand_dense_axis_range(
+        valid_mask=valid_rows,
+        seed_start=seed_y1,
+        seed_end=max(seed_y2, seed_y1 + 1),
+    )
+    if selected_column_range is None or selected_row_range is None:
+        return fallback_text_area
+
+    column_start, column_end = selected_column_range
+    row_start, row_end = selected_row_range
+    if column_end <= column_start or row_end <= row_start:
+        return fallback_text_area
+
+    refined_x1 = x1 + anchor_x1 + column_start
+    refined_y1 = y1 + anchor_y1 + row_start
+    refined_x2 = x1 + anchor_x1 + column_end
+    refined_y2 = y1 + anchor_y1 + row_end
+
+    selected_width = max(refined_x2 - refined_x1, 1)
+    selected_height = max(refined_y2 - refined_y1, 1)
+    if block.vertical:
+        padding_x = min(12.0, max(4.0, selected_width * 0.18, selected_height * 0.04))
+        padding_y = min(12.0, max(4.0, selected_height * 0.08))
+    else:
+        padding_x = min(12.0, max(4.0, selected_width * 0.05))
+        padding_y = min(10.0, max(3.0, selected_height * 0.18, selected_width * 0.02))
+
+    refined_box = _clamp_bounding_box(
+        x=float(refined_x1) - padding_x,
+        y=float(refined_y1) - padding_y,
+        width=float(selected_width) + (padding_x * 2.0),
+        height=float(selected_height) + (padding_y * 2.0),
+        page_width=page_width,
+        page_height=page_height,
+    )
+    center_guard_width = min(max(block.width * 0.24, 6.0), max(block.width * 0.5, 12.0))
+    center_guard_height = min(max(block.height * 0.24, 8.0), max(block.height * 0.5, 18.0))
+    center_guard = _clamp_bounding_box(
+        x=(block.x + (block.width / 2.0)) - (center_guard_width / 2.0),
+        y=(block.y + (block.height / 2.0)) - (center_guard_height / 2.0),
+        width=center_guard_width,
+        height=center_guard_height,
+        page_width=page_width,
+        page_height=page_height,
+    )
+    final_box = _merge_bounding_boxes(
+        refined_box,
+        center_guard,
+        page_width=page_width,
+        page_height=page_height,
+    )
+    final_box = _intersect_bounding_boxes(
+        final_box,
+        fallback_text_area,
+        page_width=page_width,
+        page_height=page_height,
+    )
+    if (
+        final_box["width"] >= fallback_text_area["width"]
+        and final_box["height"] >= fallback_text_area["height"]
+    ):
+        return fallback_text_area
+    return final_box
+
+
+def _dense_axis_mask(counts: np.ndarray, *, min_pixels: int) -> np.ndarray:
+    valid_mask = counts >= max(min_pixels, 1)
+    if valid_mask.size <= 2:
+        return valid_mask
+
+    # Fill tiny gaps so punctuation/ruby doesn't split one text column into multiple segments.
+    filled = valid_mask.copy()
+    for index in range(1, len(valid_mask) - 1):
+        if not valid_mask[index] and valid_mask[index - 1] and valid_mask[index + 1]:
+            filled[index] = True
+    return filled
+
+
+def _remove_anchor_boundary_artifacts(mask: np.ndarray) -> np.ndarray:
+    if mask.size == 0 or np.count_nonzero(mask) == 0:
+        return mask
+
+    component_count, labels, stats, _centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
+    if component_count <= 1:
+        return mask
+
+    cleaned = np.zeros_like(mask, dtype=np.uint8)
+    mask_height, mask_width = mask.shape
+    for component_index in range(1, component_count):
+        area = int(stats[component_index, cv2.CC_STAT_AREA])
+        if area < 8:
+            continue
+
+        component_x = int(stats[component_index, cv2.CC_STAT_LEFT])
+        component_y = int(stats[component_index, cv2.CC_STAT_TOP])
+        component_w = int(stats[component_index, cv2.CC_STAT_WIDTH])
+        component_h = int(stats[component_index, cv2.CC_STAT_HEIGHT])
+        bbox_area = max(component_w * component_h, 1)
+        fill_ratio = area / bbox_area
+        touches_boundary = (
+            component_x == 0
+            or component_y == 0
+            or (component_x + component_w) >= mask_width
+            or (component_y + component_h) >= mask_height
+        )
+        long_span = (
+            component_w >= max(mask_width * 0.32, component_h * 4.8)
+            or component_h >= max(mask_height * 0.32, component_w * 4.8)
+        )
+        large_sparse = fill_ratio < 0.22 and (
+            component_w >= mask_width * 0.24 or component_h >= mask_height * 0.24
+        )
+        if touches_boundary and (long_span or large_sparse):
+            continue
+
+        cleaned[labels == component_index] = 255
+
+    return cleaned if np.count_nonzero(cleaned) > 0 else mask
+
+
+def _expand_dense_axis_range(
+    *,
+    valid_mask: np.ndarray,
+    seed_start: int,
+    seed_end: int,
+    allowed_gap: int = 2,
+) -> tuple[int, int] | None:
+    if valid_mask.size == 0:
+        return None
+
+    seed_start = max(min(seed_start, len(valid_mask) - 1), 0)
+    seed_end = max(min(seed_end, len(valid_mask)), seed_start + 1)
+    active_indexes = np.flatnonzero(valid_mask)
+    if len(active_indexes) == 0:
+        return None
+
+    seed_slice = active_indexes[(active_indexes >= seed_start) & (active_indexes < seed_end)]
+    if len(seed_slice) == 0:
+        seed_center = int(round((seed_start + seed_end - 1) / 2.0))
+        seed_index = int(active_indexes[np.argmin(np.abs(active_indexes - seed_center))])
+        left = seed_index
+        right = seed_index
+    else:
+        left = int(seed_slice[0])
+        right = int(seed_slice[-1])
+
+    gap = 0
+    cursor = left - 1
+    while cursor >= 0:
+        if valid_mask[cursor]:
+            left = cursor
+            gap = 0
+        else:
+            gap += 1
+            if gap > allowed_gap:
+                break
+        cursor -= 1
+
+    gap = 0
+    cursor = right + 1
+    while cursor < len(valid_mask):
+        if valid_mask[cursor]:
+            right = cursor
+            gap = 0
+        else:
+            gap += 1
+            if gap > allowed_gap:
+                break
+        cursor += 1
+
+    return left, right + 1
+
+
+def _compute_text_refinement_anchor_box(
+    *,
+    block: ComicTextBlock,
+    crop_origin: tuple[int, int],
+    crop_shape: tuple[int, int],
+) -> dict[str, float]:
+    crop_x, crop_y = crop_origin
+    crop_height, crop_width = crop_shape
+    if block.vertical:
+        margin_x = max(10.0, block.width * 0.34, block.height * 0.08)
+        margin_y = max(10.0, block.height * 0.16, block.width * 0.5)
+    else:
+        margin_x = max(10.0, block.width * 0.1, block.height * 0.44)
+        margin_y = max(8.0, block.height * 0.34, block.width * 0.05)
+
+    x = max(block.x - crop_x - margin_x, 0.0)
+    y = max(block.y - crop_y - margin_y, 0.0)
+    width = min(block.width + (margin_x * 2.0), crop_width - x)
+    height = min(block.height + (margin_y * 2.0), crop_height - y)
+    return {
+        "x": x,
+        "y": y,
+        "width": max(width, 1.0),
+        "height": max(height, 1.0),
+    }
+
+
+def _component_is_probably_border_art(
+    *,
+    component_box: dict[str, float],
+    crop_width: int,
+    crop_height: int,
+) -> bool:
+    touches_boundary = (
+        component_box["x"] <= 1.0
+        or component_box["y"] <= 1.0
+        or (component_box["x"] + component_box["width"]) >= (crop_width - 1.0)
+        or (component_box["y"] + component_box["height"]) >= (crop_height - 1.0)
+    )
+    if not touches_boundary:
+        return False
+
+    is_long_horizontal = component_box["width"] >= max(crop_width * 0.42, component_box["height"] * 5.5)
+    is_long_vertical = component_box["height"] >= max(crop_height * 0.42, component_box["width"] * 5.5)
+    return is_long_horizontal or is_long_vertical
+
+
+def _component_is_relevant_for_text_area(
+    *,
+    component_box: dict[str, float],
+    anchor_box: dict[str, float],
+    block: ComicTextBlock,
+) -> bool:
+    if _bounding_box_iou(component_box, anchor_box) > 0.0:
+        return True
+
+    component_center_x = component_box["x"] + (component_box["width"] / 2.0)
+    component_center_y = component_box["y"] + (component_box["height"] / 2.0)
+    anchor_center_x = anchor_box["x"] + (anchor_box["width"] / 2.0)
+    anchor_center_y = anchor_box["y"] + (anchor_box["height"] / 2.0)
+    max_dx = max(anchor_box["width"] * 0.6, block.width * 1.1, 18.0)
+    max_dy = max(anchor_box["height"] * 0.6, block.height * 0.28, 18.0)
+    if block.vertical:
+        max_dx = max(max_dx, block.width * 1.6, 22.0)
+        max_dy = max(max_dy, block.height * 0.5, 26.0)
+    else:
+        max_dx = max(max_dx, block.width * 0.38, 22.0)
+        max_dy = max(max_dy, block.height * 1.4, 22.0)
+
+    return (
+        abs(component_center_x - anchor_center_x) <= max_dx
+        and abs(component_center_y - anchor_center_y) <= max_dy
     )
 
 

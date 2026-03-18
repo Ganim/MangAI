@@ -145,6 +145,71 @@ def test_build_detected_regions_from_comic_text_blocks_fits_single_balloon_conta
     assert candidate.context_area["height"] >= 148
 
 
+def test_build_detected_regions_from_comic_text_blocks_refines_vertical_text_area_from_pixels() -> None:
+    image = np.full((260, 260), 236, dtype=np.uint8)
+    cv2.ellipse(image, (132, 130), (56, 86), 0, 0, 360, 0, thickness=3)
+    image[46:214, 78:186] = 246
+    image[72:186, 126:134] = 12
+    image[78:192, 138:146] = 18
+
+    candidates = build_detected_regions_from_comic_text_blocks(
+        text_blocks=[
+            ComicTextBlock(
+                x=116,
+                y=64,
+                width=42,
+                height=132,
+                language="ja",
+                vertical=True,
+            )
+        ],
+        page_width=260,
+        page_height=260,
+        grayscale_image=image,
+    )
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate.type == "speech_balloon"
+    assert candidate.text_area["width"] < 38
+    assert candidate.text_area["height"] < 142
+    assert candidate.text_area["x"] > 118
+    assert candidate.text_area["y"] > 60
+    assert candidate.context_area["width"] > candidate.text_area["width"]
+
+
+def test_build_detected_regions_from_comic_text_blocks_refines_horizontal_text_area_from_pixels() -> None:
+    image = np.full((140, 520), 236, dtype=np.uint8)
+    cv2.rectangle(image, (32, 42), (488, 98), 0, thickness=3)
+    image[45:95, 35:485] = 247
+    image[58:82, 136:406] = 22
+
+    candidates = build_detected_regions_from_comic_text_blocks(
+        text_blocks=[
+            ComicTextBlock(
+                x=112,
+                y=52,
+                width=330,
+                height=38,
+                language="unknown",
+                vertical=False,
+            )
+        ],
+        page_width=520,
+        page_height=140,
+        grayscale_image=image,
+    )
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate.type == "narration_box"
+    assert candidate.text_area["width"] < 308
+    assert candidate.text_area["height"] < 36
+    assert candidate.text_area["x"] > 118
+    assert candidate.text_area["y"] > 51
+    assert candidate.context_area["width"] > candidate.text_area["width"]
+
+
 def test_build_detected_regions_from_comic_text_blocks_splits_merged_balloon_component() -> None:
     image = np.zeros((260, 340), dtype=np.uint8)
     cv2.circle(image, (118, 130), 62, 245, thickness=-1)
