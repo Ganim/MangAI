@@ -19,10 +19,12 @@ import {
   normalizeProjectTargetLanguage,
   parseCreatePageRegionRequest,
   parseCreateProjectResponse,
+  parseCreateStylePresetRequest,
   parseListPageMaskRevisionsResponse,
   parseListPageJobsResponse,
   parseListPageRegionsResponse,
   parseListPageTranslationsResponse,
+  parseListProjectStylePresetsResponse,
   parseMaskRevisionResponse,
   parsePlacementResponse,
   parsePageRegionResponse,
@@ -39,11 +41,17 @@ import {
   parseProject,
   parseRegisterProjectPagesRequest,
   parseRegisterProjectPagesResponse,
+  parseScriptImportApplyRequest,
+  parseScriptImportApplyResponse,
+  parseScriptImportParseRequest,
+  parseScriptImportParseResponse,
+  parseStylePresetResponse,
   parseTranslationJobPayload,
   parseTranslationJobResult,
   parseTranslationResponse,
   parseUpdateMaskRevisionRequest,
   parseUpdatePageRegionRequest,
+  parseUpdateStylePresetRequest,
   parseUpsertAssignmentRequest,
   parseUpsertPlacementRequest,
   parseUpsertTranslationRequest,
@@ -529,6 +537,29 @@ const parsedDialogueResponse = parseDialogueResponse({
 
 assert.equal(parsedDialogueResponse.dialogue.status, "reviewed");
 
+const parsedImportedDialogue = parseDialogueResponse({
+  dialogue: {
+    id: UUID_4,
+    page_id: UUID_2,
+    source: "imported_script",
+    source_language: "ja-JP",
+    content: "Imported line",
+    reading_order: 3,
+    status: "approved",
+    source_region_id: UUID_3,
+    script_row_index: 7,
+    page_marker: "[2]",
+    import_batch_id: UUID,
+    preferred_style_preset_id: UUID_2,
+    created_at: "2026-03-15T00:00:00Z",
+    updated_at: "2026-03-15T00:00:00Z",
+  },
+});
+
+assert.equal(parsedImportedDialogue.dialogue.script_row_index, 7);
+assert.equal(parsedImportedDialogue.dialogue.page_marker, "[2]");
+assert.equal(parsedImportedDialogue.dialogue.preferred_style_preset_id, UUID_2);
+
 const parsedTranslationRequest = parseUpsertTranslationRequest({
   dialogue_id: UUID,
   target_language: "pt-BR",
@@ -639,6 +670,10 @@ const parsedPlacementRequest = parseUpsertPlacementRequest({
 });
 
 assert.equal(parsedPlacementRequest.style.font_size, 24);
+assert.equal(parsedPlacementRequest.style.min_font_size, 24);
+assert.equal(parsedPlacementRequest.style.max_font_size, 24);
+assert.equal(parsedPlacementRequest.style.padding_x, 0);
+assert.equal(parsedPlacementRequest.style.line_break_mode, "auto");
 
 const parsedPlacementsResponse = parseListPagePlacementsResponse({
   placements: [
@@ -666,6 +701,11 @@ const parsedPlacementsResponse = parseListPagePlacementsResponse({
       layout_metrics: {
         mode: "manual",
       },
+      locked_by_user: true,
+      manual_line_breaks: ["Line 1", "Line 2"],
+      layout_status: "adjusted",
+      overflow_detected: false,
+      fit_score: 0.93,
       created_at: "2026-03-15T00:00:00Z",
       updated_at: "2026-03-15T00:00:00Z",
     },
@@ -673,6 +713,9 @@ const parsedPlacementsResponse = parseListPagePlacementsResponse({
 });
 
 assert.equal(parsedPlacementsResponse.placements[0]?.is_active, true);
+assert.equal(parsedPlacementsResponse.placements[0]?.locked_by_user, true);
+assert.equal(parsedPlacementsResponse.placements[0]?.manual_line_breaks[1], "Line 2");
+assert.equal(parsedPlacementsResponse.placements[0]?.layout_status, "adjusted");
 
 const parsedPlacementResponse = parsePlacementResponse({
   placement: {
@@ -699,12 +742,206 @@ const parsedPlacementResponse = parsePlacementResponse({
     layout_metrics: {
       mode: "manual",
     },
+    locked_by_user: false,
+    manual_line_breaks: [],
+    layout_status: "generated",
+    overflow_detected: true,
+    fit_score: 0.41,
     created_at: "2026-03-15T00:00:00Z",
     updated_at: "2026-03-15T00:00:00Z",
   },
 });
 
 assert.equal(parsedPlacementResponse.placement.style.font_family, "Komika");
+assert.equal(parsedPlacementResponse.placement.layout_status, "generated");
+assert.equal(parsedPlacementResponse.placement.overflow_detected, true);
+assert.equal(parsedPlacementResponse.placement.fit_score, 0.41);
+
+const parsedCreateStylePreset = parseCreateStylePresetRequest({
+  name: "Normal",
+  category: "normal",
+  is_default: true,
+  style: {
+    font_family: "Komika",
+    font_fallbacks: ["Arial"],
+    font_size: 26,
+    min_font_size: 18,
+    max_font_size: 30,
+    leading: 30,
+    tracking: 0,
+    alignment: "center",
+    direction: "ltr",
+    rotation: 0,
+    fill: "#000000",
+    padding_x: 8,
+    padding_y: 10,
+    line_break_mode: "balanced",
+    stroke_fill: "#ffffff",
+    stroke_width: 2,
+    uppercase: false,
+    auto_fit: true,
+    vertical_bias: -0.1,
+    allow_overflow: false,
+  },
+});
+
+assert.equal(parsedCreateStylePreset.category, "normal");
+assert.equal(parsedCreateStylePreset.style.padding_x, 8);
+assert.equal(parsedCreateStylePreset.style.stroke_fill, "#ffffff");
+
+const parsedUpdateStylePreset = parseUpdateStylePresetRequest({
+  name: "Narration",
+  category: "narration_box",
+});
+
+assert.equal(parsedUpdateStylePreset.name, "Narration");
+assert.equal(parsedUpdateStylePreset.category, "narration_box");
+assert.throws(() => parseUpdateStylePresetRequest({}), ValidationError);
+
+const parsedStylePresetList = parseListProjectStylePresetsResponse({
+  presets: [
+    {
+      id: UUID,
+      project_id: UUID_2,
+      name: "Normal",
+      category: "normal",
+      is_default: true,
+      source_preset_id: null,
+      style: {
+        font_family: "Komika",
+        font_fallbacks: ["Arial"],
+        font_size: 26,
+        min_font_size: 18,
+        max_font_size: 30,
+        leading: 30,
+        tracking: 0,
+        alignment: "center",
+        direction: "ltr",
+        rotation: 0,
+        fill: "#000000",
+        padding_x: 8,
+        padding_y: 10,
+        line_break_mode: "balanced",
+        stroke_fill: "#ffffff",
+        stroke_width: 2,
+        uppercase: false,
+        auto_fit: true,
+        vertical_bias: 0,
+        allow_overflow: false,
+      },
+      created_at: "2026-03-15T00:00:00Z",
+      updated_at: "2026-03-15T00:00:00Z",
+    },
+  ],
+});
+
+assert.equal(parsedStylePresetList.presets[0]?.style.max_font_size, 30);
+
+const parsedStylePreset = parseStylePresetResponse({
+  preset: {
+    id: UUID_3,
+    project_id: UUID_2,
+    name: "Thoughts",
+    category: "thoughts",
+    is_default: false,
+    source_preset_id: UUID,
+    style: {
+      font_family: "WildWords",
+      font_fallbacks: ["Arial"],
+      font_size: 24,
+      leading: 28,
+      tracking: 5,
+      alignment: "center",
+      direction: "ltr",
+      rotation: 0,
+      fill: "#111111",
+    },
+    created_at: "2026-03-15T00:00:00Z",
+    updated_at: "2026-03-15T00:00:00Z",
+  },
+});
+
+assert.equal(parsedStylePreset.preset.source_preset_id, UUID);
+assert.equal(parsedStylePreset.preset.style.min_font_size, 24);
+
+assert.throws(
+  () =>
+    parseCreateStylePresetRequest({
+      name: "Broken",
+      category: "normal",
+      style: {
+        font_family: "Komika",
+        font_fallbacks: [],
+        font_size: 24,
+        min_font_size: 25,
+        max_font_size: 20,
+        leading: 28,
+        tracking: 0,
+        alignment: "center",
+        direction: "ltr",
+        rotation: 0,
+        fill: "#000000",
+      },
+    }),
+  ValidationError,
+);
+
+const parsedScriptParseRequest = parseScriptImportParseRequest({
+  mode: "translations",
+  content: "[1]\nLinha 1\nLinha 2\n\n[2]\nLinha 3",
+  current_page_number: 1,
+});
+
+assert.equal(parsedScriptParseRequest.mode, "translations");
+assert.equal(parsedScriptParseRequest.current_page_number, 1);
+
+const parsedScriptParseResponse = parseScriptImportParseResponse({
+  mode: "translations",
+  pages: [
+    {
+      page_number: 1,
+      marker: "[1]",
+      lines: [
+        { row_index: 1, content: "Linha 1" },
+        { row_index: 2, content: "Linha 2" },
+      ],
+    },
+    {
+      page_number: 2,
+      marker: "[2]",
+      lines: [{ row_index: 3, content: "Linha 3" }],
+    },
+  ],
+  warnings: ["Page 3 not found"],
+  total_line_count: 3,
+});
+
+assert.equal(parsedScriptParseResponse.pages[0]?.lines[1]?.content, "Linha 2");
+assert.equal(parsedScriptParseResponse.warnings[0], "Page 3 not found");
+
+const parsedScriptApplyRequest = parseScriptImportApplyRequest({
+  mode: "source_dialogues",
+  pages: [
+    {
+      page_number: 1,
+      marker: "[1]",
+      lines: [{ row_index: 1, content: "Original 1" }],
+    },
+  ],
+  replace_existing: true,
+});
+
+assert.equal(parsedScriptApplyRequest.replace_existing, true);
+
+const parsedScriptApplyResponse = parseScriptImportApplyResponse({
+  mode: "source_dialogues",
+  pages_touched: 2,
+  dialogues_upserted: 10,
+  translations_upserted: 0,
+});
+
+assert.equal(parsedScriptApplyResponse.dialogues_upserted, 10);
+assert.equal(parsedScriptApplyResponse.translations_upserted, 0);
 
 const parsedJobsResponse = parseListPageJobsResponse({
   jobs: [

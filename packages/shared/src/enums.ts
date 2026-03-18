@@ -25,6 +25,23 @@ export const DialogueStatus = ["draft", "reviewed", "approved", "rejected"] as c
 export const TranslationStatus = ["draft", "reviewed", "approved"] as const;
 export const AssignmentOrigin = ["automatic", "manual"] as const;
 export const TextDirection = ["ltr", "rtl", "ttb"] as const;
+export const StylePresetCategory = [
+  "normal",
+  "thoughts",
+  "shout",
+  "narration_box",
+  "sfx",
+  "handwritten",
+] as const;
+export const LineBreakMode = ["auto", "balanced", "manual"] as const;
+export const ScriptImportMode = ["source_dialogues", "translations"] as const;
+export const PlacementLayoutStatus = [
+  "draft",
+  "generated",
+  "adjusted",
+  "locked",
+  "overflow",
+] as const;
 export const JobType = [
   "detect_regions",
   "generate_cleanup",

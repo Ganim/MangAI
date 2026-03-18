@@ -6,6 +6,8 @@ import {
   ReadingProfile,
   RegionState,
   RegionType,
+  ScriptImportMode,
+  StylePresetCategory,
   TextDirection,
   TranslationStatus,
 } from "./enums.ts";
@@ -39,6 +41,7 @@ import {
   parseMaskRevision,
   parsePolygonShape,
   parseRegion,
+  parseStylePreset,
   parseTextStyle,
   parseTextPlacement,
   parseTranslation,
@@ -509,6 +512,201 @@ export function parseUpsertPlacementRequest(value: unknown, path: Array<string |
     assignment_id: readUuid(objectValue.assignment_id, atPath(path, "assignment_id")),
     text_box: parseBoundingBox(objectValue.text_box, atPath(path, "text_box")),
     style: parseTextStyle(objectValue.style, atPath(path, "style")),
+  };
+}
+
+export function parseCreateStylePresetRequest(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    name: readString(objectValue.name, atPath(path, "name")),
+    category: readEnum(objectValue.category, StylePresetCategory, atPath(path, "category")),
+    is_default:
+      readOptional(
+        objectValue.is_default,
+        (input, inputPath) => readBoolean(input, inputPath),
+        atPath(path, "is_default"),
+      ) ?? false,
+    style: parseTextStyle(objectValue.style, atPath(path, "style")),
+  };
+}
+
+export function parseUpdateStylePresetRequest(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  const parsedValue = {
+    name: readOptional(
+      objectValue.name,
+      (input, inputPath) => readString(input, inputPath),
+      atPath(path, "name"),
+    ),
+    category: readOptional(
+      objectValue.category,
+      (input, inputPath) => readEnum(input, StylePresetCategory, inputPath),
+      atPath(path, "category"),
+    ),
+    is_default: readOptional(
+      objectValue.is_default,
+      (input, inputPath) => readBoolean(input, inputPath),
+      atPath(path, "is_default"),
+    ),
+    style: readOptional(
+      objectValue.style,
+      (input, inputPath) => parseTextStyle(input, inputPath),
+      atPath(path, "style"),
+    ),
+  };
+
+  if (
+    parsedValue.name === undefined
+    && parsedValue.category === undefined
+    && parsedValue.is_default === undefined
+    && parsedValue.style === undefined
+  ) {
+    throw new ValidationError("At least one style preset field must be updated", path);
+  }
+
+  return parsedValue;
+}
+
+export function parseListProjectStylePresetsResponse(
+  value: unknown,
+  path: Array<string | number> = [],
+) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    presets: readArray(
+      objectValue.presets,
+      atPath(path, "presets"),
+      (item, itemPath) => parseStylePreset(item, itemPath),
+    ),
+  };
+}
+
+export function parseStylePresetResponse(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    preset: parseStylePreset(objectValue.preset, atPath(path, "preset")),
+  };
+}
+
+function parseScriptImportLine(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    row_index: readNumber(objectValue.row_index, atPath(path, "row_index"), {
+      integer: true,
+      min: 1,
+    }),
+    content: readString(objectValue.content, atPath(path, "content"), { allowEmpty: true }),
+  };
+}
+
+function parseScriptImportPage(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    page_number: readNumber(objectValue.page_number, atPath(path, "page_number"), {
+      integer: true,
+      min: 1,
+    }),
+    marker:
+      readOptional(
+        objectValue.marker,
+        (input, inputPath) => readString(input, inputPath),
+        atPath(path, "marker"),
+      ) ?? null,
+    lines: readArray(
+      objectValue.lines,
+      atPath(path, "lines"),
+      (item, itemPath) => parseScriptImportLine(item, itemPath),
+    ),
+  };
+}
+
+export function parseScriptImportParseRequest(value: unknown, path: Array<string | number> = []) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    mode: readEnum(objectValue.mode, ScriptImportMode, atPath(path, "mode")),
+    content: readString(objectValue.content, atPath(path, "content"), { allowEmpty: true }),
+    current_page_number:
+      readOptional(
+        objectValue.current_page_number,
+        (input, inputPath) => readNumber(input, inputPath, { integer: true, min: 1 }),
+        atPath(path, "current_page_number"),
+      ) ?? null,
+  };
+}
+
+export function parseScriptImportParseResponse(
+  value: unknown,
+  path: Array<string | number> = [],
+) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    mode: readEnum(objectValue.mode, ScriptImportMode, atPath(path, "mode")),
+    pages: readArray(
+      objectValue.pages,
+      atPath(path, "pages"),
+      (item, itemPath) => parseScriptImportPage(item, itemPath),
+    ),
+    warnings: readArray(
+      objectValue.warnings ?? [],
+      atPath(path, "warnings"),
+      (item, itemPath) => readString(item, itemPath),
+    ),
+    total_line_count: readNumber(objectValue.total_line_count, atPath(path, "total_line_count"), {
+      integer: true,
+      min: 0,
+    }),
+  };
+}
+
+export function parseScriptImportApplyRequest(
+  value: unknown,
+  path: Array<string | number> = [],
+) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    mode: readEnum(objectValue.mode, ScriptImportMode, atPath(path, "mode")),
+    pages: readArray(
+      objectValue.pages,
+      atPath(path, "pages"),
+      (item, itemPath) => parseScriptImportPage(item, itemPath),
+      { minLength: 1 },
+    ),
+    replace_existing:
+      readOptional(
+        objectValue.replace_existing,
+        (input, inputPath) => readBoolean(input, inputPath),
+        atPath(path, "replace_existing"),
+      ) ?? false,
+  };
+}
+
+export function parseScriptImportApplyResponse(
+  value: unknown,
+  path: Array<string | number> = [],
+) {
+  const objectValue = readObject<Record<string, unknown>>(value, path);
+  return {
+    mode: readEnum(objectValue.mode, ScriptImportMode, atPath(path, "mode")),
+    pages_touched: readNumber(objectValue.pages_touched, atPath(path, "pages_touched"), {
+      integer: true,
+      min: 0,
+    }),
+    dialogues_upserted: readNumber(
+      objectValue.dialogues_upserted,
+      atPath(path, "dialogues_upserted"),
+      {
+        integer: true,
+        min: 0,
+      },
+    ),
+    translations_upserted: readNumber(
+      objectValue.translations_upserted,
+      atPath(path, "translations_upserted"),
+      {
+        integer: true,
+        min: 0,
+      },
+    ),
   };
 }
 
