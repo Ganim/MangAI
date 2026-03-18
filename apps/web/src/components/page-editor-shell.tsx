@@ -73,6 +73,7 @@ import {
   getPageCanvasSize,
   getRegionAreaBoundingBox,
   moveBoundingBox,
+  refineTextAreaToDarkPixels,
   resizeBoundingBox,
   resizeBoundingBoxFromHandle,
 } from "../features/projects/regions.ts";
@@ -124,6 +125,12 @@ type RegionAreaDraft = {
   box: RegionBoundingBox;
 };
 
+type PageImageRaster = {
+  width: number;
+  height: number;
+  data: Uint8ClampedArray;
+};
+
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof ApiClientError) {
     return error.message;
@@ -164,6 +171,33 @@ function areBoundingBoxesEqual(left: RegionBoundingBox, right: RegionBoundingBox
   );
 }
 
+async function loadPageImageRaster(imageSrc: string): Promise<PageImageRaster> {
+  const image = new Image();
+  image.crossOrigin = "anonymous";
+
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("PAGE_IMAGE_LOAD_FAILED"));
+    image.src = imageSrc;
+  });
+
+  const canvas = document.createElement("canvas");
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (context === null) {
+    throw new Error("PAGE_IMAGE_CONTEXT_UNAVAILABLE");
+  }
+
+  context.drawImage(image, 0, 0);
+  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+  return {
+    width: imageData.width,
+    height: imageData.height,
+    data: imageData.data,
+  };
+}
+
 export function PageEditorShell({
   locale,
   messages,
@@ -195,6 +229,7 @@ export function PageEditorShell({
   const [isExportingJpeg, setIsExportingJpeg] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingPsd, setIsExportingPsd] = useState(false);
+  const [isRefiningTextArea, setIsRefiningTextArea] = useState(false);
   const [deletingRegionId, setDeletingRegionId] = useState<string | null>(null);
   const [updatingRegionId, setUpdatingRegionId] = useState<string | null>(null);
   const [updatingMaskRevisionId, setUpdatingMaskRevisionId] = useState<string | null>(null);
@@ -220,6 +255,7 @@ export function PageEditorShell({
   const [activeRegionTransform, setActiveRegionTransform] = useState<ActiveRegionTransform | null>(null);
   const [regionAreaDraft, setRegionAreaDraft] = useState<RegionAreaDraft | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const pageImageRasterRef = useRef<{ src: string; raster: PageImageRaster } | null>(null);
 
   useEffect(() => {
     let canceled = false;
@@ -895,6 +931,64 @@ export function PageEditorShell({
     );
   }
 
+  async function getCurrentPageImageRaster() {
+    if (currentPage === null) {
+      throw new Error("PAGE_IMAGE_UNAVAILABLE");
+    }
+
+    const imageSrc = resolveApiAssetUrl(currentPage.original_asset_path);
+    if (pageImageRasterRef.current?.src === imageSrc) {
+      return pageImageRasterRef.current.raster;
+    }
+
+    const raster = await loadPageImageRaster(imageSrc);
+    pageImageRasterRef.current = {
+      src: imageSrc,
+      raster,
+    };
+    return raster;
+  }
+
+  async function handleRefineSelectedTextArea() {
+    if (currentPage === null || selectedRegion === null) {
+      return;
+    }
+
+    setIsRefiningTextArea(true);
+    setUpdatingRegionId(selectedRegion.id);
+    setRegionActionError(null);
+
+    try {
+      const raster = await getCurrentPageImageRaster();
+      const nextTextArea = refineTextAreaToDarkPixels(
+        raster,
+        getRegionAreaDisplayBoundingBox(selectedRegion, "text_area"),
+      );
+      const currentTextArea = getRegionAreaBoundingBox(selectedRegion, "text_area");
+      if (areBoundingBoxesEqual(nextTextArea, currentTextArea)) {
+        setSelectedRegionArea("text_area");
+        return;
+      }
+
+      const response = await updatePageRegion(projectId, currentPage.id, selectedRegion.id, {
+        bounding_box: nextTextArea,
+        text_area: nextTextArea,
+      });
+      setRegions((currentRegions) =>
+        currentRegions.map((region) =>
+          region.id === response.region.id ? response.region : region,
+        ),
+      );
+      setSelectedRegionArea("text_area");
+      setShowTextAreas(true);
+    } catch (error) {
+      setRegionActionError(getErrorMessage(error, messages.editor.regionUpdateErrorFallback));
+    } finally {
+      setIsRefiningTextArea(false);
+      setUpdatingRegionId(null);
+    }
+  }
+
   function handleRegionAreaMouseDown(
     event: ReactMouseEvent<HTMLElement>,
     region: PageRegion,
@@ -1545,6 +1639,20 @@ export function PageEditorShell({
                     type="button"
                   >
                     {messages.editor.areaKindLabels.text_area}
+                  </button>
+                  <button
+                    className="ghost-button"
+                    disabled={
+                      isRefiningTextArea
+                      || updatingRegionId === selectedRegion.id
+                      || hasRunningJobsForPage
+                    }
+                    onClick={() => void handleRefineSelectedTextArea()}
+                    type="button"
+                  >
+                    {isRefiningTextArea
+                      ? messages.editor.refiningTextAreaAction
+                      : messages.editor.refineTextAreaAction}
                   </button>
                   <button
                     className="ghost-button"

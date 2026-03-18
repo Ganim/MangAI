@@ -15,6 +15,12 @@ type RegionBoundingBox = {
   height: number;
 };
 
+type ImageRaster = {
+  width: number;
+  height: number;
+  data: Uint8ClampedArray;
+};
+
 export type RegionAreaKind = "text_area" | "context_area";
 export type ResizeHandle = "nw" | "ne" | "sw" | "se";
 
@@ -316,6 +322,178 @@ export function resizeBoundingBoxFromHandle(
     width: Math.round(nextWidth),
     height: Math.round(nextHeight),
   };
+}
+
+export function refineTextAreaToDarkPixels(
+  raster: ImageRaster,
+  boundingBox: RegionBoundingBox,
+) {
+  const x1 = Math.max(Math.floor(boundingBox.x), 0);
+  const y1 = Math.max(Math.floor(boundingBox.y), 0);
+  const x2 = Math.min(Math.ceil(boundingBox.x + boundingBox.width), raster.width);
+  const y2 = Math.min(Math.ceil(boundingBox.y + boundingBox.height), raster.height);
+  if (x2 <= x1 || y2 <= y1) {
+    return boundingBox;
+  }
+
+  const cropWidth = x2 - x1;
+  const cropHeight = y2 - y1;
+  const grayscale = new Uint8Array(cropWidth * cropHeight);
+  const histogram = new Array<number>(256).fill(0);
+  let index = 0;
+  for (let y = y1; y < y2; y += 1) {
+    for (let x = x1; x < x2; x += 1) {
+      const offset = ((y * raster.width) + x) * 4;
+      const gray = Math.round(
+        ((raster.data[offset] ?? 0) * 0.299)
+        + ((raster.data[offset + 1] ?? 0) * 0.587)
+        + ((raster.data[offset + 2] ?? 0) * 0.114),
+      );
+      grayscale[index] = gray;
+      histogram[gray] = (histogram[gray] ?? 0) + 1;
+      index += 1;
+    }
+  }
+
+  const threshold = clampNumber(computeOtsuThreshold(histogram), 72, 188);
+  const darkCountsByColumn = new Array<number>(cropWidth).fill(0);
+  const darkCountsByRow = new Array<number>(cropHeight).fill(0);
+  index = 0;
+  for (let y = 0; y < cropHeight; y += 1) {
+    for (let x = 0; x < cropWidth; x += 1) {
+      if ((grayscale[index] ?? 255) <= threshold) {
+        darkCountsByColumn[x] = (darkCountsByColumn[x] ?? 0) + 1;
+        darkCountsByRow[y] = (darkCountsByRow[y] ?? 0) + 1;
+      }
+      index += 1;
+    }
+  }
+
+  suppressBoundaryArtifacts(darkCountsByColumn, cropHeight);
+  suppressBoundaryArtifacts(darkCountsByRow, cropWidth);
+
+  const isVertical = boundingBox.height >= boundingBox.width * 1.1;
+  const validColumns = fillTinyAxisGaps(
+    darkCountsByColumn.map((count) => count >= Math.max(2, Math.round(cropHeight * 0.06))),
+  );
+  const validRows = fillTinyAxisGaps(
+    darkCountsByRow.map((count) =>
+      count >= Math.max(2, Math.round(cropWidth * (isVertical ? 0.035 : 0.06)))
+    ),
+  );
+
+  const columnRange = findActiveAxisRange(validColumns);
+  const rowRange = findActiveAxisRange(validRows);
+  if (columnRange === null || rowRange === null) {
+    return boundingBox;
+  }
+
+  const [columnStart, columnEnd] = columnRange;
+  const [rowStart, rowEnd] = rowRange;
+  const selectedWidth = Math.max(columnEnd - columnStart, 1);
+  const selectedHeight = Math.max(rowEnd - rowStart, 1);
+  const paddingX = isVertical
+    ? Math.min(6, Math.max(2, Math.round(selectedWidth * 0.08)))
+    : Math.min(8, Math.max(2, Math.round(selectedWidth * 0.03)));
+  const paddingY = isVertical
+    ? Math.min(8, Math.max(3, Math.round(selectedHeight * 0.05)))
+    : Math.min(6, Math.max(2, Math.round(selectedHeight * 0.08)));
+
+  const nextBoundingBox = {
+    x: Math.max(x1 + columnStart - paddingX, x1),
+    y: Math.max(y1 + rowStart - paddingY, y1),
+    width: Math.min(selectedWidth + (paddingX * 2), x2 - x1),
+    height: Math.min(selectedHeight + (paddingY * 2), y2 - y1),
+  };
+  if (
+    (boundingBox.width - nextBoundingBox.width) < 4
+    && (boundingBox.height - nextBoundingBox.height) < 4
+  ) {
+    return boundingBox;
+  }
+  return nextBoundingBox;
+}
+
+function computeOtsuThreshold(histogram: number[]) {
+  let total = 0;
+  let sum = 0;
+  for (let index = 0; index < histogram.length; index += 1) {
+    total += histogram[index] ?? 0;
+    sum += index * (histogram[index] ?? 0);
+  }
+
+  let sumBackground = 0;
+  let weightBackground = 0;
+  let maxVariance = -1;
+  let threshold = 128;
+  for (let index = 0; index < histogram.length; index += 1) {
+    weightBackground += histogram[index] ?? 0;
+    if (weightBackground === 0) {
+      continue;
+    }
+    const weightForeground = total - weightBackground;
+    if (weightForeground === 0) {
+      break;
+    }
+    sumBackground += index * (histogram[index] ?? 0);
+    const meanBackground = sumBackground / weightBackground;
+    const meanForeground = (sum - sumBackground) / weightForeground;
+    const variance =
+      weightBackground
+      * weightForeground
+      * (meanBackground - meanForeground)
+      * (meanBackground - meanForeground);
+    if (variance > maxVariance) {
+      maxVariance = variance;
+      threshold = index;
+    }
+  }
+  return threshold;
+}
+
+function suppressBoundaryArtifacts(counts: number[], oppositeAxisLength: number) {
+  const boundaryLimit = oppositeAxisLength * 0.7;
+  const edgeWindow = Math.min(3, counts.length);
+  for (let index = 0; index < edgeWindow; index += 1) {
+    if ((counts[index] ?? 0) >= boundaryLimit) {
+      counts[index] = 0;
+    }
+    const mirroredIndex = counts.length - 1 - index;
+    if ((counts[mirroredIndex] ?? 0) >= boundaryLimit) {
+      counts[mirroredIndex] = 0;
+    }
+  }
+}
+
+function fillTinyAxisGaps(values: boolean[]) {
+  if (values.length <= 2) {
+    return values;
+  }
+  const filled = values.slice();
+  for (let index = 1; index < values.length - 1; index += 1) {
+    if (!values[index] && values[index - 1] && values[index + 1]) {
+      filled[index] = true;
+    }
+  }
+  return filled;
+}
+
+function findActiveAxisRange(values: boolean[]) {
+  let start = -1;
+  let end = -1;
+  for (let index = 0; index < values.length; index += 1) {
+    if (!values[index]) {
+      continue;
+    }
+    if (start === -1) {
+      start = index;
+    }
+    end = index + 1;
+  }
+  if (start === -1 || end === -1) {
+    return null;
+  }
+  return [start, end] as const;
 }
 
 function formatBoundingBox(boundingBox: RegionBoundingBox) {

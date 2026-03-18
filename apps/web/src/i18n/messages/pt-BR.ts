@@ -375,6 +375,8 @@ export const ptBRMessages: AppMessages = {
     hideBalloonGroupsAction: "Ocultar grupos de balao",
     addRegionAction: "Adicionar regiao",
     creatingRegionAction: "Adicionando regiao...",
+    refineTextAreaAction: "Ajustar area de texto ao conteudo",
+    refiningTextAreaAction: "Ajustando area de texto...",
     markReviewedAction: "Marcar como revisada",
     approveRegionAction: "Aprovar regiao",
     resetRegionAction: "Voltar para rascunho",

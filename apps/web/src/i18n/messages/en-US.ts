@@ -281,6 +281,8 @@ export type AppMessages = {
     hideBalloonGroupsAction: string;
     addRegionAction: string;
     creatingRegionAction: string;
+    refineTextAreaAction: string;
+    refiningTextAreaAction: string;
     markReviewedAction: string;
     approveRegionAction: string;
     resetRegionAction: string;
@@ -694,6 +696,8 @@ export const enUSMessages: AppMessages = {
     hideBalloonGroupsAction: "Hide balloon groups",
     addRegionAction: "Add review region",
     creatingRegionAction: "Adding region...",
+    refineTextAreaAction: "Fit text area to text",
+    refiningTextAreaAction: "Fitting text area...",
     markReviewedAction: "Mark reviewed",
     approveRegionAction: "Approve region",
     resetRegionAction: "Reset to draft",

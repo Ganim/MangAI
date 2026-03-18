@@ -15,6 +15,7 @@ import {
   getPageCanvasSize,
   getRegionAreaBoundingBox,
   getRegionOverlayStyle,
+  refineTextAreaToDarkPixels,
   moveBoundingBox,
   resizeBoundingBox,
   resizeBoundingBoxFromHandle,
@@ -312,6 +313,51 @@ assert.deepEqual(balloonGroupOverlays[0]?.bounding_box, {
   y: 84,
   width: 192,
   height: 272,
+});
+
+function createSolidRaster(
+  width: number,
+  height: number,
+  rgb: [number, number, number],
+) {
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let index = 0; index < width * height; index += 1) {
+    const offset = index * 4;
+    data[offset] = rgb[0];
+    data[offset + 1] = rgb[1];
+    data[offset + 2] = rgb[2];
+    data[offset + 3] = 255;
+  }
+  return { width, height, data };
+}
+
+const raster = createSolidRaster(120, 160, [245, 245, 245]);
+for (let y = 28; y < 132; y += 1) {
+  for (let x = 48; x < 54; x += 1) {
+    const offset = ((y * raster.width) + x) * 4;
+    raster.data[offset] = 24;
+    raster.data[offset + 1] = 24;
+    raster.data[offset + 2] = 24;
+  }
+  for (let x = 64; x < 70; x += 1) {
+    const offset = ((y * raster.width) + x) * 4;
+    raster.data[offset] = 18;
+    raster.data[offset + 1] = 18;
+    raster.data[offset + 2] = 18;
+  }
+}
+
+const refinedTextArea = refineTextAreaToDarkPixels(raster, {
+  x: 36,
+  y: 18,
+  width: 48,
+  height: 132,
+});
+assert.deepEqual(refinedTextArea, {
+  x: 46,
+  y: 23,
+  width: 26,
+  height: 114,
 });
 
 console.log("WEB_REGION_TESTS_OK");
