@@ -1236,6 +1236,7 @@ def _refine_regions_within_balloon_group(
         next_first_area, next_second_area = _refine_balloon_group_pair_context_areas(
             refined_regions[first_index],
             refined_regions[second_index],
+            balloon_group_area=balloon_group_area,
         )
         refined_regions[first_index]["context_area"] = next_first_area
         refined_regions[second_index]["context_area"] = next_second_area
@@ -1247,6 +1248,7 @@ def _refine_regions_within_balloon_group(
         next_first_area, next_second_area = _refine_balloon_group_pair_context_areas(
             refined_regions[first_index],
             refined_regions[second_index],
+            balloon_group_area=balloon_group_area,
         )
         refined_regions[first_index]["context_area"] = next_first_area
         refined_regions[second_index]["context_area"] = next_second_area
@@ -1257,11 +1259,19 @@ def _refine_regions_within_balloon_group(
 def _refine_balloon_group_pair_context_areas(
     first_region: dict[str, Any],
     second_region: dict[str, Any],
+    *,
+    balloon_group_area: dict[str, Any],
 ) -> tuple[dict[str, float], dict[str, float]]:
     first_text = _get_region_area(first_region, "text_area")
     second_text = _get_region_area(second_region, "text_area")
     first_context = _get_region_area(first_region, "context_area")
     second_context = _get_region_area(second_region, "context_area")
+    group_area = _bounding_box(
+        float(balloon_group_area["x"]),
+        float(balloon_group_area["y"]),
+        float(balloon_group_area["width"]),
+        float(balloon_group_area["height"]),
+    )
 
     if _should_split_balloon_group_pair_on_x(first_text, second_text):
         return _split_balloon_group_pair_along_x(
@@ -1269,12 +1279,14 @@ def _refine_balloon_group_pair_context_areas(
             first_context=first_context,
             second_text=second_text,
             second_context=second_context,
+            group_area=group_area,
         )
     return _split_balloon_group_pair_along_y(
         first_text=first_text,
         first_context=first_context,
         second_text=second_text,
         second_context=second_context,
+        group_area=group_area,
     )
 
 
@@ -1324,6 +1336,7 @@ def _split_balloon_group_pair_along_x(
     first_context: dict[str, Any],
     second_text: dict[str, Any],
     second_context: dict[str, Any],
+    group_area: dict[str, Any],
 ) -> tuple[dict[str, float], dict[str, float]]:
     if _bounding_box_center_x(first_text) > _bounding_box_center_x(second_text):
         next_second, next_first = _split_balloon_group_pair_along_x(
@@ -1331,47 +1344,71 @@ def _split_balloon_group_pair_along_x(
             first_context=second_context,
             second_text=first_text,
             second_context=first_context,
+            group_area=group_area,
         )
         return next_first, next_second
 
-    cut_x = (_bounding_box_center_x(first_text) + _bounding_box_center_x(second_text)) / 2.0
+    group_left = float(group_area["x"])
+    group_right = float(group_area["x"]) + float(group_area["width"])
+    text_gap_start = float(first_text["x"]) + float(first_text["width"])
+    text_gap_end = float(second_text["x"])
+    if text_gap_end > text_gap_start:
+        cut_x = (text_gap_start + text_gap_end) / 2.0
+    else:
+        cut_x = (_bounding_box_center_x(first_text) + _bounding_box_center_x(second_text)) / 2.0
     text_guard = min(
-        10.0,
+        16.0,
         max(
-            4.0,
+            8.0,
             min(float(first_text["width"]), float(second_text["width"])) * 0.08,
-            min(float(first_text["height"]), float(second_text["height"])) * 0.024,
-        ),
-    )
-    cut_guard = min(
-        12.0,
-        max(
-            5.0,
-            min(float(first_text["width"]), float(second_text["width"])) * 0.1,
             min(float(first_text["height"]), float(second_text["height"])) * 0.03,
         ),
     )
-
-    first_x2 = max(
-        min(float(first_context["x"]) + float(first_context["width"]), cut_x + cut_guard),
+    split_gap = min(
+        18.0,
+        max(
+            8.0,
+            min(float(first_text["width"]), float(second_text["width"])) * 0.08,
+        ),
+    )
+    left_corridor_right = max(
         float(first_text["x"]) + float(first_text["width"]) + text_guard,
+        min(
+            cut_x - (split_gap / 2.0),
+            float(second_text["x"]) - text_guard,
+        ),
     )
-    second_x1 = min(
-        max(float(second_context["x"]), cut_x - cut_guard),
+    right_corridor_left = min(
         float(second_text["x"]) - text_guard,
+        max(
+            cut_x + (split_gap / 2.0),
+            float(first_text["x"]) + float(first_text["width"]) + text_guard,
+        ),
+    )
+    left_corridor = _bounding_box(
+        group_left,
+        float(group_area["y"]),
+        max(left_corridor_right - group_left, 1.0),
+        float(group_area["height"]),
+    )
+    right_corridor = _bounding_box(
+        right_corridor_left,
+        float(group_area["y"]),
+        max(group_right - right_corridor_left, 1.0),
+        float(group_area["height"]),
     )
 
-    next_first = _bounding_box(
-        float(first_context["x"]),
-        float(first_context["y"]),
-        max(first_x2 - float(first_context["x"]), 1.0),
-        float(first_context["height"]),
+    next_first = _fit_text_area_within_bounds(
+        text_area=first_text,
+        preferred_bounds=left_corridor,
+        fallback_context=first_context,
+        split_axis="x",
     )
-    next_second = _bounding_box(
-        second_x1,
-        float(second_context["y"]),
-        max((float(second_context["x"]) + float(second_context["width"])) - second_x1, 1.0),
-        float(second_context["height"]),
+    next_second = _fit_text_area_within_bounds(
+        text_area=second_text,
+        preferred_bounds=right_corridor,
+        fallback_context=second_context,
+        split_axis="x",
     )
     return next_first, next_second
 
@@ -1382,6 +1419,7 @@ def _split_balloon_group_pair_along_y(
     first_context: dict[str, Any],
     second_text: dict[str, Any],
     second_context: dict[str, Any],
+    group_area: dict[str, Any],
 ) -> tuple[dict[str, float], dict[str, float]]:
     if _bounding_box_center_y(first_text) > _bounding_box_center_y(second_text):
         next_second, next_first = _split_balloon_group_pair_along_y(
@@ -1389,49 +1427,177 @@ def _split_balloon_group_pair_along_y(
             first_context=second_context,
             second_text=first_text,
             second_context=first_context,
+            group_area=group_area,
         )
         return next_first, next_second
 
-    cut_y = (_bounding_box_center_y(first_text) + _bounding_box_center_y(second_text)) / 2.0
+    group_top = float(group_area["y"])
+    group_bottom = float(group_area["y"]) + float(group_area["height"])
+    text_gap_start = float(first_text["y"]) + float(first_text["height"])
+    text_gap_end = float(second_text["y"])
+    if text_gap_end > text_gap_start:
+        cut_y = (text_gap_start + text_gap_end) / 2.0
+    else:
+        cut_y = (_bounding_box_center_y(first_text) + _bounding_box_center_y(second_text)) / 2.0
     text_guard = min(
-        10.0,
+        16.0,
         max(
-            4.0,
-            min(float(first_text["height"]), float(second_text["height"])) * 0.06,
-            min(float(first_text["width"]), float(second_text["width"])) * 0.08,
-        ),
-    )
-    cut_guard = min(
-        12.0,
-        max(
-            5.0,
+            8.0,
             min(float(first_text["height"]), float(second_text["height"])) * 0.08,
-            min(float(first_text["width"]), float(second_text["width"])) * 0.1,
+            min(float(first_text["width"]), float(second_text["width"])) * 0.03,
         ),
     )
-
-    first_y2 = max(
-        min(float(first_context["y"]) + float(first_context["height"]), cut_y + cut_guard),
+    split_gap = min(
+        18.0,
+        max(
+            8.0,
+            min(float(first_text["height"]), float(second_text["height"])) * 0.08,
+        ),
+    )
+    top_corridor_bottom = max(
         float(first_text["y"]) + float(first_text["height"]) + text_guard,
+        min(
+            cut_y - (split_gap / 2.0),
+            float(second_text["y"]) - text_guard,
+        ),
     )
-    second_y1 = min(
-        max(float(second_context["y"]), cut_y - cut_guard),
+    bottom_corridor_top = min(
         float(second_text["y"]) - text_guard,
+        max(
+            cut_y + (split_gap / 2.0),
+            float(first_text["y"]) + float(first_text["height"]) + text_guard,
+        ),
+    )
+    top_corridor = _bounding_box(
+        float(group_area["x"]),
+        group_top,
+        float(group_area["width"]),
+        max(top_corridor_bottom - group_top, 1.0),
+    )
+    bottom_corridor = _bounding_box(
+        float(group_area["x"]),
+        bottom_corridor_top,
+        float(group_area["width"]),
+        max(group_bottom - bottom_corridor_top, 1.0),
     )
 
-    next_first = _bounding_box(
-        float(first_context["x"]),
-        float(first_context["y"]),
-        float(first_context["width"]),
-        max(first_y2 - float(first_context["y"]), 1.0),
+    next_first = _fit_text_area_within_bounds(
+        text_area=first_text,
+        preferred_bounds=top_corridor,
+        fallback_context=first_context,
+        split_axis="y",
     )
-    next_second = _bounding_box(
-        float(second_context["x"]),
-        second_y1,
-        float(second_context["width"]),
-        max((float(second_context["y"]) + float(second_context["height"])) - second_y1, 1.0),
+    next_second = _fit_text_area_within_bounds(
+        text_area=second_text,
+        preferred_bounds=bottom_corridor,
+        fallback_context=second_context,
+        split_axis="y",
     )
     return next_first, next_second
+
+
+def _fit_text_area_within_bounds(
+    *,
+    text_area: dict[str, Any],
+    preferred_bounds: dict[str, Any],
+    fallback_context: dict[str, Any],
+    split_axis: str,
+) -> dict[str, float]:
+    effective_bounds = _intersect_bounding_boxes(preferred_bounds, fallback_context) or preferred_bounds
+    pad_x = _resolve_group_member_padding(text_area, axis="x", split_axis=split_axis)
+    pad_y = _resolve_group_member_padding(text_area, axis="y", split_axis=split_axis)
+
+    min_x = max(float(effective_bounds["x"]), float(text_area["x"]) - pad_x)
+    max_x = min(
+        float(effective_bounds["x"]) + float(effective_bounds["width"]),
+        float(text_area["x"]) + float(text_area["width"]) + pad_x,
+    )
+    min_y = max(float(effective_bounds["y"]), float(text_area["y"]) - pad_y)
+    max_y = min(
+        float(effective_bounds["y"]) + float(effective_bounds["height"]),
+        float(text_area["y"]) + float(text_area["height"]) + pad_y,
+    )
+
+    fitted = _bounding_box(
+        min_x,
+        min_y,
+        max(max_x - min_x, float(text_area["width"]) + 4.0),
+        max(max_y - min_y, float(text_area["height"]) + 4.0),
+    )
+
+    return _clamp_bounding_box_to_bounds(
+        fitted,
+        effective_bounds,
+        fallback_context=fallback_context,
+    )
+
+
+def _resolve_group_member_padding(
+    text_area: dict[str, Any],
+    *,
+    axis: str,
+    split_axis: str,
+) -> float:
+    text_width = float(text_area["width"])
+    text_height = float(text_area["height"])
+    if split_axis == "x":
+        if axis == "x":
+            return min(34.0, max(22.0, text_width * 0.28, text_height * 0.16))
+        return min(30.0, max(18.0, text_height * 0.12, text_width * 0.16))
+    if axis == "x":
+        return min(30.0, max(20.0, text_width * 0.22, text_height * 0.10))
+    return min(30.0, max(24.0, text_height * 0.16, text_width * 0.10))
+
+
+def _clamp_bounding_box_to_bounds(
+    bounding_box: dict[str, Any],
+    bounds: dict[str, Any],
+    *,
+    fallback_context: dict[str, Any],
+) -> dict[str, float]:
+    bounds_x1 = float(bounds["x"])
+    bounds_y1 = float(bounds["y"])
+    bounds_x2 = bounds_x1 + float(bounds["width"])
+    bounds_y2 = bounds_y1 + float(bounds["height"])
+
+    current_x1 = float(bounding_box["x"])
+    current_y1 = float(bounding_box["y"])
+    current_x2 = current_x1 + float(bounding_box["width"])
+    current_y2 = current_y1 + float(bounding_box["height"])
+
+    fallback_width = min(float(fallback_context["width"]), bounds_x2 - bounds_x1)
+    fallback_height = min(float(fallback_context["height"]), bounds_y2 - bounds_y1)
+
+    next_x1 = min(max(current_x1, bounds_x1), max(bounds_x2 - fallback_width, bounds_x1))
+    next_y1 = min(max(current_y1, bounds_y1), max(bounds_y2 - fallback_height, bounds_y1))
+    next_x2 = max(min(current_x2, bounds_x2), next_x1 + 1.0)
+    next_y2 = max(min(current_y2, bounds_y2), next_y1 + 1.0)
+
+    return _bounding_box(
+        next_x1,
+        next_y1,
+        max(next_x2 - next_x1, 1.0),
+        max(next_y2 - next_y1, 1.0),
+    )
+
+
+def _intersect_bounding_boxes(
+    first_box: dict[str, Any],
+    second_box: dict[str, Any],
+) -> dict[str, float] | None:
+    left = max(float(first_box["x"]), float(second_box["x"]))
+    top = max(float(first_box["y"]), float(second_box["y"]))
+    right = min(
+        float(first_box["x"]) + float(first_box["width"]),
+        float(second_box["x"]) + float(second_box["width"]),
+    )
+    bottom = min(
+        float(first_box["y"]) + float(first_box["height"]),
+        float(second_box["y"]) + float(second_box["height"]),
+    )
+    if right <= left or bottom <= top:
+        return None
+    return _bounding_box(left, top, right - left, bottom - top)
 
 
 def _bounding_box_center_x(bounding_box: dict[str, Any]) -> float:
