@@ -7,7 +7,6 @@ from mangai_workers.detection import (
     _bounding_box_intersection_area,
     _classify_cleanup_strategy,
     _refine_candidate_context_areas,
-    _tighten_text_area_to_local_dark_content,
     build_detected_regions_from_comic_text_blocks,
     build_detected_regions_from_recognized_lines,
     detect_regions_from_asset,
@@ -312,25 +311,6 @@ def test_build_detected_regions_from_comic_text_blocks_handles_small_balloon_bor
     assert candidate.context_area["x"] < 86
     assert candidate.context_area["width"] < 150
     assert candidate.context_area["height"] < 220
-
-
-def test_tighten_text_area_to_local_dark_content_keeps_small_interior_marks() -> None:
-    image = np.full((180, 96), 244, dtype=np.uint8)
-    image[28:142, 36:44] = 18
-    image[54:58, 49:53] = 14
-    image[72:76, 49:53] = 14
-    image[90:94, 49:53] = 14
-
-    tightened = _tighten_text_area_to_local_dark_content(
-        text_area={"x": 24.0, "y": 22.0, "width": 34.0, "height": 128.0},
-        grayscale_image=image,
-        page_width=96,
-        page_height=180,
-        vertical=True,
-    )
-
-    assert tightened["x"] + tightened["width"] >= 52
-    assert tightened["width"] >= 20
 
 
 def test_build_detected_regions_from_comic_text_blocks_marks_page_edge_vertical_text_as_free_text() -> None:

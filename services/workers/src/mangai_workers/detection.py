@@ -1027,13 +1027,10 @@ def _refine_text_area_within_context_crop(
 
     # Otsu can drift too bright on clean balloons; cap the text threshold to stay selective.
     effective_threshold = int(min(max(threshold_value, 72), 188))
-    raw_dark_mask = (crop <= effective_threshold).astype(np.uint8) * 255
     dark_mask = (blurred <= effective_threshold).astype(np.uint8) * 255
-    dark_mask = cv2.bitwise_or(dark_mask, raw_dark_mask)
     dark_mask = cv2.medianBlur(dark_mask, 3)
 
-    kernel_size = 2 if max(block.width, block.height) < 120 else 3
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
     dark_mask = cv2.morphologyEx(dark_mask, cv2.MORPH_OPEN, kernel)
 
     anchor_box = _compute_text_refinement_anchor_box(
@@ -1047,8 +1044,6 @@ def _refine_text_area_within_context_crop(
     anchor_y2 = int(np.ceil(anchor_box["y"] + anchor_box["height"]))
     anchor_mask = dark_mask[anchor_y1:anchor_y2, anchor_x1:anchor_x2]
     anchor_mask = _remove_anchor_boundary_artifacts(anchor_mask)
-    sparse_anchor_mask = raw_dark_mask[anchor_y1:anchor_y2, anchor_x1:anchor_x2]
-    sparse_anchor_mask = _remove_anchor_boundary_artifacts(sparse_anchor_mask)
     if anchor_mask.size == 0 or np.count_nonzero(anchor_mask) == 0:
         return fallback_text_area
 
@@ -1081,41 +1076,8 @@ def _refine_text_area_within_context_crop(
     if selected_column_range is None or selected_row_range is None:
         return fallback_text_area
 
-    selected_column_range = _extend_axis_range_with_sparse_neighbors(
-        counts=np.count_nonzero(sparse_anchor_mask, axis=0),
-        selected_range=selected_column_range,
-        min_pixels=1,
-        max_gap=8 if block.vertical else 3,
-        max_extension=max(
-            10 if block.vertical else 6,
-            int(round(max(block.width * (1.1 if block.vertical else 0.24), block.height * 0.08))),
-        ),
-    )
-    selected_row_range = _extend_axis_range_with_sparse_neighbors(
-        counts=np.count_nonzero(sparse_anchor_mask, axis=1),
-        selected_range=selected_row_range,
-        min_pixels=1,
-        max_gap=4 if block.vertical else 3,
-        max_extension=max(8, int(round(block.height * (0.16 if block.vertical else 0.4)))),
-    )
-
     column_start, column_end = selected_column_range
     row_start, row_end = selected_row_range
-    component_bounds = _build_relevant_text_component_bounds(
-        mask=sparse_anchor_mask,
-        anchor_box={
-            "x": float(column_start),
-            "y": float(row_start),
-            "width": float(max(column_end - column_start, 1)),
-            "height": float(max(row_end - row_start, 1)),
-        },
-        block=block,
-    )
-    if component_bounds is not None:
-        column_start = min(column_start, int(np.floor(component_bounds["x"])))
-        row_start = min(row_start, int(np.floor(component_bounds["y"])))
-        column_end = max(column_end, int(np.ceil(component_bounds["x"] + component_bounds["width"])))
-        row_end = max(row_end, int(np.ceil(component_bounds["y"] + component_bounds["height"])))
     if column_end <= column_start or row_end <= row_start:
         return fallback_text_area
 
@@ -1157,15 +1119,9 @@ def _refine_text_area_within_context_crop(
         page_width=page_width,
         page_height=page_height,
     )
-    refinement_guard = _build_text_refinement_guard_box(
-        block=block,
-        fallback_text_area=fallback_text_area,
-        page_width=page_width,
-        page_height=page_height,
-    )
     final_box = _intersect_bounding_boxes(
         final_box,
-        refinement_guard,
+        fallback_text_area,
         page_width=page_width,
         page_height=page_height,
     )
@@ -1204,9 +1160,7 @@ def _tighten_text_area_to_local_dark_content(
         cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU,
     )
     effective_threshold = int(min(max(threshold_value, 72), 188))
-    raw_dark_mask = (crop <= effective_threshold).astype(np.uint8) * 255
     dark_mask = (blurred <= effective_threshold).astype(np.uint8) * 255
-    dark_mask = cv2.bitwise_or(dark_mask, raw_dark_mask)
     dark_mask = _remove_anchor_boundary_artifacts(dark_mask)
     if np.count_nonzero(dark_mask) == 0:
         return text_area
@@ -1257,52 +1211,6 @@ def _dense_axis_mask(counts: np.ndarray, *, min_pixels: int) -> np.ndarray:
     return filled
 
 
-def _extend_axis_range_with_sparse_neighbors(
-    *,
-    counts: np.ndarray,
-    selected_range: tuple[int, int],
-    min_pixels: int,
-    max_gap: int,
-    max_extension: int,
-) -> tuple[int, int]:
-    start, end = selected_range
-    if counts.size == 0 or max_extension <= 0:
-        return selected_range
-
-    start = max(min(start, len(counts) - 1), 0)
-    end = max(min(end, len(counts)), start + 1)
-
-    gap = 0
-    extension = 0
-    cursor = start - 1
-    while cursor >= 0 and extension < max_extension:
-        if counts[cursor] >= min_pixels:
-            start = cursor
-            gap = 0
-        else:
-            gap += 1
-            if gap > max_gap:
-                break
-        cursor -= 1
-        extension += 1
-
-    gap = 0
-    extension = 0
-    cursor = end
-    while cursor < len(counts) and extension < max_extension:
-        if counts[cursor] >= min_pixels:
-            end = cursor + 1
-            gap = 0
-        else:
-            gap += 1
-            if gap > max_gap:
-                break
-        cursor += 1
-        extension += 1
-
-    return start, end
-
-
 def _remove_anchor_boundary_artifacts(mask: np.ndarray) -> np.ndarray:
     if mask.size == 0 or np.count_nonzero(mask) == 0:
         return mask
@@ -1315,24 +1223,21 @@ def _remove_anchor_boundary_artifacts(mask: np.ndarray) -> np.ndarray:
     mask_height, mask_width = mask.shape
     for component_index in range(1, component_count):
         area = int(stats[component_index, cv2.CC_STAT_AREA])
+        if area < 8:
+            continue
+
         component_x = int(stats[component_index, cv2.CC_STAT_LEFT])
         component_y = int(stats[component_index, cv2.CC_STAT_TOP])
         component_w = int(stats[component_index, cv2.CC_STAT_WIDTH])
         component_h = int(stats[component_index, cv2.CC_STAT_HEIGHT])
+        bbox_area = max(component_w * component_h, 1)
+        fill_ratio = area / bbox_area
         touches_boundary = (
             component_x == 0
             or component_y == 0
             or (component_x + component_w) >= mask_width
             or (component_y + component_h) >= mask_height
         )
-        if area < 3:
-            continue
-        if area < 8 and not touches_boundary:
-            cleaned[labels == component_index] = 255
-            continue
-
-        bbox_area = max(component_w * component_h, 1)
-        fill_ratio = area / bbox_area
         long_span = (
             component_w >= max(mask_width * 0.32, component_h * 4.8)
             or component_h >= max(mask_height * 0.32, component_w * 4.8)
@@ -1346,30 +1251,6 @@ def _remove_anchor_boundary_artifacts(mask: np.ndarray) -> np.ndarray:
         cleaned[labels == component_index] = 255
 
     return cleaned if np.count_nonzero(cleaned) > 0 else mask
-
-
-def _build_text_refinement_guard_box(
-    *,
-    block: ComicTextBlock,
-    fallback_text_area: dict[str, float],
-    page_width: int,
-    page_height: int,
-) -> dict[str, float]:
-    if block.vertical:
-        padding_x = min(20.0, max(6.0, block.width * 0.42, block.height * 0.045))
-        padding_y = min(18.0, max(5.0, block.height * 0.08, block.width * 0.28))
-    else:
-        padding_x = min(18.0, max(5.0, block.width * 0.08, block.height * 0.24))
-        padding_y = min(16.0, max(5.0, block.height * 0.14, block.width * 0.035))
-
-    return _clamp_bounding_box(
-        x=fallback_text_area["x"] - padding_x,
-        y=fallback_text_area["y"] - padding_y,
-        width=fallback_text_area["width"] + (padding_x * 2.0),
-        height=fallback_text_area["height"] + (padding_y * 2.0),
-        page_width=page_width,
-        page_height=page_height,
-    )
 
 
 def _expand_dense_axis_range(
@@ -1498,65 +1379,6 @@ def _component_is_relevant_for_text_area(
         abs(component_center_x - anchor_center_x) <= max_dx
         and abs(component_center_y - anchor_center_y) <= max_dy
     )
-
-
-def _build_relevant_text_component_bounds(
-    *,
-    mask: np.ndarray,
-    anchor_box: dict[str, float],
-    block: ComicTextBlock,
-) -> dict[str, float] | None:
-    if mask.size == 0 or np.count_nonzero(mask) == 0:
-        return None
-
-    component_count, labels, stats, _centroids = cv2.connectedComponentsWithStats(mask, connectivity=8)
-    if component_count <= 1:
-        return None
-
-    relevant_bounds: dict[str, float] | None = None
-    mask_height, mask_width = mask.shape
-    for component_index in range(1, component_count):
-        area = int(stats[component_index, cv2.CC_STAT_AREA])
-        if area < 3:
-            continue
-
-        component_box = {
-            "x": float(stats[component_index, cv2.CC_STAT_LEFT]),
-            "y": float(stats[component_index, cv2.CC_STAT_TOP]),
-            "width": float(stats[component_index, cv2.CC_STAT_WIDTH]),
-            "height": float(stats[component_index, cv2.CC_STAT_HEIGHT]),
-        }
-        if _component_is_probably_border_art(
-            component_box=component_box,
-            crop_width=mask_width,
-            crop_height=mask_height,
-        ):
-            continue
-        if not _component_is_relevant_for_text_area(
-            component_box=component_box,
-            anchor_box=anchor_box,
-            block=block,
-        ):
-            continue
-
-        if relevant_bounds is None:
-            relevant_bounds = component_box
-            continue
-
-        relevant_bounds = {
-            "x": min(relevant_bounds["x"], component_box["x"]),
-            "y": min(relevant_bounds["y"], component_box["y"]),
-            "width": max(
-                relevant_bounds["x"] + relevant_bounds["width"],
-                component_box["x"] + component_box["width"],
-            ) - min(relevant_bounds["x"], component_box["x"]),
-            "height": max(
-                relevant_bounds["y"] + relevant_bounds["height"],
-                component_box["y"] + component_box["height"],
-            ) - min(relevant_bounds["y"], component_box["y"]),
-        }
-
-    return relevant_bounds
 
 
 def build_detected_regions_from_recognized_lines(
