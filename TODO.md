@@ -52,6 +52,10 @@
 - [x] Create page editor shell
 - [x] Create overlay and mask editing interactions
 - [x] Create dialogue side panel
+- [ ] Create dual text workspace for extracted and translated text
+- [ ] Create script import UI with page markers
+- [ ] Create project style preset library
+- [ ] Create preset copy flow between projects
 
 ## Backend
 
@@ -60,6 +64,9 @@
 - [x] Create asset storage layer
 - [x] Create cleanup pipeline contract
 - [ ] Create OCR pipeline contract
+- [ ] Create script import parse/apply APIs
+- [ ] Create style preset APIs
+- [ ] Create typesetting apply/reflow APIs
 
 ## AI
 
@@ -69,6 +76,8 @@
 - [ ] Create translation adapter
 - [ ] Create matching heuristics
 - [ ] Create typesetting heuristics
+- [ ] Create auto-fit typesetting engine
+- [ ] Preserve manual placement locks during reflow
 
 ## Export
 
@@ -77,6 +86,7 @@
 - [x] Define PSD renderer
 - [ ] Define export manifest format
 - [ ] Define font fallback and missing-font behavior
+- [ ] Align export text rendering with preset library
 
 ## Operations
 

@@ -177,6 +177,33 @@ Done when:
 
 ### E8-T6 Language-aware font fallback model
 
+### E8-T7 Dual text workspace
+
+- extracted text panel
+- translated text panel
+- dialogue to region selection sync
+
+### E8-T8 Script import parser
+
+- parse `[1]`, `[2]`, `[3]` page markers
+- support multi-page import preview
+- apply imported lines to dialogues or translations
+
+### E8-T9 Preset library by project
+
+- CRUD for presets
+- default preset selection
+- preset categories
+
+### E8-T10 Preset copy flow
+
+- copy one or more presets from another project
+
+### E8-T11 Placement lock and reflow safety
+
+- preserve manual typesetting edits
+- skip locked placements during automatic reflow
+
 Done when:
 
 - auto layout works and is editable
@@ -222,3 +249,13 @@ The first implementation sprint should contain only:
 - E2-T4
 
 This keeps the first sprint focused on contracts and scaffolding instead of accidental feature work.
+
+## Recommended Next Sprint
+
+The next typesetting-focused sprint should contain only:
+
+- E8-T5
+- E8-T7
+- E8-T8
+
+This keeps the first typesetting sprint focused on text workspace and preset foundations before automatic layout logic.
