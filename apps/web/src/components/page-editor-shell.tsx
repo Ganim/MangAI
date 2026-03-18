@@ -251,6 +251,7 @@ export function PageEditorShell({
   const [showTextAreas, setShowTextAreas] = useState(true);
   const [showPanelAreas, setShowPanelAreas] = useState(false);
   const [showBalloonGroups, setShowBalloonGroups] = useState(false);
+  const [showOverlayLabels, setShowOverlayLabels] = useState(true);
   const [selectedRegionArea, setSelectedRegionArea] = useState<RegionAreaKind>("context_area");
   const [activeRegionTransform, setActiveRegionTransform] = useState<ActiveRegionTransform | null>(null);
   const [regionAreaDraft, setRegionAreaDraft] = useState<RegionAreaDraft | null>(null);
@@ -2376,6 +2377,15 @@ export function PageEditorShell({
                 </button>
                 <button
                   className="ghost-button"
+                  onClick={() => setShowOverlayLabels((currentValue) => !currentValue)}
+                  type="button"
+                >
+                  {showOverlayLabels
+                    ? messages.editor.hideOverlayLabelsAction
+                    : messages.editor.showOverlayLabelsAction}
+                </button>
+                <button
+                  className="ghost-button"
                   onClick={() => setShowPanelAreas((currentValue) => !currentValue)}
                   type="button"
                 >
@@ -2467,12 +2477,16 @@ export function PageEditorShell({
                           key={overlay.id}
                           style={getBoundingBoxOverlayStyle(overlay.bounding_box, currentPage)}
                         >
-                          <span className="editor-structure-chip">
-                            {formatPanelOverlayLabel(overlay, index)}
-                          </span>
-                          <span className="editor-structure-caption">
-                            {messages.editor.panelAreaLabel}
-                          </span>
+                          {showOverlayLabels ? (
+                            <>
+                              <span className="editor-structure-chip">
+                                {formatPanelOverlayLabel(overlay, index)}
+                              </span>
+                              <span className="editor-structure-caption">
+                                {messages.editor.panelAreaLabel}
+                              </span>
+                            </>
+                          ) : null}
                         </div>
                       );
                     })
@@ -2493,12 +2507,16 @@ export function PageEditorShell({
                           key={overlay.id}
                           style={getBoundingBoxOverlayStyle(overlay.bounding_box, currentPage)}
                         >
-                          <span className="editor-structure-chip">
-                            {formatBalloonGroupOverlayLabel(overlay, index)}
-                          </span>
-                          <span className="editor-structure-caption">
-                            {messages.editor.balloonGroupLabel}
-                          </span>
+                          {showOverlayLabels ? (
+                            <>
+                              <span className="editor-structure-chip">
+                                {formatBalloonGroupOverlayLabel(overlay, index)}
+                              </span>
+                              <span className="editor-structure-caption">
+                                {messages.editor.balloonGroupLabel}
+                              </span>
+                            </>
+                          ) : null}
                         </div>
                       );
                     })
@@ -2528,12 +2546,16 @@ export function PageEditorShell({
                           )}
                           type="button"
                         >
-                          <span className="editor-region-chip">
-                            {regionDisplayLabels.get(region.id) ?? `R${String(index + 1).padStart(2, "0")}`}
-                          </span>
-                          <span className="editor-region-caption">
-                            {messages.editor.regionTypeLabels[region.type]}
-                          </span>
+                          {showOverlayLabels ? (
+                            <>
+                              <span className="editor-region-chip">
+                                {regionDisplayLabels.get(region.id) ?? `R${String(index + 1).padStart(2, "0")}`}
+                              </span>
+                              <span className="editor-region-caption">
+                                {messages.editor.regionTypeLabels[region.type]}
+                              </span>
+                            </>
+                          ) : null}
                         </button>
                       );
                     })
@@ -2563,12 +2585,16 @@ export function PageEditorShell({
                           )}
                           type="button"
                         >
-                          <span className="editor-region-chip">
-                            {regionDisplayLabels.get(region.id) ?? `R${String(index + 1).padStart(2, "0")}`}
-                          </span>
-                          <span className="editor-region-caption">
-                            {messages.editor.areaKindLabels.text_area}
-                          </span>
+                          {showOverlayLabels ? (
+                            <>
+                              <span className="editor-region-chip">
+                                {regionDisplayLabels.get(region.id) ?? `R${String(index + 1).padStart(2, "0")}`}
+                              </span>
+                              <span className="editor-region-caption">
+                                {messages.editor.areaKindLabels.text_area}
+                              </span>
+                            </>
+                          ) : null}
                         </button>
                       );
                     })

@@ -792,15 +792,23 @@ button:hover {
 }
 
 .editor-region-overlay-text-area {
+  --region-accent: rgba(47, 122, 72, 0.9);
+  --region-fill: rgba(92, 164, 116, 0.1);
   border-style: dashed;
   border-width: 2px;
-  background: rgba(255, 252, 247, 0.74);
+  background: rgba(245, 252, 247, 0.74);
   backdrop-filter: blur(4px);
   z-index: 32;
 }
 
+.editor-region-overlay-text-area .editor-region-chip {
+  background: rgba(245, 252, 247, 0.96);
+  color: rgba(35, 101, 58, 0.96);
+}
+
 .editor-region-overlay-text-area .editor-region-caption {
-  background: rgba(255, 252, 247, 0.94);
+  background: rgba(245, 252, 247, 0.94);
+  color: rgba(35, 101, 58, 0.96);
 }
 
 .editor-region-chip {

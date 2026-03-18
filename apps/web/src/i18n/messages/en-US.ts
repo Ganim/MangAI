@@ -275,6 +275,8 @@ export type AppMessages = {
     hideContextAreasAction: string;
     showTextAreasAction: string;
     hideTextAreasAction: string;
+    showOverlayLabelsAction: string;
+    hideOverlayLabelsAction: string;
     showPanelAreasAction: string;
     hidePanelAreasAction: string;
     showBalloonGroupsAction: string;
@@ -690,6 +692,8 @@ export const enUSMessages: AppMessages = {
     hideContextAreasAction: "Hide context areas",
     showTextAreasAction: "Show text areas",
     hideTextAreasAction: "Hide text areas",
+    showOverlayLabelsAction: "Show labels",
+    hideOverlayLabelsAction: "Hide labels",
     showPanelAreasAction: "Show panel areas",
     hidePanelAreasAction: "Hide panel areas",
     showBalloonGroupsAction: "Show balloon groups",

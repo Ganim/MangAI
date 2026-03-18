@@ -369,6 +369,8 @@ export const ptBRMessages: AppMessages = {
     hideContextAreasAction: "Ocultar areas de contexto",
     showTextAreasAction: "Mostrar areas de texto",
     hideTextAreasAction: "Ocultar areas de texto",
+    showOverlayLabelsAction: "Mostrar rotulos",
+    hideOverlayLabelsAction: "Ocultar rotulos",
     showPanelAreasAction: "Mostrar areas de painel",
     hidePanelAreasAction: "Ocultar areas de painel",
     showBalloonGroupsAction: "Mostrar grupos de balao",
