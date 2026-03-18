@@ -250,6 +250,7 @@ export type AppMessages = {
     jobsEmpty: string;
     jobLoadErrorFallback: string;
     jobCreateErrorFallback: string;
+    cleanupRequiresRegionsFallback: string;
     queuedJobsNotice: string;
     runningJobsNotice: string;
     textLoadErrorFallback: string;
@@ -650,6 +651,7 @@ export const enUSMessages: AppMessages = {
     jobsEmpty: "No jobs have been queued for this page yet.",
     jobLoadErrorFallback: "The editor could not load the page job history.",
     jobCreateErrorFallback: "The editor could not queue the selected automation right now.",
+    cleanupRequiresRegionsFallback: "Create or keep at least one non-rejected region before running cleanup.",
     queuedJobsNotice:
       "There are queued jobs on this page. You can still reset or delete regions; queued region jobs will be cleared automatically.",
     runningJobsNotice:

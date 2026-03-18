@@ -327,6 +327,7 @@ export const ptBRMessages: AppMessages = {
     jobsEmpty: "Nenhum job foi enfileirado para esta pagina ainda.",
     jobLoadErrorFallback: "O editor nao conseguiu carregar o historico de jobs da pagina.",
     jobCreateErrorFallback: "O editor nao conseguiu enfileirar a automacao selecionada agora.",
+    cleanupRequiresRegionsFallback: "Crie ou mantenha ao menos uma regiao nao rejeitada antes de rodar a limpeza.",
     queuedJobsNotice:
       "Existem jobs na fila para esta pagina. Voce ainda pode resetar ou excluir regioes; os jobs pendentes de regiao serao limpos automaticamente.",
     runningJobsNotice:

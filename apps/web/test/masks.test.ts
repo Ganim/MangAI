@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildMaskRevisionInputFromRegion,
   countApprovedActiveMaskRevisions,
+  getCleanupMaskCandidateRegions,
   getActiveMaskRevisionForRegion,
   hasApprovedActiveMaskRevisions,
 } from "../src/features/projects/masks.ts";
@@ -56,5 +57,12 @@ assert.equal(getActiveMaskRevisionForRegion(maskRevisions, region.id)?.id, "3333
 assert.equal(countApprovedActiveMaskRevisions(maskRevisions), 1);
 assert.equal(hasApprovedActiveMaskRevisions(maskRevisions), true);
 assert.equal(getActiveMaskRevisionForRegion(maskRevisions, "99999999-9999-4999-8999-999999999999"), null);
+assert.deepEqual(
+  getCleanupMaskCandidateRegions([
+    { ...region, state: "approved" },
+    { ...region, id: "66666666-6666-4666-8666-666666666666", state: "rejected" },
+  ]).map((candidateRegion) => candidateRegion.id),
+  [region.id],
+);
 
 console.log("WEB_MASK_TESTS_OK");

@@ -10,6 +10,8 @@ type PolygonShape = {
 
 type RegionLike = {
   id: string;
+  type?: string;
+  state?: string;
   shape: PolygonShape;
 };
 
@@ -47,4 +49,8 @@ export function countApprovedActiveMaskRevisions(maskRevisions: MaskRevisionLike
 
 export function hasApprovedActiveMaskRevisions(maskRevisions: MaskRevisionLike[]) {
   return countApprovedActiveMaskRevisions(maskRevisions) > 0;
+}
+
+export function getCleanupMaskCandidateRegions(regions: RegionLike[]) {
+  return regions.filter((region) => region.state !== "rejected");
 }

@@ -35,6 +35,7 @@ import {
   countUnassignedDialogues,
 } from "../features/projects/automation.ts";
 import {
+  hasPendingPageJobs,
   hasPendingPageJobType,
   hasQueuedPageJobs,
   hasRunningPageJobs,
@@ -51,6 +52,7 @@ import {
 import {
   buildMaskRevisionInputFromRegion,
   countApprovedActiveMaskRevisions,
+  getCleanupMaskCandidateRegions,
   getActiveMaskRevisionForRegion,
   hasApprovedActiveMaskRevisions,
 } from "../features/projects/masks.ts";
@@ -607,7 +609,7 @@ export function PageEditorShell({
   }, [currentPage, messages.editor.textLoadErrorFallback, projectId]);
 
   useEffect(() => {
-    if (currentPage === null || !hasRunningPageJobs(jobs)) {
+    if (currentPage === null || !hasPendingPageJobs(jobs)) {
       return;
     }
 
@@ -1165,8 +1167,62 @@ export function PageEditorShell({
 
     setIsQueueingCleanup(true);
     setJobActionError(null);
+    setMaskActionError(null);
 
     try {
+      const cleanupCandidateRegions = getCleanupMaskCandidateRegions(regions);
+      if (cleanupCandidateRegions.length === 0) {
+        throw new Error(messages.editor.cleanupRequiresRegionsFallback);
+      }
+
+      let nextMaskRevisions = [...maskRevisions];
+      for (const region of cleanupCandidateRegions) {
+        const activeMaskRevision = getActiveMaskRevisionForRegion(nextMaskRevisions, region.id);
+        if (activeMaskRevision?.approved) {
+          continue;
+        }
+
+        if (activeMaskRevision !== null) {
+          const approvedMaskResponse = await updateMaskRevision(
+            projectId,
+            currentPage.id,
+            activeMaskRevision.id,
+            { approved: true },
+          );
+          nextMaskRevisions = nextMaskRevisions.map((maskRevision) =>
+            maskRevision.id === approvedMaskResponse.mask_revision.id
+              ? approvedMaskResponse.mask_revision
+              : maskRevision,
+          );
+          continue;
+        }
+
+        const createdMaskResponse = await createMaskRevision(
+          projectId,
+          currentPage.id,
+          buildMaskRevisionInputFromRegion(region),
+        );
+        nextMaskRevisions = [
+          ...nextMaskRevisions.filter(
+            (maskRevision) =>
+              !(maskRevision.region_id === createdMaskResponse.mask_revision.region_id && maskRevision.is_active),
+          ),
+          createdMaskResponse.mask_revision,
+        ];
+        const approvedMaskResponse = await updateMaskRevision(
+          projectId,
+          currentPage.id,
+          createdMaskResponse.mask_revision.id,
+          { approved: true },
+        );
+        nextMaskRevisions = nextMaskRevisions.map((maskRevision) =>
+          maskRevision.id === approvedMaskResponse.mask_revision.id
+            ? approvedMaskResponse.mask_revision
+            : maskRevision,
+        );
+      }
+
+      setMaskRevisions(nextMaskRevisions);
       const response = await createPageJob(projectId, currentPage.id, {
         type: "generate_cleanup",
       });
@@ -1192,6 +1248,7 @@ export function PageEditorShell({
         type: "run_ocr",
       });
       setJobs((currentJobs) => [response.job, ...currentJobs]);
+      await refreshProjectDetailState();
     } catch (error) {
       setJobActionError(getErrorMessage(error, messages.editor.jobCreateErrorFallback));
     } finally {
@@ -2003,7 +2060,7 @@ export function PageEditorShell({
                 disabled={
                   isQueueingCleanup
                   || hasPendingCleanupJob
-                  || !hasApprovedActiveMaskRevisions(maskRevisions)
+                  || getCleanupMaskCandidateRegions(regions).length === 0
                 }
                 onClick={() => void handleQueueCleanup()}
                 type="button"
