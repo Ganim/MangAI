@@ -1504,19 +1504,30 @@ def _fit_text_area_within_bounds(
     split_axis: str,
 ) -> dict[str, float]:
     effective_bounds = _intersect_bounding_boxes(preferred_bounds, fallback_context) or preferred_bounds
-    pad_x = _resolve_group_member_padding(text_area, axis="x", split_axis=split_axis)
-    pad_y = _resolve_group_member_padding(text_area, axis="y", split_axis=split_axis)
+    desired_pad_x = _resolve_group_member_padding(text_area, axis="x", split_axis=split_axis)
+    desired_pad_y = _resolve_group_member_padding(text_area, axis="y", split_axis=split_axis)
 
-    min_x = max(float(effective_bounds["x"]), float(text_area["x"]) - pad_x)
-    max_x = min(
-        float(effective_bounds["x"]) + float(effective_bounds["width"]),
-        float(text_area["x"]) + float(text_area["width"]) + pad_x,
-    )
-    min_y = max(float(effective_bounds["y"]), float(text_area["y"]) - pad_y)
-    max_y = min(
-        float(effective_bounds["y"]) + float(effective_bounds["height"]),
-        float(text_area["y"]) + float(text_area["height"]) + pad_y,
-    )
+    bounds_x1 = float(effective_bounds["x"])
+    bounds_y1 = float(effective_bounds["y"])
+    bounds_x2 = bounds_x1 + float(effective_bounds["width"])
+    bounds_y2 = bounds_y1 + float(effective_bounds["height"])
+    text_x1 = float(text_area["x"])
+    text_y1 = float(text_area["y"])
+    text_x2 = text_x1 + float(text_area["width"])
+    text_y2 = text_y1 + float(text_area["height"])
+
+    available_left = max(text_x1 - bounds_x1, 0.0)
+    available_right = max(bounds_x2 - text_x2, 0.0)
+    available_top = max(text_y1 - bounds_y1, 0.0)
+    available_bottom = max(bounds_y2 - text_y2, 0.0)
+
+    symmetric_pad_x = max(0.0, min(desired_pad_x, available_left, available_right))
+    symmetric_pad_y = max(0.0, min(desired_pad_y, available_top, available_bottom))
+
+    min_x = text_x1 - symmetric_pad_x
+    max_x = text_x2 + symmetric_pad_x
+    min_y = text_y1 - symmetric_pad_y
+    max_y = text_y2 + symmetric_pad_y
 
     fitted = _bounding_box(
         min_x,
