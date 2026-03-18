@@ -159,6 +159,13 @@ def build_detected_regions_from_comic_text_blocks(
                 page_width=page_width,
                 page_height=page_height,
             )
+            text_area = _tighten_text_area_to_local_dark_content(
+                text_area=text_area,
+                grayscale_image=grayscale_image,
+                page_width=page_width,
+                page_height=page_height,
+                vertical=fit.block.vertical,
+            )
         region_type = _classify_comic_text_block(
             block=fit.block,
             bounding_box=fit.bounding_box,
@@ -1124,6 +1131,71 @@ def _refine_text_area_within_context_crop(
     ):
         return fallback_text_area
     return final_box
+
+
+def _tighten_text_area_to_local_dark_content(
+    *,
+    text_area: dict[str, float],
+    grayscale_image: np.ndarray,
+    page_width: int,
+    page_height: int,
+    vertical: bool,
+) -> dict[str, float]:
+    x1 = max(int(np.floor(text_area["x"])), 0)
+    y1 = max(int(np.floor(text_area["y"])), 0)
+    x2 = min(int(np.ceil(text_area["x"] + text_area["width"])), grayscale_image.shape[1])
+    y2 = min(int(np.ceil(text_area["y"] + text_area["height"])), grayscale_image.shape[0])
+    if x2 <= x1 or y2 <= y1:
+        return text_area
+
+    crop = grayscale_image[y1:y2, x1:x2]
+    if crop.size == 0:
+        return text_area
+
+    blurred = cv2.GaussianBlur(crop, (3, 3), 0)
+    threshold_value, _ = cv2.threshold(
+        blurred,
+        0,
+        255,
+        cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU,
+    )
+    effective_threshold = int(min(max(threshold_value, 72), 188))
+    dark_mask = (blurred <= effective_threshold).astype(np.uint8) * 255
+    dark_mask = _remove_anchor_boundary_artifacts(dark_mask)
+    if np.count_nonzero(dark_mask) == 0:
+        return text_area
+
+    y_values, x_values = np.nonzero(dark_mask)
+    if len(x_values) == 0:
+        return text_area
+
+    dark_x1 = int(np.min(x_values))
+    dark_y1 = int(np.min(y_values))
+    dark_x2 = int(np.max(x_values)) + 1
+    dark_y2 = int(np.max(y_values)) + 1
+
+    dark_width = max(dark_x2 - dark_x1, 1)
+    dark_height = max(dark_y2 - dark_y1, 1)
+    if vertical:
+        padding_x = min(7.0, max(3.0, dark_width * 0.08))
+        padding_y = min(10.0, max(4.0, dark_height * 0.05))
+    else:
+        padding_x = min(10.0, max(4.0, dark_width * 0.03))
+        padding_y = min(6.0, max(2.0, dark_height * 0.1))
+
+    tightened = _clamp_bounding_box(
+        x=x1 + dark_x1 - padding_x,
+        y=y1 + dark_y1 - padding_y,
+        width=dark_width + (padding_x * 2.0),
+        height=dark_height + (padding_y * 2.0),
+        page_width=page_width,
+        page_height=page_height,
+    )
+    width_gain = text_area["width"] - tightened["width"]
+    height_gain = text_area["height"] - tightened["height"]
+    if width_gain < 4.0 and height_gain < 4.0:
+        return text_area
+    return tightened
 
 
 def _dense_axis_mask(counts: np.ndarray, *, min_pixels: int) -> np.ndarray:

@@ -210,6 +210,37 @@ def test_build_detected_regions_from_comic_text_blocks_refines_horizontal_text_a
     assert candidate.context_area["width"] > candidate.text_area["width"]
 
 
+def test_build_detected_regions_from_comic_text_blocks_tightens_text_area_inside_balloon() -> None:
+    image = np.full((240, 220), 240, dtype=np.uint8)
+    cv2.ellipse(image, (112, 122), (54, 88), 0, 0, 360, 0, thickness=3)
+    image[42:204, 58:166] = 246
+    image[84:186, 102:110] = 12
+    image[84:186, 118:126] = 18
+
+    candidates = build_detected_regions_from_comic_text_blocks(
+        text_blocks=[
+            ComicTextBlock(
+                x=94,
+                y=72,
+                width=40,
+                height=130,
+                language="ja",
+                vertical=True,
+            )
+        ],
+        page_width=220,
+        page_height=240,
+        grayscale_image=image,
+    )
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate.text_area["width"] < 34
+    assert candidate.text_area["height"] < 122
+    assert candidate.text_area["x"] > 98
+    assert candidate.text_area["y"] > 78
+
+
 def test_build_detected_regions_from_comic_text_blocks_splits_merged_balloon_component() -> None:
     image = np.zeros((260, 340), dtype=np.uint8)
     cv2.circle(image, (118, 130), 62, 245, thickness=-1)
