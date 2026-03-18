@@ -333,6 +333,7 @@ export type AppMessages = {
     cleanupPreviewEmpty: string;
     originalPreviewLabel: string;
     cleanedPreviewLabel: string;
+    compareSliderLabel: string;
   };
 };
 
@@ -756,5 +757,6 @@ export const enUSMessages: AppMessages = {
       "No cleaned preview exists yet. Approve at least one active mask and queue cleanup to generate the first comparison.",
     originalPreviewLabel: "Original",
     cleanedPreviewLabel: "Cleanup preview",
+    compareSliderLabel: "Cleanup compare slider",
   },
 };

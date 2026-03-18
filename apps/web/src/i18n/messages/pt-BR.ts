@@ -433,5 +433,6 @@ export const ptBRMessages: AppMessages = {
       "Ainda nao existe preview limpo. Aprove pelo menos uma mascara ativa e enfileire a limpeza para gerar a primeira comparacao.",
     originalPreviewLabel: "Original",
     cleanedPreviewLabel: "Preview limpo",
+    compareSliderLabel: "Slider de comparacao da limpeza",
   },
 };

@@ -35,6 +35,11 @@ import {
   countUnassignedDialogues,
 } from "../features/projects/automation.ts";
 import {
+  getCompareDividerStyle,
+  getCompareRevealStyle,
+  resolveComparePositionFromSliderValue,
+} from "../features/projects/compare.ts";
+import {
   hasPendingPageJobs,
   hasPendingPageJobType,
   hasQueuedPageJobs,
@@ -254,6 +259,7 @@ export function PageEditorShell({
   const [showPanelAreas, setShowPanelAreas] = useState(false);
   const [showBalloonGroups, setShowBalloonGroups] = useState(false);
   const [showOverlayLabels, setShowOverlayLabels] = useState(true);
+  const [cleanupComparePosition, setCleanupComparePosition] = useState(50);
   const [selectedRegionArea, setSelectedRegionArea] = useState<RegionAreaKind>("context_area");
   const [activeRegionTransform, setActiveRegionTransform] = useState<ActiveRegionTransform | null>(null);
   const [regionAreaDraft, setRegionAreaDraft] = useState<RegionAreaDraft | null>(null);
@@ -2700,23 +2706,59 @@ export function PageEditorShell({
             </div>
 
             {currentPage.active_cleaned_asset_path ? (
-              <div className="editor-compare-grid">
-                <article className="editor-compare-card">
-                  <span className="card-step">{messages.editor.originalPreviewLabel}</span>
-                  <img
-                    alt={`${currentPage.file_name} original`}
-                    className="editor-compare-image"
-                    src={resolveApiAssetUrl(currentPage.original_asset_path)}
-                  />
-                </article>
-                <article className="editor-compare-card">
-                  <span className="card-step">{messages.editor.cleanedPreviewLabel}</span>
-                  <img
-                    alt={`${currentPage.file_name} cleaned`}
-                    className="editor-compare-image"
-                    src={resolveApiAssetUrl(currentPage.active_cleaned_asset_path)}
-                  />
-                </article>
+              <div className="editor-compare-slider-card">
+                <div className="editor-compare-slider">
+                  <div className="editor-compare-slider-header">
+                    <span className="card-step">{messages.editor.originalPreviewLabel}</span>
+                    <span className="card-step">{messages.editor.cleanedPreviewLabel}</span>
+                  </div>
+
+                  <div className="editor-compare-stage">
+                    <div
+                      className="editor-compare-stage-sizer"
+                      style={{
+                        aspectRatio: `${currentPage.width ?? 1000} / ${currentPage.height ?? 1400}`,
+                      }}
+                    />
+                    <img
+                      alt={`${currentPage.file_name} original`}
+                      className="editor-compare-image"
+                      draggable={false}
+                      src={resolveApiAssetUrl(currentPage.original_asset_path)}
+                    />
+                    <div
+                      className="editor-compare-reveal"
+                      style={getCompareRevealStyle(cleanupComparePosition)}
+                    >
+                      <img
+                        alt={`${currentPage.file_name} cleaned`}
+                        className="editor-compare-image"
+                        draggable={false}
+                        src={resolveApiAssetUrl(currentPage.active_cleaned_asset_path)}
+                      />
+                    </div>
+                    <div
+                      aria-hidden="true"
+                      className="editor-compare-divider"
+                      style={getCompareDividerStyle(cleanupComparePosition)}
+                    >
+                      <span className="editor-compare-handle" />
+                    </div>
+                    <input
+                      aria-label={messages.editor.compareSliderLabel}
+                      className="editor-compare-range"
+                      max="100"
+                      min="0"
+                      onChange={(event) =>
+                        setCleanupComparePosition(
+                          resolveComparePositionFromSliderValue(event.currentTarget.value),
+                        )
+                      }
+                      type="range"
+                      value={cleanupComparePosition}
+                    />
+                  </div>
+                </div>
               </div>
             ) : (
               <p className="empty-state">{messages.editor.cleanupPreviewEmpty}</p>
