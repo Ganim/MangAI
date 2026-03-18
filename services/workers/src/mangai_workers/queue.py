@@ -11,6 +11,7 @@ from uuid import uuid4
 import cv2
 import numpy as np
 
+from mangai_workers.cleanup import build_cleanup_mask_specs, render_cleaned_png
 from mangai_workers.config import WorkerSettings
 from mangai_workers.detection import detect_regions_from_asset
 from mangai_workers.ocr import OcrCandidateRegion, extract_ocr_lines_from_asset
@@ -222,6 +223,11 @@ def _apply_generate_cleanup_result(
     approved_masks = _get_mask_revisions(state, page_id, mask_revision_ids)
     if len(approved_masks) == 0:
         raise WorkerExecutionError("Cleanup jobs require at least one approved active mask revision.")
+    region_lookup = {
+        str(region.get("id")): region
+        for region in state.get("regions", [])
+        if str(region.get("page_id")) == page_id
+    }
 
     cleaned_asset = _build_cleaned_asset(
         project_id=project_id,
@@ -229,6 +235,7 @@ def _apply_generate_cleanup_result(
         cleaned_asset_id=str(result["cleaned_asset_id"]),
         source_asset=source_asset,
         approved_masks=approved_masks,
+        region_lookup=region_lookup,
         settings=settings,
         page_width=int(page.get("width") or 1000),
         page_height=int(page.get("height") or 1400),
@@ -1835,19 +1842,46 @@ def _build_cleaned_asset(
     cleaned_asset_id: str,
     source_asset: dict[str, Any],
     approved_masks: list[dict[str, Any]],
+    region_lookup: dict[str, dict[str, Any]],
     settings: WorkerSettings,
     page_width: int,
     page_height: int,
 ) -> dict[str, Any]:
-    storage_key = str(Path(project_id) / f"{cleaned_asset_id}.svg")
-    asset_path = settings.data_dir / "assets" / storage_key
-    asset_path.parent.mkdir(parents=True, exist_ok=True)
-
     source_asset_path = settings.data_dir / "assets" / str(source_asset["storage_key"])
     if not source_asset_path.exists():
         raise WorkerExecutionError(f"Could not find source asset '{source_asset['id']}'.")
 
     source_bytes = source_asset_path.read_bytes()
+    cleanup_masks = build_cleanup_mask_specs(
+        approved_masks=approved_masks,
+        region_lookup=region_lookup,
+    )
+    timestamp = _utcnow_iso()
+    raster_cleanup = render_cleaned_png(
+        source_bytes=source_bytes,
+        masks=cleanup_masks,
+    )
+    if raster_cleanup is not None:
+        storage_key = str(Path(project_id) / f"{cleaned_asset_id}.png")
+        asset_path = settings.data_dir / "assets" / storage_key
+        asset_path.parent.mkdir(parents=True, exist_ok=True)
+        asset_path.write_bytes(raster_cleanup)
+        return {
+            "id": cleaned_asset_id,
+            "project_id": project_id,
+            "page_id": page_id,
+            "kind": "cleaned",
+            "file_name": f"{page_id}-cleaned.png",
+            "storage_key": storage_key,
+            "mime_type": "image/png",
+            "size_bytes": len(raster_cleanup),
+            "created_at": timestamp,
+            "updated_at": timestamp,
+        }
+
+    storage_key = str(Path(project_id) / f"{cleaned_asset_id}.svg")
+    asset_path = settings.data_dir / "assets" / storage_key
+    asset_path.parent.mkdir(parents=True, exist_ok=True)
     svg_markup = _render_cleanup_svg(
         source_bytes=source_bytes,
         source_mime_type=str(source_asset["mime_type"]),
@@ -1857,7 +1891,6 @@ def _build_cleaned_asset(
     )
     serialized = svg_markup.encode("utf-8")
     asset_path.write_bytes(serialized)
-    timestamp = _utcnow_iso()
     return {
         "id": cleaned_asset_id,
         "project_id": project_id,

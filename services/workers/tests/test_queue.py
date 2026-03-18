@@ -1,6 +1,9 @@
 import json
 from pathlib import Path
 
+import cv2
+import numpy as np
+
 from mangai_workers.config import WorkerSettings
 import mangai_workers.queue as worker_queue
 from mangai_workers.queue import (
@@ -235,6 +238,27 @@ def seed_cleanup_state(data_dir) -> tuple[str, str]:
     asset_path.parent.mkdir(parents=True, exist_ok=True)
     asset_path.write_bytes(b"cleanup-worker-page" * 32)
     (data_dir / "state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
+    return page_id, project_id
+
+
+def seed_cleanup_png_state(data_dir) -> tuple[str, str]:
+    page_id, project_id = seed_cleanup_state(data_dir)
+    asset_path = data_dir / "assets" / f"{project_id}/33333333-3333-4333-8333-333333333333.png"
+    image = np.full((240, 320, 3), 255, dtype=np.uint8)
+    cv2.rectangle(image, (70, 50), (250, 180), (245, 245, 245), thickness=-1)
+    cv2.putText(
+        image,
+        "TEXT",
+        (92, 126),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        1.0,
+        (5, 5, 5),
+        2,
+        cv2.LINE_AA,
+    )
+    success, encoded = cv2.imencode(".png", image)
+    assert success
+    asset_path.write_bytes(encoded.tobytes())
     return page_id, project_id
 
 
@@ -987,6 +1011,40 @@ def test_process_next_job_generates_cleaned_asset_preview(tmp_path) -> None:
     assert svg_markup.startswith("<svg")
     assert "data:image/png;base64," in svg_markup
     assert "<polygon" in svg_markup
+
+
+def test_process_next_job_generates_png_cleanup_asset_for_real_image(tmp_path) -> None:
+    data_dir = tmp_path / "worker-data"
+    page_id, project_id = seed_cleanup_png_state(data_dir)
+    settings = WorkerSettings(data_dir=data_dir, poll_interval_seconds=0.01)
+
+    processed_job = process_next_job(settings)
+
+    assert processed_job is not None
+    assert processed_job["status"] == "succeeded"
+    assert processed_job["type"] == "generate_cleanup"
+    assert processed_job["result"]["page_id"] == page_id
+
+    state = json.loads((data_dir / "state.json").read_text(encoding="utf-8"))
+    page = state["pages"][0]
+    assert page["status"] == "cleaned"
+    assert page["active_cleaned_asset_path"].startswith(
+        f"/api/v1/projects/{project_id}/assets/"
+    )
+
+    cleaned_asset = next(asset for asset in state["assets"] if asset["kind"] == "cleaned")
+    assert cleaned_asset["mime_type"] == "image/png"
+    cleaned_asset_path = data_dir / "assets" / cleaned_asset["storage_key"]
+    assert cleaned_asset_path.exists()
+    cleaned_image = cv2.imdecode(
+        np.frombuffer(cleaned_asset_path.read_bytes(), dtype=np.uint8),
+        cv2.IMREAD_COLOR,
+    )
+    assert cleaned_image is not None
+    center_pixel = cleaned_image[120, 160]
+    assert int(center_pixel[0]) >= 235
+    assert int(center_pixel[1]) >= 235
+    assert int(center_pixel[2]) >= 235
 
 
 def test_process_next_job_runs_ocr_and_persists_preview_dialogues(tmp_path) -> None:
